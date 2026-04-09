@@ -1,0 +1,308 @@
+# ═══════════════════════════════════════════════════════════
+# INTEGRATIONS CONFIG — ATS + Data Sources
+# ═══════════════════════════════════════════════════════════
+#
+# Copy this to config/integrations.yml and fill in your keys.
+# Each integration feeds data into the Placement-Ops engine.
+#
+# HOW IT WORKS:
+# - Agency side: pulls job postings, candidate stages, client activity
+# - Company side: pulls employee data, hiring pipeline, offer metrics
+# - Both sides: competitive intel feeds from public data
+#
+# You don't need ALL of these. Start with your ATS + 1 data source.
+# The system degrades gracefully — missing integrations just mean
+# those sections show "manual entry" instead of auto-populated.
+
+# ═══════════════════════════════════════════════════════════
+# ATS CONNECTIONS — Where your recruiting data lives
+# ═══════════════════════════════════════════════════════════
+
+ats:
+  # Pick ONE primary ATS. Comment out the rest.
+
+  greenhouse:
+    enabled: false
+    api_key: ""                          # Settings → API → Create API Key
+    harvest_api_url: "https://harvest.greenhouse.io/v1"
+    # What to sync:
+    sync:
+      jobs: true                         # Open roles, JDs, hiring team
+      candidates: true                   # Candidate profiles, resumes
+      applications: true                 # Stage transitions, scorecards
+      offers: true                       # Offer details, accept/reject
+      scorecards: true                   # Interview feedback
+    # Sync frequency (minutes). 0 = manual only.
+    sync_interval: 30
+
+  lever:
+    enabled: false
+    api_key: ""                          # Settings → Integrations → API Credentials
+    base_url: "https://api.lever.co/v1"
+    sync:
+      postings: true
+      candidates: true
+      opportunities: true                # Lever's version of applications
+      offers: true
+      feedback: true
+    sync_interval: 30
+
+  ashby:
+    enabled: false
+    api_key: ""                          # Settings → API Keys → Create
+    base_url: "https://api.ashbyhq.com"
+    sync:
+      jobs: true
+      candidates: true
+      applications: true
+      offers: true
+      interview_schedules: true          # Ashby has great scheduling data
+    sync_interval: 30
+
+  workday:
+    enabled: false
+    # Workday requires OAuth2 + tenant config
+    tenant_url: ""                       # e.g., https://wd5-impl-services1.workday.com
+    client_id: ""
+    client_secret: ""
+    refresh_token: ""
+    sync:
+      workers: true                      # Employee records (company mode)
+      job_requisitions: true
+      candidates: true
+      compensation: true                 # Comp data (company mode)
+    sync_interval: 60
+
+  icims:
+    enabled: false
+    customer_id: ""
+    api_url: ""
+    username: ""
+    password: ""
+    sync:
+      jobs: true
+      people: true
+      workflows: true
+    sync_interval: 60
+
+  # ─── UNIVERSAL ATS ADAPTER ───
+  # If your ATS isn't listed above, use Merge.dev to connect 50+ ATS platforms
+  # through a single API. This is the easiest path for most setups.
+  merge:
+    enabled: false
+    api_key: ""                          # Get at merge.dev → API Keys
+    account_token: ""                    # Generated when you link your ATS
+    base_url: "https://api.merge.dev/api/ats/v1"
+    # Merge normalizes all ATS data into a common schema.
+    # These map to Merge's unified endpoints:
+    sync:
+      jobs: true                         # → /jobs
+      candidates: true                   # → /candidates
+      applications: true                 # → /applications
+      offers: true                       # → /offers
+      scorecards: true                   # → /scorecards
+      interviews: true                   # → /scheduled-interviews
+      departments: true                  # → /departments
+      offices: true                      # → /offices
+    sync_interval: 30
+
+
+# ═══════════════════════════════════════════════════════════
+# HRIS CONNECTIONS — Employee data (Company mode)
+# ═══════════════════════════════════════════════════════════
+
+hris:
+  # For company-side People-Ops: employee records, comp, org chart
+
+  bamboohr:
+    enabled: false
+    api_key: ""
+    subdomain: ""                        # yourcompany.bamboohr.com
+    sync:
+      employees: true                    # Name, role, department, start date
+      compensation: true                 # Salary, bonus, equity
+      time_off: true                     # PTO balance, usage patterns
+      performance: true                  # Review scores (if available)
+    sync_interval: 60
+
+  rippling:
+    enabled: false
+    api_key: ""
+    base_url: "https://api.rippling.com"
+    sync:
+      employees: true
+      compensation: true
+      departments: true
+      org_chart: true
+    sync_interval: 60
+
+  # Universal HRIS via Merge.dev
+  merge_hris:
+    enabled: false
+    api_key: ""
+    account_token: ""
+    base_url: "https://api.merge.dev/api/hris/v1"
+    sync:
+      employees: true                    # → /employees
+      employments: true                  # → /employments (job history)
+      teams: true                        # → /teams
+      pay_groups: true                   # → /pay-groups
+      locations: true                    # → /locations
+    sync_interval: 60
+
+
+# ═══════════════════════════════════════════════════════════
+# COMPETITIVE INTELLIGENCE SOURCES
+# ═══════════════════════════════════════════════════════════
+
+competitive_intel:
+
+  # ─── JOB POSTING AGGREGATORS ───
+  # These power the market hygiene analysis — what competitors are posting,
+  # comp ranges, role volume, location distribution.
+
+  # Built-in portal scanner (already in portals.yml)
+  portal_scanner:
+    enabled: true                        # Uses your portals.yml config
+    # No API key needed — uses Playwright/Greenhouse/WebSearch
+
+  # Google Jobs API (via SerpAPI or similar)
+  google_jobs:
+    enabled: false
+    serpapi_key: ""                       # serpapi.com — $50/mo for 5000 searches
+    # Define your competitive landscape:
+    search_queries:
+      - "machine learning engineer"
+      - "data engineer"
+      - "ML platform engineer"
+      - "AI engineer"
+      - "data scientist"
+    locations:
+      - "San Francisco, CA"
+      - "New York, NY"
+      - "Remote"
+    radius_miles: 50
+    # How often to scan competitors
+    scan_interval_hours: 24
+
+  # LinkedIn Job Postings (via Proxycurl or similar)
+  linkedin_jobs:
+    enabled: false
+    proxycurl_key: ""                    # proxycurl.com
+    # Track specific competitor companies:
+    competitor_companies:
+      - company_name: "Anthropic"
+        linkedin_url: "https://www.linkedin.com/company/anthropic"
+      - company_name: "OpenAI"
+        linkedin_url: "https://www.linkedin.com/company/openai"
+      - company_name: "Databricks"
+        linkedin_url: "https://www.linkedin.com/company/databricks"
+    scan_interval_hours: 48
+
+  # ─── COMPENSATION DATA ───
+
+  # Levels.fyi API (unofficial — scrape-based)
+  levels_fyi:
+    enabled: false
+    # No API key — uses WebSearch to pull public data
+    target_companies: []                 # Leave empty to use portals.yml companies
+    roles_to_track:
+      - "Machine Learning Engineer"
+      - "Data Engineer"
+      - "Software Engineer - ML"
+
+  # Glassdoor / Payscale (manual entry or scrape)
+  comp_sources:
+    glassdoor:
+      enabled: false
+      # No official API — data entered manually or via WebSearch
+    payscale:
+      enabled: false
+    builtin:
+      enabled: false
+      # Built In has good startup comp data
+
+  # ─── FUNDING & SIGNALS ───
+
+  crunchbase:
+    enabled: false
+    api_key: ""                          # crunchbase.com/home — Basic plan
+    track_categories:
+      - "artificial-intelligence"
+      - "machine-learning"
+      - "data-analytics"
+    # Funding events trigger hiring signals in forecast mode
+    signal_threshold_usd: 10000000       # Only alert on rounds > $10M
+
+  # PitchBook / CB Insights (enterprise — optional)
+  pitchbook:
+    enabled: false
+    api_key: ""
+
+
+# ═══════════════════════════════════════════════════════════
+# DATA MAPPING — How ATS fields map to Placement-Ops
+# ═══════════════════════════════════════════════════════════
+
+field_mapping:
+
+  # Agency mode: ATS → Pipeline
+  agency:
+    job_title: "requisition.title"
+    company: "requisition.company_name"
+    status: "application.current_stage"
+    candidate_name: "candidate.full_name"
+    candidate_email: "candidate.email"
+    resume_url: "candidate.resume_url"
+    scorecard: "application.scorecards"
+    offer_amount: "offer.salary"
+    stage_transitions: "application.stage_history"
+
+    # Map ATS stages to Placement-Ops pipeline states
+    stage_map:
+      # Greenhouse stages → Placement-Ops states
+      "Application Review": "Submitted"
+      "Recruiter Phone Screen": "Interviewing"
+      "Technical Interview": "Interviewing"
+      "Onsite Interview": "Interviewing"
+      "Reference Check": "Interviewing"
+      "Offer": "Offer Extended"
+      "Hired": "Placed"
+      "Rejected": "Rejected"
+
+  # Company mode: ATS + HRIS → People-Ops
+  company:
+    employee_name: "employee.full_name"
+    employee_email: "employee.email"
+    department: "employee.department"
+    title: "employee.job_title"
+    level: "employee.custom_fields.level"
+    start_date: "employee.start_date"
+    manager: "employee.manager"
+    compensation: "employee.compensation.base_salary"
+    location: "employee.location"
+
+
+# ═══════════════════════════════════════════════════════════
+# SYNC SETTINGS
+# ═══════════════════════════════════════════════════════════
+
+sync:
+  # Where synced data lands
+  data_dir: "data/synced"
+
+  # Files generated by sync
+  outputs:
+    pipeline_tsv: "data/synced/pipeline-ats.tsv"
+    candidates_dir: "data/synced/candidates/"
+    jobs_dir: "data/synced/jobs/"
+    employees_dir: "data/synced/employees/"         # Company mode
+    comp_benchmarks: "data/synced/comp-benchmarks.yml"
+    competitor_postings: "data/synced/competitor-postings.tsv"
+    market_signals: "data/synced/market-signals.yml"
+
+  # Conflict resolution: when manual pipeline data conflicts with ATS data
+  conflict_strategy: "ats_wins"          # ats_wins | manual_wins | ask
+
+  # Data retention
+  history_days: 365                      # Keep historical sync data for trending

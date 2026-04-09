@@ -1,0 +1,2658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Placement-Ops — Talent Engineering Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   PLACEMENT-OPS DASHBOARD — DESIGN SYSTEM
+   Dark theme, sharp edges, neon accents, data-dense layouts.
+   Think: Bloomberg Terminal meets Linear meets Vercel.
+   ═══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #111118;
+  --bg-card: #16161f;
+  --bg-card-hover: #1c1c28;
+  --bg-elevated: #1e1e2a;
+  --bg-input: #0d0d14;
+  --border: #2a2a3a;
+  --border-hover: #3a3a50;
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888a0;
+  --text-muted: #555570;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --accent-cyan: #06b6d4;
+  --accent-green: #10b981;
+  --accent-orange: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-pink: #ec4899;
+  --gradient-primary: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  --gradient-green: linear-gradient(135deg, #10b981, #06b6d4);
+  --gradient-orange: linear-gradient(135deg, #f59e0b, #ef4444);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+  --shadow-glow-blue: 0 0 20px rgba(59,130,246,0.15);
+  --shadow-glow-green: 0 0 20px rgba(16,185,129,0.15);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --sidebar-width: 240px;
+  --header-height: 56px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ═══ LAYOUT ═══ */
+.app { display: flex; height: 100vh; }
+
+/* ═══ SIDEBAR ═══ */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.sidebar-logo {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-logo h1 {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sidebar-logo span {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  display: block;
+  margin-top: 2px;
+}
+
+.sidebar-section {
+  padding: 16px 12px 4px;
+}
+
+.sidebar-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+
+.sidebar-nav { padding: 4px 12px; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+  position: relative;
+  user-select: none;
+}
+
+.nav-item:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: rgba(59,130,246,0.1);
+  color: var(--accent-blue);
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  background: var(--accent-blue);
+  border-radius: 0 2px 2px 0;
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.nav-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(59,130,246,0.15);
+  color: var(--accent-blue);
+}
+
+.nav-badge.green { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.nav-badge.orange { background: rgba(245,158,11,0.15); color: var(--accent-orange); }
+.nav-badge.red { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-footer-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ═══ MAIN CONTENT ═══ */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  height: var(--header-height);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+}
+
+.header-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.header-breadcrumb {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  background: var(--bg-card);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.header-stat .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  scroll-behavior: smooth;
+}
+
+.content::-webkit-scrollbar { width: 6px; }
+.content::-webkit-scrollbar-track { background: transparent; }
+.content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.content::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+
+/* ═══ VIEW TRANSITIONS ═══ */
+.view { display: none; animation: fadeIn 0.3s ease; }
+.view.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══ CARDS & CONTAINERS ═══ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+
+.card:hover { border-color: var(--border-hover); }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.card-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.card-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+/* ═══ GRID LAYOUTS ═══ */
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+.grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+
+/* ═══ KPI CARDS ═══ */
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
+.kpi-card.blue::before { background: var(--gradient-primary); }
+.kpi-card.green::before { background: var(--gradient-green); }
+.kpi-card.orange::before { background: var(--gradient-orange); }
+.kpi-card.purple::before { background: linear-gradient(135deg, #8b5cf6, #ec4899); }
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.kpi-value.blue { color: var(--accent-blue); }
+.kpi-value.green { color: var(--accent-green); }
+.kpi-value.orange { color: var(--accent-orange); }
+.kpi-value.purple { color: var(--accent-purple); }
+
+.kpi-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.kpi-change.up { background: rgba(16,185,129,0.1); color: var(--accent-green); }
+.kpi-change.down { background: rgba(239,68,68,0.1); color: var(--accent-red); }
+
+/* ═══ TABLES ═══ */
+.table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+td {
+  padding: 12px;
+  border-bottom: 1px solid rgba(42,42,58,0.5);
+  vertical-align: middle;
+}
+
+tr:hover td { background: rgba(59,130,246,0.03); }
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-pill.active { background: rgba(16,185,129,0.12); color: var(--accent-green); }
+.status-pill.interviewing { background: rgba(59,130,246,0.12); color: var(--accent-blue); }
+.status-pill.submitted { background: rgba(139,92,246,0.12); color: var(--accent-purple); }
+.status-pill.offer { background: rgba(245,158,11,0.12); color: var(--accent-orange); }
+.status-pill.placed { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.status-pill.sourcing { background: rgba(6,182,212,0.12); color: var(--accent-cyan); }
+.status-pill.rejected { background: rgba(239,68,68,0.1); color: var(--accent-red); }
+
+.company-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.company-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.company-name { font-weight: 600; }
+.company-role { font-size: 11px; color: var(--text-muted); }
+
+/* ═══ SCORE BARS ═══ */
+.score-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-input);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.score-bar-value {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ═══ TERMINAL OUTPUT ═══ */
+.terminal {
+  background: #0c0c14;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.terminal-header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.terminal-dot.red { background: #ff5f57; }
+.terminal-dot.yellow { background: #ffbd2e; }
+.terminal-dot.green { background: #28c840; }
+
+.terminal-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.terminal-body {
+  padding: 16px 20px;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 500px;
+}
+
+.terminal-body::-webkit-scrollbar { width: 4px; height: 4px; }
+.terminal-body::-webkit-scrollbar-track { background: transparent; }
+.terminal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.terminal-inner {
+  display: inline-block;
+  min-width: 100%;
+}
+
+.term-line { white-space: pre; display: block; }
+.term-green { color: var(--accent-green); }
+.term-blue { color: var(--accent-blue); }
+.term-cyan { color: var(--accent-cyan); }
+.term-purple { color: var(--accent-purple); }
+.term-orange { color: var(--accent-orange); }
+.term-red { color: var(--accent-red); }
+.term-yellow { color: #fbbf24; }
+.term-dim { color: var(--text-muted); }
+.term-bold { font-weight: 700; }
+.term-pink { color: var(--accent-pink); }
+.term-white { color: #ffffff; }
+
+/* ═══ COMPATIBILITY MATRIX ═══ */
+.matrix-grid {
+  display: grid;
+  gap: 2px;
+}
+
+.matrix-cell {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.matrix-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.matrix-bar-wrap {
+  flex: 1;
+  margin: 0 12px;
+  height: 8px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.matrix-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.matrix-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 30px;
+  text-align: right;
+}
+
+/* ═══ FUNNEL ═══ */
+.funnel-stage {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.funnel-bar-wrap {
+  flex: 1;
+  position: relative;
+}
+
+.funnel-bar {
+  height: 36px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.funnel-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 60%, rgba(255,255,255,0.05));
+}
+
+.funnel-label {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 100px;
+  color: var(--text-secondary);
+}
+
+.funnel-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  position: relative;
+  z-index: 1;
+}
+
+.funnel-rate {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* ═══ CHARTS ═══ */
+.chart-container {
+  position: relative;
+  height: 220px;
+}
+
+/* ═══ HEAT MAP ═══ */
+.heatmap-row {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 3px;
+}
+
+.heatmap-cell {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.heatmap-cell:hover { transform: scale(1.2); z-index: 2; }
+
+.heatmap-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 80px;
+  text-align: right;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* ═══ RETENTION TIMELINE ═══ */
+.timeline {
+  position: relative;
+  padding-left: 24px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 24px;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -20px;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid;
+}
+
+.timeline-dot.completed { background: var(--accent-green); border-color: var(--accent-green); }
+.timeline-dot.current { background: var(--accent-blue); border-color: var(--accent-blue); animation: pulse-dot 2s infinite; }
+.timeline-dot.upcoming { background: transparent; border-color: var(--text-muted); }
+
+.timeline-date {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.timeline-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.timeline-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ═══ STRATEGY ORG CHART ═══ */
+.org-chart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.org-node {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 12px;
+  text-align: center;
+  min-width: 140px;
+}
+
+.org-node.existing { border-color: var(--accent-green); background: rgba(16,185,129,0.08); }
+.org-node.new-hire { border-color: var(--accent-blue); background: rgba(59,130,246,0.08); border-style: dashed; }
+
+.org-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.org-connector {
+  width: 2px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 auto;
+}
+
+/* ═══ SECTION HEADERS ═══ */
+.section-header {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.section-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
+.mb-24 { margin-bottom: 24px; }
+.mt-24 { margin-top: 24px; }
+
+/* ═══ TAGS ═══ */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-right: 4px;
+  margin-bottom: 4px;
+}
+
+.tag.blue { background: rgba(59,130,246,0.12); color: var(--accent-blue); }
+.tag.green { background: rgba(16,185,129,0.12); color: var(--accent-green); }
+.tag.purple { background: rgba(139,92,246,0.12); color: var(--accent-purple); }
+.tag.orange { background: rgba(245,158,11,0.12); color: var(--accent-orange); }
+.tag.cyan { background: rgba(6,182,212,0.12); color: var(--accent-cyan); }
+
+/* ═══ SIGNAL CARDS ═══ */
+.signal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  transition: border-color 0.2s;
+}
+
+.signal-card:hover { border-color: var(--border-hover); }
+
+.signal-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.signal-content { flex: 1; }
+
+.signal-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.signal-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.signal-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  display: flex;
+  gap: 12px;
+}
+
+.signal-strength {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 800;
+  align-self: center;
+}
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 1200px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .grid-3, .grid-2-1, .grid-1-2 { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>PLACEMENT-OPS</h1>
+      <span>Talent Engineering</span>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Overview</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showView('dashboard')">
+        <span class="nav-icon">⬡</span> Dashboard
+      </div>
+    </nav>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Core Ops</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="showView('scan')">
+        <span class="nav-icon">◎</span> Scan
+        <span class="nav-badge green">12</span>
+      </div>
+      <div class="nav-item" onclick="showView('evaluate')">
+        <span class="nav-icon">◈</span> Evaluate
+      </div>
+      <div class="nav-item" onclick="showView('pipeline')">
+        <span class="nav-icon">▤</span> Pipeline
+        <span class="nav-badge">24</span>
+      </div>
+      <div class="nav-item" onclick="showView('batch')">
+        <span class="nav-icon">⧉</span> Batch
+      </div>
+    </nav>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Intelligence</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="showView('analytics')">
+        <span class="nav-icon">◐</span> Analytics
+      </div>
+      <div class="nav-item" onclick="showView('forecast')">
+        <span class="nav-icon">◬</span> Forecast
+        <span class="nav-badge orange">3</span>
+      </div>
+      <div class="nav-item" onclick="showView('benchmark')">
+        <span class="nav-icon">◧</span> Benchmark
+      </div>
+    </nav>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Strategy</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="showView('strategy')">
+        <span class="nav-icon">◆</span> Strategy
+      </div>
+      <div class="nav-item" onclick="showView('retention')">
+        <span class="nav-icon">◉</span> Retention
+        <span class="nav-badge green">93%</span>
+      </div>
+      <div class="nav-item" onclick="showView('calibrate')">
+        <span class="nav-icon">⟳</span> Calibrate
+      </div>
+    </nav>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Data</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="showView('marketintel')">
+        <span class="nav-icon">⬢</span> Market Intel
+        <span class="nav-badge" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan)">87</span>
+      </div>
+      <div class="nav-item" onclick="showView('integrations')">
+        <span class="nav-icon">⟡</span> Integrations
+        <span class="nav-badge green">Live</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-text">v2.1 · 16 modes · MIT</div>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN ═══ -->
+  <div class="main">
+    <header class="header">
+      <span class="header-title" id="headerTitle">Dashboard</span>
+      <span class="header-breadcrumb" id="headerBreadcrumb">Overview</span>
+      <div class="header-right">
+        <div class="header-stat">
+          <span class="dot"></span>
+          <span>154 portals tracked</span>
+        </div>
+        <div class="header-stat">
+          <span style="color:var(--accent-green);font-weight:700;">$48.2K</span>
+          <span>pipeline value</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="content" id="content">
+
+      <!-- ═══════════════════════════════════════════════════
+           DASHBOARD VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view active" id="view-dashboard">
+        <div class="section-header">
+          <div class="section-title">Command Center</div>
+          <div class="section-desc">Real-time overview of your talent engineering operations</div>
+        </div>
+
+        <!-- KPI ROW -->
+        <div class="grid-4 mb-24">
+          <div class="kpi-card blue">
+            <div class="kpi-label">Active Searches</div>
+            <div class="kpi-value blue">24</div>
+            <div class="kpi-change up">↑ 3 this week</div>
+          </div>
+          <div class="kpi-card green">
+            <div class="kpi-label">Placements YTD</div>
+            <div class="kpi-value green">7</div>
+            <div class="kpi-change up">↑ 2 this quarter</div>
+          </div>
+          <div class="kpi-card orange">
+            <div class="kpi-label">Revenue YTD</div>
+            <div class="kpi-value orange">$182K</div>
+            <div class="kpi-change up">↑ 34% vs Q1 target</div>
+          </div>
+          <div class="kpi-card purple">
+            <div class="kpi-label">Avg Score-to-Place</div>
+            <div class="kpi-value purple">4.3</div>
+            <div class="kpi-change up">↑ 0.2 from calibration</div>
+          </div>
+        </div>
+
+        <!-- PIPELINE + REVENUE ROW -->
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Pipeline Velocity</div>
+                <div class="card-subtitle">Submissions → Placements over time</div>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="pipelineChart"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Revenue by Month</div>
+                <div class="card-subtitle">Placed revenue + projected pipeline</div>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="revenueChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTIVE PIPELINE TABLE -->
+        <div class="card mb-24">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Hot Pipeline</div>
+              <div class="card-subtitle">Candidates most likely to close in the next 30 days</div>
+            </div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Company</th>
+                  <th>Role</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>Fee Est</th>
+                  <th>Days Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Alice Chen</strong></td>
+                  <td>
+                    <div class="company-cell">
+                      <div class="company-logo" style="background:rgba(59,130,246,0.15);color:var(--accent-blue)">A</div>
+                      <div><div class="company-name">Anthropic</div><div class="company-role">Frontier AI</div></div>
+                    </div>
+                  </td>
+                  <td>Sr. Agent Engineer</td>
+                  <td><span style="color:var(--accent-green);font-weight:700;font-family:'JetBrains Mono'">4.6</span></td>
+                  <td><span class="status-pill offer">● Offer Stage</span></td>
+                  <td style="font-family:'JetBrains Mono';font-weight:600;color:var(--accent-green)">$52K</td>
+                  <td style="color:var(--text-muted)">18d</td>
+                </tr>
+                <tr>
+                  <td><strong>Marcus Rivera</strong></td>
+                  <td>
+                    <div class="company-cell">
+                      <div class="company-logo" style="background:rgba(139,92,246,0.15);color:var(--accent-purple)">D</div>
+                      <div><div class="company-name">Databricks</div><div class="company-role">Data Platform</div></div>
+                    </div>
+                  </td>
+                  <td>Staff MLE</td>
+                  <td><span style="color:var(--accent-green);font-weight:700;font-family:'JetBrains Mono'">4.4</span></td>
+                  <td><span class="status-pill interviewing">● Final Round</span></td>
+                  <td style="font-family:'JetBrains Mono';font-weight:600;color:var(--accent-green)">$48K</td>
+                  <td style="color:var(--text-muted)">24d</td>
+                </tr>
+                <tr>
+                  <td><strong>Priya Patel</strong></td>
+                  <td>
+                    <div class="company-cell">
+                      <div class="company-logo" style="background:rgba(245,158,11,0.15);color:var(--accent-orange)">S</div>
+                      <div><div class="company-name">Scale AI</div><div class="company-role">AI Infrastructure</div></div>
+                    </div>
+                  </td>
+                  <td>Data Eng Manager</td>
+                  <td><span style="color:var(--accent-blue);font-weight:700;font-family:'JetBrains Mono'">4.2</span></td>
+                  <td><span class="status-pill interviewing">● Interviewing</span></td>
+                  <td style="font-family:'JetBrains Mono';font-weight:600;color:var(--accent-orange)">$46K</td>
+                  <td style="color:var(--text-muted)">12d</td>
+                </tr>
+                <tr>
+                  <td><strong>James Okafor</strong></td>
+                  <td>
+                    <div class="company-cell">
+                      <div class="company-logo" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan)">O</div>
+                      <div><div class="company-name">OpenAI</div><div class="company-role">Frontier AI</div></div>
+                    </div>
+                  </td>
+                  <td>Research Engineer</td>
+                  <td><span style="color:var(--accent-blue);font-weight:700;font-family:'JetBrains Mono'">4.1</span></td>
+                  <td><span class="status-pill submitted">● Submitted</span></td>
+                  <td style="font-family:'JetBrains Mono';font-weight:600;color:var(--accent-orange)">$55K</td>
+                  <td style="color:var(--text-muted)">6d</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ACTIONS + SCAN RESULTS -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Action Items Today</div>
+              <span class="card-badge" style="background:rgba(239,68,68,0.12);color:var(--accent-red)">4 overdue</span>
+            </div>
+            <div class="signal-card" style="border-left:3px solid var(--accent-red)">
+              <div class="signal-content">
+                <div class="signal-title">Follow up: Alice Chen offer</div>
+                <div class="signal-desc">Anthropic extended verbal offer 2 days ago. Need written confirmation.</div>
+                <div class="signal-meta"><span>Overdue by 1 day</span><span>$52K at stake</span></div>
+              </div>
+            </div>
+            <div class="signal-card" style="border-left:3px solid var(--accent-orange)">
+              <div class="signal-content">
+                <div class="signal-title">Prep Marcus for Databricks final</div>
+                <div class="signal-desc">System design interview Thursday. Run /placement-ops prep.</div>
+                <div class="signal-meta"><span>Due tomorrow</span><span>$48K at stake</span></div>
+              </div>
+            </div>
+            <div class="signal-card" style="border-left:3px solid var(--accent-blue)">
+              <div class="signal-content">
+                <div class="signal-title">30-day check-in: Wei Zhang at Stripe</div>
+                <div class="signal-desc">Placed March 8. First retention check-in due.</div>
+                <div class="signal-meta"><span>Due today</span><span>Retention tracking</span></div>
+              </div>
+            </div>
+            <div class="signal-card" style="border-left:3px solid var(--accent-cyan)">
+              <div class="signal-content">
+                <div class="signal-title">Submit James to OpenAI</div>
+                <div class="signal-desc">Score: 4.1 — above threshold. Package ready to send.</div>
+                <div class="signal-meta"><span>Due today</span><span>$55K potential</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Latest Scan Results</div>
+              <span class="card-badge" style="background:rgba(16,185,129,0.12);color:var(--accent-green)">12 new</span>
+            </div>
+            <div class="signal-card">
+              <div class="signal-icon" style="background:rgba(59,130,246,0.12)">🔍</div>
+              <div class="signal-content">
+                <div class="signal-title">Anthropic — ML Platform Engineer</div>
+                <div class="signal-desc">SF/Remote · $220-280K · Posted 2 days ago</div>
+                <div style="margin-top:6px">
+                  <span class="tag blue">PyTorch</span><span class="tag purple">K8s</span><span class="tag cyan">MLflow</span>
+                </div>
+              </div>
+            </div>
+            <div class="signal-card">
+              <div class="signal-icon" style="background:rgba(139,92,246,0.12)">🔍</div>
+              <div class="signal-content">
+                <div class="signal-title">Databricks — Staff Data Engineer</div>
+                <div class="signal-desc">Remote · $250-320K · Posted 1 day ago</div>
+                <div style="margin-top:6px">
+                  <span class="tag blue">Spark</span><span class="tag purple">Delta Lake</span><span class="tag green">dbt</span>
+                </div>
+              </div>
+            </div>
+            <div class="signal-card">
+              <div class="signal-icon" style="background:rgba(245,158,11,0.12)">🔍</div>
+              <div class="signal-content">
+                <div class="signal-title">Scale AI — Head of ML Engineering</div>
+                <div class="signal-desc">SF · $300-400K + equity · Posted today</div>
+                <div style="margin-top:6px">
+                  <span class="tag orange">Leadership</span><span class="tag blue">LLM</span><span class="tag purple">Infra</span>
+                </div>
+              </div>
+            </div>
+            <div class="signal-card">
+              <div class="signal-icon" style="background:rgba(16,185,129,0.12)">🔍</div>
+              <div class="signal-content">
+                <div class="signal-title">Stripe — Senior ML Engineer</div>
+                <div class="signal-desc">Remote US · $200-260K · Posted 3 days ago</div>
+                <div style="margin-top:6px">
+                  <span class="tag green">Python</span><span class="tag blue">TensorFlow</span><span class="tag cyan">Ray</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           SCAN VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-scan">
+        <div class="section-header">
+          <div class="section-title">Portal Scanner</div>
+          <div class="section-desc">Crawling 154 company portals across 14 categories</div>
+        </div>
+
+        <div class="terminal mb-24">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">placement-ops scan — April 8, 2026</div>
+          </div>
+          <div class="terminal-body"><div class="terminal-inner">
+<span class="term-line"><span class="term-cyan term-bold">PLACEMENT-OPS SCAN</span> <span class="term-dim">— 154 portals · Data/ML/AI niche</span></span>
+<span class="term-line"><span class="term-dim">═══════════════════════════════════════════════════════════</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-green">✓</span> <span class="term-bold">Frontier AI Labs</span> <span class="term-dim">(13 portals)</span></span>
+<span class="term-line">  <span class="term-green">●</span> Anthropic        <span class="term-blue">3 new roles</span>  <span class="term-dim">via Greenhouse API</span></span>
+<span class="term-line">  <span class="term-green">●</span> OpenAI           <span class="term-blue">5 new roles</span>  <span class="term-dim">via Playwright</span></span>
+<span class="term-line">  <span class="term-green">●</span> DeepMind         <span class="term-blue">2 new roles</span>  <span class="term-dim">via Playwright</span></span>
+<span class="term-line">  <span class="term-dim">○</span> Cohere           <span class="term-dim">0 new</span>       <span class="term-dim">via Greenhouse API</span></span>
+<span class="term-line">  <span class="term-green">●</span> Mistral AI       <span class="term-blue">1 new role</span>   <span class="term-dim">via WebSearch</span></span>
+<span class="term-line">  <span class="term-dim">○</span> Inflection AI    <span class="term-dim">0 new</span>       <span class="term-dim">via Playwright</span></span>
+<span class="term-line">  <span class="term-dim">...</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-green">✓</span> <span class="term-bold">AI Infrastructure</span> <span class="term-dim">(25 portals)</span></span>
+<span class="term-line">  <span class="term-green">●</span> Databricks       <span class="term-blue">4 new roles</span>  <span class="term-dim">via Greenhouse API</span></span>
+<span class="term-line">  <span class="term-green">●</span> Scale AI         <span class="term-blue">2 new roles</span>  <span class="term-dim">via Playwright</span></span>
+<span class="term-line">  <span class="term-green">●</span> Anyscale         <span class="term-blue">1 new role</span>   <span class="term-dim">via Greenhouse API</span></span>
+<span class="term-line">  <span class="term-green">●</span> Weights & Biases <span class="term-blue">1 new role</span>   <span class="term-dim">via Greenhouse API</span></span>
+<span class="term-line">  <span class="term-dim">...</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-green">✓</span> <span class="term-bold">Big Tech</span> <span class="term-dim">(14 portals)</span></span>
+<span class="term-line">  <span class="term-green">●</span> Stripe           <span class="term-blue">3 new roles</span>  <span class="term-dim">via Playwright</span></span>
+<span class="term-line">  <span class="term-green">●</span> Meta AI          <span class="term-blue">6 new roles</span>  <span class="term-dim">via Playwright</span></span>
+<span class="term-line">  <span class="term-dim">○</span> Apple ML         <span class="term-dim">0 new</span>       <span class="term-dim">via WebSearch</span></span>
+<span class="term-line">  <span class="term-dim">...</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-dim">═══════════════════════════════════════════════════════════</span></span>
+<span class="term-line"><span class="term-bold term-white">SCAN COMPLETE</span></span>
+<span class="term-line"></span>
+<span class="term-line">  Portals scanned:    <span class="term-cyan term-bold">154</span></span>
+<span class="term-line">  New roles found:    <span class="term-green term-bold"> 38</span></span>
+<span class="term-line">  Match your niche:   <span class="term-blue term-bold"> 12</span></span>
+<span class="term-line">  Duplicates removed: <span class="term-dim">  6</span></span>
+<span class="term-line">  Expired filtered:   <span class="term-dim">  4</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-green term-bold">→ 12 new roles added to pipeline</span></span>
+<span class="term-line">  <span class="term-dim">  Saved to data/scan-history.tsv</span></span>
+          </div></div>
+        </div>
+
+        <!-- Scan Results Table -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Matched Roles (12)</div>
+            <span class="card-badge" style="background:rgba(16,185,129,0.12);color:var(--accent-green)">Ready to evaluate</span>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Company</th><th>Role</th><th>Level</th><th>Location</th><th>Comp Range</th><th>Priority</th><th>Scan Method</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>Anthropic</strong></td><td>ML Platform Engineer</td><td>Senior</td><td>SF / Remote</td><td>$220-280K</td><td><span class="tag orange">HIGH</span></td><td style="color:var(--text-muted)">Greenhouse</td></tr>
+                <tr><td><strong>Anthropic</strong></td><td>Agent Systems Engineer</td><td>Senior</td><td>SF</td><td>$240-300K</td><td><span class="tag orange">HIGH</span></td><td style="color:var(--text-muted)">Greenhouse</td></tr>
+                <tr><td><strong>OpenAI</strong></td><td>Research Engineer — Evals</td><td>Mid-Senior</td><td>SF</td><td>$250-340K</td><td><span class="tag orange">HIGH</span></td><td style="color:var(--text-muted)">Playwright</td></tr>
+                <tr><td><strong>Databricks</strong></td><td>Staff Data Engineer</td><td>Staff</td><td>Remote</td><td>$250-320K</td><td><span class="tag blue">MED</span></td><td style="color:var(--text-muted)">Greenhouse</td></tr>
+                <tr><td><strong>Scale AI</strong></td><td>Head of ML Engineering</td><td>Director</td><td>SF</td><td>$300-400K</td><td><span class="tag orange">HIGH</span></td><td style="color:var(--text-muted)">Playwright</td></tr>
+                <tr><td><strong>Stripe</strong></td><td>Senior ML Engineer</td><td>Senior</td><td>Remote US</td><td>$200-260K</td><td><span class="tag blue">MED</span></td><td style="color:var(--text-muted)">Playwright</td></tr>
+                <tr><td><strong>Meta AI</strong></td><td>Research Scientist — LLM</td><td>Senior</td><td>Menlo Park</td><td>$230-310K</td><td><span class="tag blue">MED</span></td><td style="color:var(--text-muted)">Playwright</td></tr>
+                <tr><td><strong>Mistral AI</strong></td><td>ML Engineer</td><td>Senior</td><td>Paris / Remote</td><td>€120-160K</td><td><span class="tag cyan">LOW</span></td><td style="color:var(--text-muted)">WebSearch</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           EVALUATE VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-evaluate">
+        <div class="section-header">
+          <div class="section-title">Candidate Evaluation</div>
+          <div class="section-desc">Taxonomy-driven scoring with 8-dimension analysis + competency mapping</div>
+        </div>
+
+        <div class="grid-2-1 mb-24">
+          <!-- LEFT: COMPATIBILITY MATRIX -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Compatibility Matrix</div>
+                <div class="card-subtitle">Alice Chen → Anthropic Sr. Agent Engineer</div>
+              </div>
+              <span class="card-badge" style="background:rgba(16,185,129,0.12);color:var(--accent-green)">STRONG SUBMIT</span>
+            </div>
+            <div id="matrix-container"></div>
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;">Composite Score</span>
+                <div style="font-size:32px;font-weight:900;color:var(--accent-green);font-family:'JetBrains Mono';letter-spacing:-1px;">4.6</div>
+              </div>
+              <div style="text-align:right">
+                <span style="font-size:11px;color:var(--text-muted);">Est. Fee</span>
+                <div style="font-size:20px;font-weight:800;color:var(--accent-green);font-family:'JetBrains Mono';">$52,000</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: SUMMARY -->
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div class="card">
+              <div class="card-title" style="margin-bottom:12px">Role Summary</div>
+              <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;">
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,42,58,0.4)">
+                  <span style="color:var(--text-muted)">Company</span><span style="font-weight:600;color:var(--text-primary)">Anthropic</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,42,58,0.4)">
+                  <span style="color:var(--text-muted)">Role</span><span style="font-weight:600;color:var(--text-primary)">Sr. Agent Engineer</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,42,58,0.4)">
+                  <span style="color:var(--text-muted)">Archetype</span><span><span class="tag blue">IC-AI</span></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,42,58,0.4)">
+                  <span style="color:var(--text-muted)">Level</span><span style="font-weight:600;color:var(--text-primary)">Senior (L5)</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(42,42,58,0.4)">
+                  <span style="color:var(--text-muted)">Location</span><span style="font-weight:600;color:var(--text-primary)">SF / Remote</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;">
+                  <span style="color:var(--text-muted)">Comp</span><span style="font-weight:600;color:var(--accent-green)">$240-300K</span>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title" style="margin-bottom:12px">Taxonomy Match</div>
+              <div style="font-size:11px;">
+                <div style="margin-bottom:8px;"><span class="tag green">1.0</span> Python <span style="color:var(--text-muted)">· exact</span></div>
+                <div style="margin-bottom:8px;"><span class="tag green">1.0</span> LangChain <span style="color:var(--text-muted)">· exact</span></div>
+                <div style="margin-bottom:8px;"><span class="tag green">1.0</span> RAG <span style="color:var(--text-muted)">· exact</span></div>
+                <div style="margin-bottom:8px;"><span class="tag blue">0.9</span> PyTorch <span style="color:var(--text-muted)">· exact × production</span></div>
+                <div style="margin-bottom:8px;"><span class="tag blue">0.6</span> TensorFlow <span style="color:var(--text-muted)">· adjacent to PyTorch</span></div>
+                <div style="margin-bottom:8px;"><span class="tag purple">0.54</span> Agent Eval <span style="color:var(--text-muted)">· adj × prod × current</span></div>
+                <div><span class="tag green">1.0</span> Kubernetes <span style="color:var(--text-muted)">· exact</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title" style="margin-bottom:8px">Recommendation</div>
+              <div style="padding:12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:8px;font-size:12px;color:var(--accent-green);font-weight:500;line-height:1.6;">
+                Strong Submit. Alice exceeds hard requirements on agent systems and LLM infrastructure. Only gap: no formal evaluation framework experience — mitigate by highlighting her A/B testing work as adjacent.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMPETENCY ASSESSMENT -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Competency Assessment</div>
+              <div class="card-subtitle">How Alice works, not just what she knows</div>
+            </div>
+          </div>
+          <div class="grid-2" style="gap:12px">
+            <div id="competency-technical"></div>
+            <div id="competency-other"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           PIPELINE VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-pipeline">
+        <div class="section-header">
+          <div class="section-title">Pipeline Dashboard</div>
+          <div class="section-desc">24 active searches across 16 companies · $276K total pipeline value</div>
+        </div>
+
+        <!-- STAGE BREAKDOWN -->
+        <div class="grid-4 mb-24">
+          <div class="kpi-card blue">
+            <div class="kpi-label">Sourcing</div>
+            <div class="kpi-value blue">8</div>
+          </div>
+          <div class="kpi-card purple">
+            <div class="kpi-label">Submitted</div>
+            <div class="kpi-value purple">7</div>
+          </div>
+          <div class="kpi-card orange">
+            <div class="kpi-label">Interviewing</div>
+            <div class="kpi-value orange">6</div>
+          </div>
+          <div class="kpi-card green">
+            <div class="kpi-label">Offer / Close</div>
+            <div class="kpi-value green">3</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">All Active Requisitions</div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>#</th><th>Company</th><th>Role</th><th>Top Candidate</th><th>Score</th><th>Stage</th><th>Fee Est</th><th>Days</th></tr>
+              </thead>
+              <tbody>
+                <tr><td style="color:var(--text-muted)">#001</td><td><strong>Anthropic</strong></td><td>Sr. Agent Engineer</td><td>Alice Chen</td><td><span style="color:var(--accent-green);font-weight:700;font-family:'JetBrains Mono'">4.6</span></td><td><span class="status-pill offer">● Offer</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$52K</td><td>18</td></tr>
+                <tr><td style="color:var(--text-muted)">#003</td><td><strong>Databricks</strong></td><td>Staff MLE</td><td>Marcus Rivera</td><td><span style="color:var(--accent-green);font-weight:700;font-family:'JetBrains Mono'">4.4</span></td><td><span class="status-pill interviewing">● Final Round</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$48K</td><td>24</td></tr>
+                <tr><td style="color:var(--text-muted)">#005</td><td><strong>Scale AI</strong></td><td>Data Eng Manager</td><td>Priya Patel</td><td><span style="color:var(--accent-blue);font-weight:700;font-family:'JetBrains Mono'">4.2</span></td><td><span class="status-pill interviewing">● Interviewing</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-orange)">$46K</td><td>12</td></tr>
+                <tr><td style="color:var(--text-muted)">#006</td><td><strong>OpenAI</strong></td><td>Research Engineer</td><td>James Okafor</td><td><span style="color:var(--accent-blue);font-weight:700;font-family:'JetBrains Mono'">4.1</span></td><td><span class="status-pill submitted">● Submitted</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-orange)">$55K</td><td>6</td></tr>
+                <tr><td style="color:var(--text-muted)">#008</td><td><strong>Stripe</strong></td><td>Sr. ML Engineer</td><td>Wei Zhang</td><td><span style="color:var(--accent-green);font-weight:700;font-family:'JetBrains Mono'">4.3</span></td><td><span class="status-pill placed">● Placed ✓</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$44K</td><td>—</td></tr>
+                <tr><td style="color:var(--text-muted)">#009</td><td><strong>Meta AI</strong></td><td>Research Scientist</td><td>—</td><td style="color:var(--text-muted)">—</td><td><span class="status-pill sourcing">● Sourcing</span></td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$50K</td><td>4</td></tr>
+                <tr><td style="color:var(--text-muted)">#010</td><td><strong>Anyscale</strong></td><td>ML Platform Eng</td><td>—</td><td style="color:var(--text-muted)">—</td><td><span class="status-pill sourcing">● Sourcing</span></td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$38K</td><td>2</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           ANALYTICS VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-analytics">
+        <div class="section-header">
+          <div class="section-title">Analytics</div>
+          <div class="section-desc">Funnel metrics, conversion rates, and revenue intelligence</div>
+        </div>
+
+        <!-- FUNNEL -->
+        <div class="card mb-24">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Placement Funnel — Last 90 Days</div>
+              <div class="card-subtitle">Conversion rates by stage</div>
+            </div>
+          </div>
+          <div id="funnel-container" style="padding:8px 0;"></div>
+        </div>
+
+        <!-- CHARTS ROW -->
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Time-to-Fill Distribution</div>
+                <div class="card-subtitle">Days from sourcing to placement by archetype</div>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="ttfChart"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Revenue per Hour Worked</div>
+                <div class="card-subtitle">Efficiency by client tier</div>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="rphChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLIENT SCOREBOARD -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Client Scoreboard</div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Client</th><th>Searches</th><th>Placements</th><th>Conversion</th><th>Avg TTF</th><th>Revenue</th><th>$/Hr</th><th>Grade</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>Anthropic</strong></td><td>5</td><td>3</td><td style="color:var(--accent-green);font-weight:700">60%</td><td>22d</td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$142K</td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$485</td><td><span class="tag green">A+</span></td></tr>
+                <tr><td><strong>Stripe</strong></td><td>3</td><td>2</td><td style="color:var(--accent-green);font-weight:700">67%</td><td>28d</td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$88K</td><td style="font-family:'JetBrains Mono';color:var(--accent-blue)">$380</td><td><span class="tag green">A</span></td></tr>
+                <tr><td><strong>Databricks</strong></td><td>4</td><td>1</td><td style="color:var(--accent-orange);font-weight:700">25%</td><td>35d</td><td style="font-family:'JetBrains Mono';color:var(--accent-orange)">$48K</td><td style="font-family:'JetBrains Mono';color:var(--accent-orange)">$220</td><td><span class="tag orange">B</span></td></tr>
+                <tr><td><strong>Scale AI</strong></td><td>3</td><td>1</td><td style="color:var(--accent-orange);font-weight:700">33%</td><td>30d</td><td style="font-family:'JetBrains Mono';color:var(--accent-orange)">$46K</td><td style="font-family:'JetBrains Mono';color:var(--accent-orange)">$260</td><td><span class="tag orange">B+</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           FORECAST VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-forecast">
+        <div class="section-header">
+          <div class="section-title">Hiring Forecast</div>
+          <div class="section-desc">Signal detection and expansion predictions for the next 90 days</div>
+        </div>
+
+        <!-- SIGNALS -->
+        <div class="card mb-24">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Active Hiring Signals</div>
+              <div class="card-subtitle">Detected from funding rounds, job postings, exec hires, and expansion patterns</div>
+            </div>
+            <span class="card-badge" style="background:rgba(245,158,11,0.12);color:var(--accent-orange)">3 high-confidence</span>
+          </div>
+
+          <div class="signal-card" style="border-left:3px solid var(--accent-green)">
+            <div class="signal-icon" style="background:rgba(16,185,129,0.12)">💰</div>
+            <div class="signal-content">
+              <div class="signal-title">Cohere — Series D ($500M) announced last week</div>
+              <div class="signal-desc">Historically, funding rounds of this size lead to 40-60% headcount increase within 6 months. ML Engineering team likely expanding from 45 to 70+.</div>
+              <div class="signal-meta">
+                <span>Signal: Funding Round</span>
+                <span>Confidence: <strong style="color:var(--accent-green)">92%</strong></span>
+                <span>Est. new hires: 8-12 ML roles</span>
+              </div>
+            </div>
+            <div class="signal-strength" style="color:var(--accent-green)">9.2</div>
+          </div>
+
+          <div class="signal-card" style="border-left:3px solid var(--accent-orange)">
+            <div class="signal-icon" style="background:rgba(245,158,11,0.12)">👤</div>
+            <div class="signal-content">
+              <div class="signal-title">Runway ML — New VP Engineering started 3 weeks ago</div>
+              <div class="signal-desc">New engineering leaders typically initiate hiring within 30-60 days. VP came from Google DeepMind — likely building an ML research team.</div>
+              <div class="signal-meta">
+                <span>Signal: Exec Hire</span>
+                <span>Confidence: <strong style="color:var(--accent-orange)">78%</strong></span>
+                <span>Est. new hires: 4-6 research roles</span>
+              </div>
+            </div>
+            <div class="signal-strength" style="color:var(--accent-orange)">7.8</div>
+          </div>
+
+          <div class="signal-card" style="border-left:3px solid var(--accent-blue)">
+            <div class="signal-icon" style="background:rgba(59,130,246,0.12)">📊</div>
+            <div class="signal-content">
+              <div class="signal-title">Databricks — Job posting velocity up 340% in ML category</div>
+              <div class="signal-desc">Posted 12 ML roles in the last 2 weeks vs. 3 in the prior month. Suggests new product initiative or team expansion mandate.</div>
+              <div class="signal-meta">
+                <span>Signal: Posting Velocity</span>
+                <span>Confidence: <strong style="color:var(--accent-blue)">85%</strong></span>
+                <span>Your client — proactive outreach recommended</span>
+              </div>
+            </div>
+            <div class="signal-strength" style="color:var(--accent-blue)">8.5</div>
+          </div>
+        </div>
+
+        <!-- HEAT MAP -->
+        <div class="card mb-24">
+          <div class="card-header">
+            <div>
+              <div class="card-title">90-Day Hiring Probability Heat Map</div>
+              <div class="card-subtitle">Company × role archetype probability</div>
+            </div>
+          </div>
+          <div id="heatmap-container" style="padding:8px 0;overflow-x:auto;"></div>
+        </div>
+
+        <!-- EXPANSION PREDICTIONS -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Client Expansion Predictions</div>
+              <div class="card-subtitle">Existing clients likely to need additional hires</div>
+            </div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Client</th><th>Last Placement</th><th>Expansion Signal</th><th>Probability</th><th>Est. New Roles</th><th>Action</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Anthropic</strong></td><td>Feb 2026</td><td>Team doubled since our last placement</td><td><span style="color:var(--accent-green);font-weight:700">HIGH</span></td><td>2-3</td><td><span class="tag green">Reach out this week</span></td></tr>
+                <tr><td><strong>Stripe</strong></td><td>Mar 2026</td><td>New ML product line announced</td><td><span style="color:var(--accent-orange);font-weight:700">MED</span></td><td>1-2</td><td><span class="tag blue">Monitor signals</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           BENCHMARK VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-benchmark">
+        <div class="section-header">
+          <div class="section-title">Market Benchmark</div>
+          <div class="section-desc">Talent scarcity, compensation data, and competitive positioning</div>
+        </div>
+
+        <div class="terminal mb-24">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">placement-ops benchmark — Senior Agent/LLM Engineer</div>
+          </div>
+          <div class="terminal-body"><div class="terminal-inner">
+<span class="term-line"><span class="term-cyan term-bold">MARKET BENCHMARK</span> <span class="term-dim">— Senior Agent/LLM Engineer · Bay Area / Remote</span></span>
+<span class="term-line"><span class="term-dim">═══════════════════════════════════════════════════════════</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-bold term-white">TALENT SCARCITY INDEX</span></span>
+<span class="term-line"></span>
+<span class="term-line">  Demand (open roles):     <span class="term-orange term-bold">342</span> <span class="term-dim">across tracked companies</span></span>
+<span class="term-line">  Supply (est. qualified): <span class="term-red term-bold">~180</span> <span class="term-dim">in US talent pool</span></span>
+<span class="term-line">  Demand/Supply ratio:     <span class="term-red term-bold">1.9x</span> <span class="term-dim">(critical scarcity)</span></span>
+<span class="term-line">  Typical time to fill:    <span class="term-orange term-bold">35-50 days</span></span>
+<span class="term-line"></span>
+<span class="term-line">  Scarcity Score: <span class="term-red term-bold">████████████████████░  9.1 / 10</span></span>
+<span class="term-line">  <span class="term-dim">→ Justifies retained search or premium contingency (25%+)</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-bold term-white">COMPENSATION BENCHMARKS</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-dim">Company Type       P25       P50       P75       P90</span></span>
+<span class="term-line">  <span class="term-dim">────────────────────────────────────────────────────</span></span>
+<span class="term-line">  Frontier AI Lab   <span class="term-green">$220K</span>    <span class="term-green">$260K</span>    <span class="term-green term-bold">$300K</span>    <span class="term-green">$340K</span></span>
+<span class="term-line">  AI Infrastructure <span class="term-blue">$200K</span>    <span class="term-blue">$235K</span>    <span class="term-blue term-bold">$270K</span>    <span class="term-blue">$310K</span></span>
+<span class="term-line">  Big Tech          <span class="term-purple">$210K</span>    <span class="term-purple">$250K</span>    <span class="term-purple term-bold">$290K</span>    <span class="term-purple">$330K</span></span>
+<span class="term-line">  Enterprise SaaS   <span class="term-cyan">$180K</span>    <span class="term-cyan">$210K</span>    <span class="term-cyan term-bold">$240K</span>    <span class="term-cyan">$270K</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-dim">Note: Base salary only. Total comp (base + equity + bonus)</span></span>
+<span class="term-line">  <span class="term-dim">typically adds 30-60% at funded startups.</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-bold term-white">FEE RANGE ESTIMATE</span></span>
+<span class="term-line"></span>
+<span class="term-line">  Contingency (20%):  <span class="term-green term-bold">$44K - $60K</span></span>
+<span class="term-line">  Premium (25%):      <span class="term-green term-bold">$55K - $75K</span></span>
+<span class="term-line">  Retained (25%+):    <span class="term-green term-bold">$55K - $85K</span> <span class="term-dim">(recommended for this scarcity)</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-yellow term-bold">→ HIGH SCARCITY = LEVERAGE. Recommend retained or 25% minimum.</span></span>
+          </div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Company Fit Heat Map — Alice Chen</div>
+            <div class="card-subtitle">Compatibility score by company tier</div>
+          </div>
+          <div class="chart-container" style="height:240px">
+            <canvas id="companyFitChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           STRATEGY VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-strategy">
+        <div class="section-header">
+          <div class="section-title">Talent Strategy</div>
+          <div class="section-desc">Workforce planning and org design — Anthropic ML Team (8 → 15)</div>
+        </div>
+
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Current vs. Target Org</div>
+            <div class="org-chart">
+              <div class="org-node existing" style="border-color:var(--text-muted)">
+                <div style="font-weight:700">VP Engineering</div>
+                <div style="font-size:10px;color:var(--text-muted)">Sarah Chen · Existing</div>
+              </div>
+              <div class="org-connector"></div>
+              <div class="org-row">
+                <div class="org-node existing">
+                  <div style="font-weight:700">EM — Training</div>
+                  <div style="font-size:10px;color:var(--accent-green)">Existing · 3 reports</div>
+                </div>
+                <div class="org-node new-hire">
+                  <div style="font-weight:700">EM — Platform</div>
+                  <div style="font-size:10px;color:var(--accent-blue)">Hire #5 · Month 7</div>
+                </div>
+                <div class="org-node new-hire">
+                  <div style="font-weight:700">TL — Agents</div>
+                  <div style="font-size:10px;color:var(--accent-orange)">Hire #1 · CRITICAL</div>
+                </div>
+              </div>
+              <div class="org-connector"></div>
+              <div class="org-row">
+                <div class="org-node existing" style="min-width:80px;padding:6px 10px"><div style="font-size:11px">Sr MLE</div></div>
+                <div class="org-node existing" style="min-width:80px;padding:6px 10px"><div style="font-size:11px">Sr MLE</div></div>
+                <div class="org-node existing" style="min-width:80px;padding:6px 10px"><div style="font-size:11px">DE</div></div>
+                <div class="org-node new-hire" style="min-width:80px;padding:6px 10px"><div style="font-size:11px">ML Plat</div></div>
+                <div class="org-node new-hire" style="min-width:80px;padding:6px 10px"><div style="font-size:11px">Sr MLE</div></div>
+                <div class="org-node new-hire" style="min-width:80px;padding:6px 10px"><div style="font-size:11px">Agent</div></div>
+              </div>
+            </div>
+            <div style="margin-top:12px;font-size:11px;display:flex;gap:16px;justify-content:center">
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(16,185,129,0.2);border:1px solid var(--accent-green);margin-right:4px;vertical-align:middle"></span> Existing</span>
+              <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(59,130,246,0.2);border:1px dashed var(--accent-blue);margin-right:4px;vertical-align:middle"></span> New Hire</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Hiring Sequence</div>
+            <div class="timeline">
+              <div class="timeline-item">
+                <div class="timeline-dot current"></div>
+                <div class="timeline-date">Phase 1 — Months 1-3</div>
+                <div class="timeline-title">Sr. Agent/LLM Engineer (Tech Lead)</div>
+                <div class="timeline-desc">$220-260K · Unblocks Q4 agent system · <strong style="color:var(--accent-green)">$44-52K fee</strong></div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot current"></div>
+                <div class="timeline-date">Phase 1</div>
+                <div class="timeline-title">Senior MLE (Agent-focused)</div>
+                <div class="timeline-desc">$200-240K · Pairs with Hire #1 · <strong style="color:var(--accent-green)">$40-48K fee</strong></div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot upcoming"></div>
+                <div class="timeline-date">Phase 2 — Months 4-6</div>
+                <div class="timeline-title">Sr. ML Platform Engineer</div>
+                <div class="timeline-desc">$200-240K · Eliminates bus factor · <strong style="color:var(--accent-orange)">$40-48K fee</strong></div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot upcoming"></div>
+                <div class="timeline-date">Phase 2</div>
+                <div class="timeline-title">Agent Engineer (Mid-level)</div>
+                <div class="timeline-desc">$160-190K · Architecture defined, now build · <strong style="color:var(--accent-orange)">$32-38K fee</strong></div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot upcoming"></div>
+                <div class="timeline-date">Phase 3 — Months 7-12</div>
+                <div class="timeline-title">Engineering Manager + Eval Eng + Jr MLE</div>
+                <div class="timeline-desc">3 hires · Scaling layer · <strong style="color:var(--accent-orange)">$106-126K fee</strong></div>
+              </div>
+            </div>
+            <div style="margin-top:20px;padding:16px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:8px;text-align:center">
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Total Fee Opportunity</div>
+              <div style="font-size:28px;font-weight:900;color:var(--accent-green);font-family:'JetBrains Mono';letter-spacing:-1px">$262K — $312K</div>
+              <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">7 hires over 12 months</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RISK + COMP -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Risk Assessment</div>
+            <div class="signal-card" style="border-left:3px solid var(--accent-red)">
+              <div class="signal-content">
+                <div class="signal-title" style="color:var(--accent-red)">HIGH — Agent Tech Lead (Hire #1)</div>
+                <div class="signal-desc">Linchpin hire. 60+ day fill = Q4 goal at risk. Recommend retained search.</div>
+              </div>
+            </div>
+            <div class="signal-card" style="border-left:3px solid var(--accent-orange)">
+              <div class="signal-content">
+                <div class="signal-title" style="color:var(--accent-orange)">MED — EM span at 11 by Phase 2</div>
+                <div class="signal-desc">Burnout risk. Promote a senior to Tech Lead as interim bridge.</div>
+              </div>
+            </div>
+            <div class="signal-card" style="border-left:3px solid var(--accent-orange)">
+              <div class="signal-content">
+                <div class="signal-title" style="color:var(--accent-orange)">MED — H1B constraint</div>
+                <div class="signal-desc">Removes ~30% of senior ML pool. Expand remote search.</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Competency Gap Analysis</div>
+            <div id="strategyCompetency"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           RETENTION VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-retention">
+        <div class="section-header">
+          <div class="section-title">Retention Tracking</div>
+          <div class="section-desc">Post-placement health monitoring · 93% retention rate (above 90% target)</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi-card green">
+            <div class="kpi-label">Retention Rate</div>
+            <div class="kpi-value green">93%</div>
+            <div class="kpi-change up">↑ above 90% target</div>
+          </div>
+          <div class="kpi-card blue">
+            <div class="kpi-label">Active Placements</div>
+            <div class="kpi-value blue">7</div>
+          </div>
+          <div class="kpi-card purple">
+            <div class="kpi-label">In Guarantee Period</div>
+            <div class="kpi-value purple">3</div>
+          </div>
+          <div class="kpi-card orange">
+            <div class="kpi-label">Check-ins Due</div>
+            <div class="kpi-value orange">2</div>
+          </div>
+        </div>
+
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Check-in Schedule</div>
+            <div class="timeline">
+              <div class="timeline-item">
+                <div class="timeline-dot completed"></div>
+                <div class="timeline-date">Mar 8 — Day 1</div>
+                <div class="timeline-title">Wei Zhang started at Stripe</div>
+                <div class="timeline-desc">Sr. ML Engineer · Score at placement: 4.3</div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot current"></div>
+                <div class="timeline-date">Apr 7 — Day 30 (TODAY)</div>
+                <div class="timeline-title">30-Day Check-in Due</div>
+                <div class="timeline-desc">Ask: onboarding experience, team dynamics, early wins, any concerns</div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot upcoming"></div>
+                <div class="timeline-date">May 7 — Day 60</div>
+                <div class="timeline-title">60-Day Check-in</div>
+                <div class="timeline-desc">Focus: meaningful contributions, manager feedback, comp satisfaction</div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot upcoming"></div>
+                <div class="timeline-date">Jun 1 — Day 85</div>
+                <div class="timeline-title">Pre-Guarantee Warning</div>
+                <div class="timeline-desc">5 days before guarantee expires. Final check with both sides.</div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-dot upcoming"></div>
+                <div class="timeline-date">Jun 6 — Day 90</div>
+                <div class="timeline-title">Guarantee Period Ends</div>
+                <div class="timeline-desc">Fee fully earned. Transition to long-term retention tracking.</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Placement Health Dashboard</div>
+            <div class="table-container">
+              <table>
+                <thead><tr><th>Candidate</th><th>Company</th><th>Day</th><th>Health</th><th>Next Check-in</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Wei Zhang</strong></td><td>Stripe</td><td>30</td><td><span style="color:var(--accent-green);font-weight:700">●</span> Healthy</td><td style="color:var(--accent-orange);font-weight:600">Today</td></tr>
+                  <tr><td><strong>Diana Torres</strong></td><td>Anthropic</td><td>65</td><td><span style="color:var(--accent-green);font-weight:700">●</span> Healthy</td><td>May 2</td></tr>
+                  <tr><td><strong>Ryan Kim</strong></td><td>Scale AI</td><td>45</td><td><span style="color:var(--accent-orange);font-weight:700">●</span> Watch</td><td style="color:var(--accent-orange);font-weight:600">Apr 10</td></tr>
+                  <tr><td><strong>Sarah Park</strong></td><td>Databricks</td><td>120</td><td><span style="color:var(--accent-green);font-weight:700">●</span> Retained</td><td>Jun 15</td></tr>
+                  <tr><td><strong>Jay Patel</strong></td><td>Anthropic</td><td>180</td><td><span style="color:var(--accent-green);font-weight:700">●</span> Retained</td><td>Sep 1</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="margin-top:16px;padding:12px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:8px;">
+              <div style="font-size:12px;font-weight:600;color:var(--accent-orange);margin-bottom:4px">⚠ Alert: Ryan Kim (Scale AI)</div>
+              <div style="font-size:11px;color:var(--text-secondary);">Manager feedback indicates slower onboarding than expected. Schedule a 3-way call to align on 60-day expectations. Still within recoverable range.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           CALIBRATE VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-calibrate">
+        <div class="section-header">
+          <div class="section-title">Calibration Engine</div>
+          <div class="section-desc">Learning from outcomes to improve matching accuracy</div>
+        </div>
+
+        <div class="terminal mb-24">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">placement-ops calibrate — 15 outcomes logged</div>
+          </div>
+          <div class="terminal-body"><div class="terminal-inner">
+<span class="term-line"><span class="term-cyan term-bold">CALIBRATION ANALYSIS</span> <span class="term-dim">— 15 outcomes (7 placed, 5 rejected, 3 withdrawn)</span></span>
+<span class="term-line"><span class="term-dim">═══════════════════════════════════════════════════════════</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-bold term-white">SCORE-TO-OUTCOME CORRELATION</span></span>
+<span class="term-line"></span>
+<span class="term-line">  Score Range    Placed    Rejected    Withdrawn    <span class="term-bold">Hit Rate</span></span>
+<span class="term-line">  <span class="term-dim">──────────────────────────────────────────────────────</span></span>
+<span class="term-line">  4.5+           <span class="term-green">4</span>         <span class="term-red">0</span>           <span class="term-orange">0</span>            <span class="term-green term-bold">100%</span></span>
+<span class="term-line">  4.0 – 4.4      <span class="term-green">3</span>         <span class="term-red">2</span>           <span class="term-orange">1</span>            <span class="term-blue term-bold"> 50%</span></span>
+<span class="term-line">  3.5 – 3.9      <span class="term-green">0</span>         <span class="term-red">3</span>           <span class="term-orange">2</span>            <span class="term-red term-bold">  0%</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-yellow term-bold">→ INSIGHT: Your threshold of 4.0 is correct.</span></span>
+<span class="term-line">  <span class="term-yellow">  Candidates below 4.0 have a 0% placement rate. Don't submit them.</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-bold term-white">ADJACENCY CONVERSION RATES</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-green">✓</span> TensorFlow → PyTorch:   <span class="term-green term-bold">83% accepted</span> <span class="term-dim">(adjacency validated)</span></span>
+<span class="term-line">  <span class="term-green">✓</span> Airflow → Prefect:      <span class="term-green term-bold">75% accepted</span> <span class="term-dim">(adjacency validated)</span></span>
+<span class="term-line">  <span class="term-red">✗</span> Pandas → Spark:         <span class="term-red term-bold">20% accepted</span> <span class="term-dim">(adjacency too generous)</span></span>
+<span class="term-line">  <span class="term-orange">~</span> React → Vue:            <span class="term-orange term-bold">50% accepted</span> <span class="term-dim">(context-dependent)</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-yellow term-bold">→ RECOMMENDATION: Reduce Pandas→Spark adjacency from 0.6 to 0.3</span></span>
+<span class="term-line">  <span class="term-yellow">  Spark requires distributed systems thinking that Pandas doesn't build.</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-bold term-white">COMPANY-SPECIFIC PATTERNS</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-blue">Anthropic</span>: Strict on production experience. "Project-level" depth rejected 100%.</span>
+<span class="term-line">  <span class="term-purple">Stripe</span>:    Cares more about system design than specific frameworks.</span>
+<span class="term-line">  <span class="term-cyan">Scale AI</span>:  Values velocity. Candidates with startup backgrounds preferred 3:1.</span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-dim">═══════════════════════════════════════════════════════════</span></span>
+<span class="term-line"><span class="term-green term-bold">Calibration data saved to data/calibration.yml</span></span>
+<span class="term-line"><span class="term-dim">Next calibration recommended after 5 more outcomes.</span></span>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           BATCH VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-batch">
+        <div class="section-header">
+          <div class="section-title">Batch Evaluation</div>
+          <div class="section-desc">Parallel candidate comparison with ranked output</div>
+        </div>
+
+        <div class="terminal mb-24">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <div class="terminal-title">placement-ops batch — 4 candidates vs. Anthropic Sr. Agent Engineer</div>
+          </div>
+          <div class="terminal-body"><div class="terminal-inner">
+<span class="term-line"><span class="term-cyan term-bold">BATCH EVALUATION</span> <span class="term-dim">— Anthropic · Senior Agent Engineer · IC-AI</span></span>
+<span class="term-line"><span class="term-dim">═══════════════════════════════════════════════════════════</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-bold term-white">RANKED RESULTS</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-bold term-white">RANK  CANDIDATE          COMPOSITE  TECH  SENIOR  FILL   VERDICT</span></span>
+<span class="term-line">  <span class="term-dim">─────────────────────────────────────────────────────────────────</span></span>
+<span class="term-line">  <span class="term-green term-bold"> #1</span>   Alice Chen          <span class="term-green term-bold">4.6</span>       <span class="term-green">4.8</span>   <span class="term-green">5.0</span>     <span class="term-green">4.5</span>    <span class="term-green term-bold">STRONG SUBMIT</span></span>
+<span class="term-line">  <span class="term-blue term-bold"> #2</span>   Marcus Rivera       <span class="term-blue term-bold">4.1</span>       <span class="term-blue">4.3</span>   <span class="term-blue">4.0</span>     <span class="term-orange">3.8</span>    <span class="term-blue term-bold">SUBMIT</span></span>
+<span class="term-line">  <span class="term-orange term-bold"> #3</span>   Priya Patel         <span class="term-orange term-bold">3.7</span>       <span class="term-orange">3.5</span>   <span class="term-green">4.0</span>     <span class="term-orange">3.2</span>    <span class="term-orange term-bold">MAYBE</span></span>
+<span class="term-line">  <span class="term-red term-bold"> #4</span>   David Kim           <span class="term-red term-bold">2.9</span>       <span class="term-red">2.5</span>   <span class="term-orange">3.0</span>     <span class="term-red">2.0</span>    <span class="term-red term-bold">HARD PASS</span></span>
+<span class="term-line"></span>
+<span class="term-line"><span class="term-bold term-white">HEAD-TO-HEAD: #1 vs #2</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-dim">Dimension            Alice Chen     Marcus Rivera</span></span>
+<span class="term-line">  <span class="term-dim">─────────────────────────────────────────────────</span></span>
+<span class="term-line">  Technical Match      <span class="term-green term-bold">4.8 ████████</span>  <span class="term-blue">4.3 ███████░</span></span>
+<span class="term-line">  Seniority Fit        <span class="term-green term-bold">5.0 ████████</span>  <span class="term-blue">4.0 ██████░░</span></span>
+<span class="term-line">  Location             <span class="term-green">5.0 ████████</span>  <span class="term-green">5.0 ████████</span></span>
+<span class="term-line">  Comp Alignment       <span class="term-green">4.0 ██████░░</span>  <span class="term-green term-bold">4.5 ███████░</span></span>
+<span class="term-line">  Culture Signals      <span class="term-green term-bold">5.0 ████████</span>  <span class="term-blue">4.0 ██████░░</span></span>
+<span class="term-line">  Gap Severity         <span class="term-green">4.0 ██████░░</span>  <span class="term-orange">3.5 █████░░░</span></span>
+<span class="term-line">  Presentation Risk    <span class="term-green term-bold">4.5 ███████░</span>  <span class="term-blue">4.0 ██████░░</span></span>
+<span class="term-line">  Fill Probability     <span class="term-green term-bold">4.5 ███████░</span>  <span class="term-orange">3.8 █████░░░</span></span>
+<span class="term-line"></span>
+<span class="term-line">  <span class="term-green term-bold">→ RECOMMENDATION: Submit Alice first, Marcus as backup.</span></span>
+<span class="term-line">  <span class="term-dim">  Alice wins on 6/8 dimensions. Marcus has better comp alignment</span></span>
+<span class="term-line">  <span class="term-dim">  but lower fill probability due to competing offers.</span></span>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           MARKET INTEL VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-marketintel">
+        <div class="section-header">
+          <div class="section-title">Market Intelligence</div>
+          <div class="section-desc">87 companies hiring · 342 open ML/AI roles · Comp hygiene + competitive landscape</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi-card blue">
+            <div class="kpi-label">Companies Hiring</div>
+            <div class="kpi-value blue">87</div>
+            <div class="kpi-change up">↑ 12 new this month</div>
+          </div>
+          <div class="kpi-card green">
+            <div class="kpi-label">Open ML/AI Roles</div>
+            <div class="kpi-value green">342</div>
+            <div class="kpi-change up">↑ 18% vs. last quarter</div>
+          </div>
+          <div class="kpi-card orange">
+            <div class="kpi-label">Market P50 (Sr MLE)</div>
+            <div class="kpi-value orange">$260K</div>
+            <div class="kpi-change up">↑ $15K from 6 months ago</div>
+          </div>
+          <div class="kpi-card purple">
+            <div class="kpi-label">Addressable Fees</div>
+            <div class="kpi-value purple">$4.2M</div>
+          </div>
+        </div>
+
+        <!-- LANDSCAPE TABLE -->
+        <div class="card mb-24">
+          <div class="card-header">
+            <div><div class="card-title">Competitive Landscape by Industry</div><div class="card-subtitle">SF + NYC + Remote · Last 90 days</div></div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Industry</th><th>Companies</th><th>Open Roles</th><th>Avg Comp (P50)</th><th>Velocity</th><th>Recruiter Density</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Frontier AI Labs</strong></td><td>8</td><td style="font-weight:700;color:var(--accent-blue)">68</td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$260K</td><td><span style="color:var(--accent-green)">↑↑</span> Growing fast</td><td><span class="tag" style="background:rgba(239,68,68,0.12);color:var(--accent-red)">HIGH</span></td></tr>
+                <tr><td><strong>AI Infrastructure</strong></td><td>14</td><td style="font-weight:700;color:var(--accent-blue)">56</td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$235K</td><td><span style="color:var(--accent-green)">↑↑↑</span> Surge</td><td><span class="tag" style="background:rgba(245,158,11,0.12);color:var(--accent-orange)">MED</span></td></tr>
+                <tr><td><strong>Big Tech (AI Div)</strong></td><td>12</td><td style="font-weight:700;color:var(--accent-blue)">82</td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$250K</td><td><span style="color:var(--text-muted)">→</span> Flat</td><td><span class="tag" style="background:rgba(239,68,68,0.12);color:var(--accent-red)">HIGH</span></td></tr>
+                <tr><td><strong>Enterprise SaaS (ML)</strong></td><td>22</td><td style="font-weight:700">64</td><td style="font-family:'JetBrains Mono'">$210K</td><td><span style="color:var(--accent-green)">↑</span> Growing</td><td><span class="tag" style="background:rgba(16,185,129,0.12);color:var(--accent-green)">LOW</span></td></tr>
+                <tr><td><strong>Fintech (Data/ML)</strong></td><td>16</td><td style="font-weight:700">42</td><td style="font-family:'JetBrains Mono'">$215K</td><td><span style="color:var(--accent-green)">↑</span> Growing</td><td><span class="tag" style="background:rgba(16,185,129,0.12);color:var(--accent-green)">LOW</span></td></tr>
+                <tr><td><strong>Healthtech (ML)</strong></td><td>8</td><td>18</td><td style="font-family:'JetBrains Mono'">$195K</td><td><span style="color:var(--accent-green)">↑</span> Growing</td><td><span class="tag" style="background:rgba(16,185,129,0.12);color:var(--accent-green)">LOW</span></td></tr>
+                <tr><td><strong>Autonomous / Robotics</strong></td><td>7</td><td>12</td><td style="font-family:'JetBrains Mono'">$240K</td><td><span style="color:var(--text-muted)">→</span> Flat</td><td><span class="tag" style="background:rgba(245,158,11,0.12);color:var(--accent-orange)">MED</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- COMP HYGIENE + TALENT FLOW -->
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Comp Trends — Senior ML Engineer (P50)</div></div>
+            <div class="chart-container" style="height:220px"><canvas id="compTrendChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div><div class="card-title">Talent Flow — Last 90 Days</div><div class="card-subtitle">Where ML talent is moving</div></div></div>
+            <div style="padding:8px 0;">
+              <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">Top Talent Sources (losing people)</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="min-width:110px;font-size:12px;color:var(--text-secondary)">Meta AI</span><div style="flex:1;height:7px;background:var(--bg-input);border-radius:4px;overflow:hidden"><div style="width:80%;height:100%;background:rgba(239,68,68,0.5);border-radius:4px"></div></div><span style="font-size:12px;font-weight:700;color:var(--accent-red);min-width:20px;font-family:'JetBrains Mono'">12</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="min-width:110px;font-size:12px;color:var(--text-secondary)">Google DeepMind</span><div style="flex:1;height:7px;background:var(--bg-input);border-radius:4px;overflow:hidden"><div style="width:53%;height:100%;background:rgba(239,68,68,0.4);border-radius:4px"></div></div><span style="font-size:12px;font-weight:700;color:var(--accent-red);min-width:20px;font-family:'JetBrains Mono'">8</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span style="min-width:110px;font-size:12px;color:var(--text-secondary)">Amazon ML</span><div style="flex:1;height:7px;background:var(--bg-input);border-radius:4px;overflow:hidden"><div style="width:40%;height:100%;background:rgba(239,68,68,0.3);border-radius:4px"></div></div><span style="font-size:12px;font-weight:700;color:var(--accent-red);min-width:20px;font-family:'JetBrains Mono'">6</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">Top Destinations (gaining people)</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="min-width:110px;font-size:12px;color:var(--text-secondary)">Anthropic</span><div style="flex:1;height:7px;background:var(--bg-input);border-radius:4px;overflow:hidden"><div style="width:93%;height:100%;background:rgba(16,185,129,0.6);border-radius:4px"></div></div><span style="font-size:12px;font-weight:700;color:var(--accent-green);min-width:20px;font-family:'JetBrains Mono'">14</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="min-width:110px;font-size:12px;color:var(--text-secondary)">OpenAI</span><div style="flex:1;height:7px;background:var(--bg-input);border-radius:4px;overflow:hidden"><div style="width:73%;height:100%;background:rgba(16,185,129,0.5);border-radius:4px"></div></div><span style="font-size:12px;font-weight:700;color:var(--accent-green);min-width:20px;font-family:'JetBrains Mono'">11</span></div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="min-width:110px;font-size:12px;color:var(--text-secondary)">Databricks</span><div style="flex:1;height:7px;background:var(--bg-input);border-radius:4px;overflow:hidden"><div style="width:53%;height:100%;background:rgba(16,185,129,0.4);border-radius:4px"></div></div><span style="font-size:12px;font-weight:700;color:var(--accent-green);min-width:20px;font-family:'JetBrains Mono'">8</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADJACENT INDUSTRY OPPS -->
+        <div class="card">
+          <div class="card-header"><div><div class="card-title">Adjacent Industry Opportunities</div><div class="card-subtitle">Companies in proximate industries with ML hiring activity — lower recruiter competition</div></div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Industry</th><th>Example Companies</th><th>Open ML Roles</th><th>Avg Comp</th><th>Recruiter Competition</th><th>Fee Potential</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Fintech</strong></td><td>Stripe, Block, Plaid, Brex, Ramp</td><td>42</td><td>$215K</td><td><span class="tag green">LOW</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$840K</td></tr>
+                <tr><td><strong>Healthtech</strong></td><td>Tempus, Recursion, Flatiron, PathAI</td><td>18</td><td>$195K</td><td><span class="tag green">LOW</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$351K</td></tr>
+                <tr><td><strong>Autonomous</strong></td><td>Waymo, Cruise, Nuro, Figure AI</td><td>22</td><td>$240K</td><td><span class="tag orange">MED</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$528K</td></tr>
+                <tr><td><strong>Defense/Gov</strong></td><td>Palantir, Anduril, Shield AI</td><td>12</td><td>$210K</td><td><span class="tag green">LOW</span></td><td style="font-family:'JetBrains Mono';color:var(--accent-green)">$252K</td></tr>
+              </tbody>
+            </table>
+            <div style="margin-top:12px;padding:12px;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.15);border-radius:8px;font-size:12px;color:var(--text-secondary)">
+              <strong style="color:var(--accent-cyan)">Insight:</strong> Adjacent industries represent $1.97M in addressable fees with significantly lower recruiter competition than Frontier AI. Fintech ML teams are the best cross-sell — overlapping skill sets with your existing candidate bench, and you already have a Stripe relationship.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           INTEGRATIONS VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="view-integrations">
+        <div class="section-header">
+          <div class="section-title">Integrations</div>
+          <div class="section-desc">ATS, HRIS, and data source connections feeding real-time data into your pipeline</div>
+        </div>
+
+        <div class="grid-3 mb-24">
+          <!-- CONNECTED -->
+          <div class="card" style="border-color:rgba(16,185,129,0.3)">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:20px">🌿</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">Greenhouse</div>
+                <div style="font-size:11px;color:var(--accent-green);font-weight:600">● Connected</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+              Syncing jobs, candidates, scorecards, and offers every 30 minutes.
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:8px 0;border-top:1px solid var(--border)">
+              <span style="color:var(--text-muted)">Last sync</span>
+              <span style="color:var(--accent-green);font-weight:600">3 min ago</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0">
+              <span style="color:var(--text-muted)">Jobs synced</span>
+              <span style="font-weight:600">12</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0">
+              <span style="color:var(--text-muted)">Candidates</span>
+              <span style="font-weight:600">34</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0">
+              <span style="color:var(--text-muted)">Stage changes today</span>
+              <span style="font-weight:600;color:var(--accent-blue)">8</span>
+            </div>
+          </div>
+
+          <div class="card" style="border-color:rgba(16,185,129,0.3)">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:20px">🔍</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">Portal Scanner</div>
+                <div style="font-size:11px;color:var(--accent-green);font-weight:600">● Active</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+              Crawling 154 company career pages daily via Playwright + Greenhouse API + WebSearch.
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:8px 0;border-top:1px solid var(--border)">
+              <span style="color:var(--text-muted)">Last scan</span>
+              <span style="color:var(--accent-green);font-weight:600">Today 9:00 AM</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0">
+              <span style="color:var(--text-muted)">Portals tracked</span>
+              <span style="font-weight:600">154</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0">
+              <span style="color:var(--text-muted)">New roles found</span>
+              <span style="font-weight:600;color:var(--accent-blue)">12 today</span>
+            </div>
+          </div>
+
+          <div class="card" style="border-color:rgba(16,185,129,0.3)">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:20px">🌐</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">Google Jobs (SerpAPI)</div>
+                <div style="font-size:11px;color:var(--accent-green);font-weight:600">● Connected</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">
+              Competitive intel: scanning ML/AI job postings across all employers for comp ranges and market trends.
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:8px 0;border-top:1px solid var(--border)">
+              <span style="color:var(--text-muted)">Last scan</span>
+              <span style="color:var(--accent-green);font-weight:600">Today 6:00 AM</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0">
+              <span style="color:var(--text-muted)">Companies tracked</span>
+              <span style="font-weight:600">87</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0">
+              <span style="color:var(--text-muted)">Roles indexed</span>
+              <span style="font-weight:600">342</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AVAILABLE TO CONNECT -->
+        <div class="card">
+          <div class="card-header"><div><div class="card-title">Available Integrations</div><div class="card-subtitle">Connect additional data sources to enrich your intelligence</div></div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Platform</th><th>Type</th><th>What You Get</th><th>Cost</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Merge.dev</strong></td><td>Universal ATS/HRIS</td><td>Connect 50+ ATS platforms through one API</td><td>Free (3 accounts)</td><td><span class="tag" style="background:rgba(6,182,212,0.12);color:var(--accent-cyan)">Recommended</span></td></tr>
+                <tr><td><strong>Lever</strong></td><td>ATS</td><td>Postings, candidates, opportunities, offers</td><td>Free (API)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+                <tr><td><strong>Ashby</strong></td><td>ATS</td><td>Jobs, candidates, interview schedules</td><td>Free (API)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+                <tr><td><strong>LinkedIn Jobs</strong></td><td>Intel</td><td>Company-specific posting data, headcount</td><td>Proxycurl ($50/mo)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+                <tr><td><strong>Crunchbase</strong></td><td>Signals</td><td>Funding rounds → hiring predictions</td><td>Basic ($29/mo)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+                <tr><td><strong>BambooHR</strong></td><td>HRIS</td><td>Employee data (company mode)</td><td>Free (API)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════
+
+const viewTitles = {
+  dashboard: ['Dashboard', 'Overview'],
+  scan: ['Portal Scanner', 'Core Ops › Scan'],
+  evaluate: ['Candidate Evaluation', 'Core Ops › Evaluate'],
+  pipeline: ['Pipeline Dashboard', 'Core Ops › Pipeline'],
+  batch: ['Batch Evaluation', 'Core Ops › Batch'],
+  analytics: ['Analytics', 'Intelligence › Analytics'],
+  forecast: ['Hiring Forecast', 'Intelligence › Forecast'],
+  benchmark: ['Market Benchmark', 'Intelligence › Benchmark'],
+  strategy: ['Talent Strategy', 'Strategy › Workforce Plans'],
+  retention: ['Retention Tracking', 'Strategy › Retention'],
+  calibrate: ['Calibration Engine', 'Strategy › Calibrate'],
+  marketintel: ['Market Intelligence', 'Data › Market Intel'],
+  integrations: ['Integrations', 'Data › Connections'],
+};
+
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  const view = document.getElementById('view-' + name);
+  if (view) view.classList.add('active');
+
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(item => {
+    if (item.textContent.trim().toLowerCase().startsWith(name.substring(0,4))) {
+      item.classList.add('active');
+    }
+  });
+  // fallback for exact match
+  navItems.forEach(item => {
+    const t = item.textContent.trim().toLowerCase().replace(/[^a-z]/g,'');
+    if (t.includes(name)) item.classList.add('active');
+  });
+
+  const titles = viewTitles[name] || [name, ''];
+  document.getElementById('headerTitle').textContent = titles[0];
+  document.getElementById('headerBreadcrumb').textContent = titles[1];
+
+  // Scroll to top
+  document.getElementById('content').scrollTop = 0;
+
+  // Trigger chart animations if needed
+  if (name === 'analytics') setTimeout(initAnalyticsCharts, 100);
+  if (name === 'benchmark') setTimeout(initBenchmarkChart, 100);
+  if (name === 'marketintel') setTimeout(initCompTrend, 100);
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMPATIBILITY MATRIX — EVALUATE VIEW
+// ═══════════════════════════════════════════════════════════
+
+const matrixData = [
+  { label: 'Technical Match', score: 4.8, weight: '25%', color: '#10b981' },
+  { label: 'Seniority Fit', score: 5.0, weight: '15%', color: '#10b981' },
+  { label: 'Location', score: 5.0, weight: '10%', color: '#10b981' },
+  { label: 'Comp Alignment', score: 4.0, weight: '15%', color: '#3b82f6' },
+  { label: 'Culture Signals', score: 5.0, weight: '5%', color: '#10b981' },
+  { label: 'Gap Severity', score: 4.0, weight: '10%', color: '#3b82f6' },
+  { label: 'Presentation Risk', score: 4.5, weight: '10%', color: '#10b981' },
+  { label: 'Fill Probability', score: 4.5, weight: '10%', color: '#10b981' },
+];
+
+function buildMatrix() {
+  const container = document.getElementById('matrix-container');
+  matrixData.forEach((d,i) => {
+    const pct = (d.score / 5) * 100;
+    const el = document.createElement('div');
+    el.className = 'matrix-cell';
+    el.innerHTML = `
+      <span class="matrix-label" style="min-width:130px">${d.label} <span style="color:var(--text-muted);font-size:10px">(${d.weight})</span></span>
+      <div class="matrix-bar-wrap">
+        <div class="matrix-bar" style="width:0%;background:${d.color}" data-width="${pct}%"></div>
+      </div>
+      <span class="matrix-score" style="color:${d.color}">${d.score.toFixed(1)}</span>
+    `;
+    container.appendChild(el);
+  });
+  // Animate bars
+  setTimeout(() => {
+    document.querySelectorAll('.matrix-bar').forEach(bar => {
+      bar.style.width = bar.dataset.width;
+    });
+  }, 200);
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMPETENCY BARS — EVALUATE VIEW
+// ═══════════════════════════════════════════════════════════
+
+function buildCompetencyBars() {
+  const tech = [
+    { name: 'System Design', score: 4.5, color: '#3b82f6' },
+    { name: 'Production Eng', score: 4.0, color: '#3b82f6' },
+    { name: 'Problem Decomp', score: 4.5, color: '#3b82f6' },
+    { name: 'Evaluation Design', score: 3.0, color: '#f59e0b' },
+    { name: 'Research Method', score: 3.5, color: '#3b82f6' },
+  ];
+  const other = [
+    { name: 'Project Execution', score: 4.5, color: '#8b5cf6' },
+    { name: 'Velocity', score: 5.0, color: '#10b981' },
+    { name: 'Cross-Func Comm', score: 4.0, color: '#8b5cf6' },
+    { name: 'Written Comm', score: 3.5, color: '#8b5cf6' },
+    { name: 'Mentorship', score: 3.5, color: '#8b5cf6' },
+  ];
+
+  function render(data, containerId, title) {
+    const el = document.getElementById(containerId);
+    let html = `<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">${title}</div>`;
+    data.forEach(d => {
+      const pct = (d.score/5)*100;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:12px;min-width:110px;color:var(--text-secondary)">${d.name}</span>
+        <div style="flex:1;height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${d.color};border-radius:3px"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:${d.color};min-width:24px;text-align:right">${d.score}</span>
+      </div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  render(tech, 'competency-technical', 'Technical Competencies');
+  render(other, 'competency-other', 'Delivery & Communication');
+}
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY COMPETENCY BARS
+// ═══════════════════════════════════════════════════════════
+
+function buildStrategyCompetency() {
+  const data = [
+    { name: 'System Design Thinking', current: 8, target: 10 },
+    { name: 'Production Engineering', current: 5, target: 10 },
+    { name: 'Research Methodology', current: 4, target: 8 },
+    { name: 'Evaluation Design', current: 1, target: 8 },
+    { name: 'Agent Architecture', current: 0, target: 10 },
+    { name: 'People Management', current: 4, target: 8 },
+    { name: 'Mentorship Capacity', current: 3, target: 7 },
+  ];
+
+  const el = document.getElementById('strategyCompetency');
+  let html = '';
+  data.forEach(d => {
+    const curPct = d.current * 10;
+    const tarPct = d.target * 10;
+    const color = d.current >= d.target * 0.7 ? '#10b981' : d.current >= d.target * 0.4 ? '#f59e0b' : '#ef4444';
+    html += `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+        <span style="color:var(--text-secondary)">${d.name}</span>
+        <span style="color:var(--text-muted)">${d.current}/${d.target}</span>
+      </div>
+      <div style="position:relative;height:8px;background:var(--bg-input);border-radius:4px;overflow:visible">
+        <div style="position:absolute;height:100%;width:${tarPct}%;background:rgba(255,255,255,0.03);border-radius:4px;border-right:2px dashed var(--text-muted)"></div>
+        <div style="position:relative;height:100%;width:${curPct}%;background:${color};border-radius:4px;z-index:1"></div>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// FUNNEL — ANALYTICS VIEW
+// ═══════════════════════════════════════════════════════════
+
+function buildFunnel() {
+  const stages = [
+    { label: 'Roles Scanned', value: 342, color: 'rgba(59,130,246,0.3)', rate: '—', rateColor: '' },
+    { label: 'Niche Match', value: 86, color: 'rgba(139,92,246,0.4)', rate: '25.1%', rateColor: 'var(--accent-purple)' },
+    { label: 'Candidates Eval\'d', value: 48, color: 'rgba(6,182,212,0.4)', rate: '55.8%', rateColor: 'var(--accent-cyan)' },
+    { label: 'Submitted', value: 24, color: 'rgba(59,130,246,0.5)', rate: '50.0%', rateColor: 'var(--accent-blue)' },
+    { label: 'Interviewing', value: 14, color: 'rgba(245,158,11,0.5)', rate: '58.3%', rateColor: 'var(--accent-orange)' },
+    { label: 'Offers', value: 9, color: 'rgba(16,185,129,0.5)', rate: '64.3%', rateColor: 'var(--accent-green)' },
+    { label: 'Placed', value: 7, color: 'rgba(16,185,129,0.7)', rate: '77.8%', rateColor: 'var(--accent-green)' },
+  ];
+
+  const max = stages[0].value;
+  const container = document.getElementById('funnel-container');
+  stages.forEach(s => {
+    const pct = (s.value / max) * 100;
+    container.innerHTML += `
+      <div class="funnel-stage">
+        <span class="funnel-label">${s.label}</span>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-bar" style="width:${pct}%;background:${s.color}">
+            <span class="funnel-value">${s.value}</span>
+          </div>
+        </div>
+        <span class="funnel-rate" style="color:${s.rateColor || 'var(--text-muted)'}">${s.rate}</span>
+      </div>
+    `;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// HEAT MAP — FORECAST VIEW
+// ═══════════════════════════════════════════════════════════
+
+function buildHeatmap() {
+  const companies = ['Anthropic', 'OpenAI', 'Databricks', 'Scale AI', 'Stripe', 'Cohere', 'Meta AI', 'Runway'];
+  const roles = ['IC-MLE', 'IC-DE', 'IC-AI', 'IC-DS', 'MGR', 'LEAD'];
+  const data = [
+    [85,60,95,40,30,70],
+    [75,50,90,55,40,60],
+    [90,85,40,70,55,30],
+    [60,70,55,45,80,35],
+    [50,75,30,65,40,25],
+    [92,55,80,35,50,65],
+    [70,45,85,60,35,50],
+    [65,30,75,25,45,40],
+  ];
+
+  function getColor(v) {
+    if (v >= 80) return 'rgba(16,185,129,0.7)';
+    if (v >= 60) return 'rgba(59,130,246,0.5)';
+    if (v >= 40) return 'rgba(245,158,11,0.4)';
+    if (v >= 20) return 'rgba(239,68,68,0.25)';
+    return 'rgba(255,255,255,0.05)';
+  }
+
+  const container = document.getElementById('heatmap-container');
+  // Header row
+  let html = '<div class="heatmap-row"><span class="heatmap-label"></span>';
+  roles.forEach(r => { html += `<div class="heatmap-cell" style="width:60px;justify-content:center;background:none;font-size:10px;color:var(--text-muted);font-weight:600">${r}</div>`; });
+  html += '</div>';
+
+  companies.forEach((c, ci) => {
+    html += `<div class="heatmap-row"><span class="heatmap-label">${c}</span>`;
+    data[ci].forEach(v => {
+      html += `<div class="heatmap-cell" style="width:60px;justify-content:center;background:${getColor(v)};color:${v>=60?'#fff':'var(--text-muted)'}" title="${v}%">${v}</div>`;
+    });
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART.JS — DASHBOARD CHARTS
+// ═══════════════════════════════════════════════════════════
+
+const chartDefaults = {
+  color: '#8888a0',
+  borderColor: '#2a2a3a',
+  font: { family: "'Inter', sans-serif" }
+};
+
+Chart.defaults.color = chartDefaults.color;
+Chart.defaults.borderColor = chartDefaults.borderColor;
+Chart.defaults.font.family = chartDefaults.font.family;
+
+function initDashboardCharts() {
+  // Pipeline velocity
+  new Chart(document.getElementById('pipelineChart'), {
+    type: 'line',
+    data: {
+      labels: ['Jan','Feb','Mar','Apr','May','Jun'],
+      datasets: [
+        {
+          label: 'Submissions',
+          data: [8,12,10,15,14,18],
+          borderColor: '#8b5cf6',
+          backgroundColor: 'rgba(139,92,246,0.1)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 2,
+          pointRadius: 0,
+        },
+        {
+          label: 'Placements',
+          data: [1,2,1,3,2,3],
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,0.1)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 2,
+          pointRadius: 0,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(42,42,58,0.5)' }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Revenue chart
+  new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Jan','Feb','Mar','Apr','May','Jun'],
+      datasets: [
+        {
+          label: 'Placed Revenue',
+          data: [0, 44, 48, 52, 0, 0],
+          backgroundColor: 'rgba(16,185,129,0.6)',
+          borderRadius: 4,
+        },
+        {
+          label: 'Projected',
+          data: [0, 0, 0, 0, 96, 48],
+          backgroundColor: 'rgba(16,185,129,0.15)',
+          borderRadius: 4,
+          borderColor: 'rgba(16,185,129,0.4)',
+          borderWidth: 1,
+          borderDash: [4,4],
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } }, stacked: true },
+        y: { grid: { color: 'rgba(42,42,58,0.5)' }, ticks: { font: { size: 11 }, callback: v => '$'+v+'K' }, stacked: true }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART.JS — ANALYTICS CHARTS
+// ═══════════════════════════════════════════════════════════
+
+let analyticsInitialized = false;
+function initAnalyticsCharts() {
+  if (analyticsInitialized) return;
+  analyticsInitialized = true;
+
+  // Time-to-fill
+  new Chart(document.getElementById('ttfChart'), {
+    type: 'bar',
+    data: {
+      labels: ['IC-MLE', 'IC-DE', 'IC-AI', 'IC-DS', 'MGR', 'LEAD'],
+      datasets: [{
+        label: 'Avg Days to Fill',
+        data: [28, 25, 38, 22, 42, 35],
+        backgroundColor: ['rgba(59,130,246,0.5)','rgba(6,182,212,0.5)','rgba(245,158,11,0.5)','rgba(139,92,246,0.5)','rgba(239,68,68,0.5)','rgba(236,72,153,0.5)'],
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(42,42,58,0.5)' }, ticks: { font: { size: 11 }, callback: v => v + 'd' } }
+      }
+    }
+  });
+
+  // Revenue per hour
+  new Chart(document.getElementById('rphChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Anthropic ($485/hr)', 'Stripe ($380/hr)', 'Scale AI ($260/hr)', 'Databricks ($220/hr)'],
+      datasets: [{
+        data: [485, 380, 260, 220],
+        backgroundColor: ['rgba(16,185,129,0.7)','rgba(59,130,246,0.7)','rgba(245,158,11,0.7)','rgba(139,92,246,0.5)'],
+        borderWidth: 0,
+        spacing: 3,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART.JS — BENCHMARK CHART
+// ═══════════════════════════════════════════════════════════
+
+let benchmarkInitialized = false;
+function initBenchmarkChart() {
+  if (benchmarkInitialized) return;
+  benchmarkInitialized = true;
+
+  new Chart(document.getElementById('companyFitChart'), {
+    type: 'radar',
+    data: {
+      labels: ['Technical', 'Seniority', 'Comp Fit', 'Culture', 'Interview Style', 'Agency Friendly'],
+      datasets: [
+        {
+          label: 'Anthropic',
+          data: [4.8, 5.0, 4.0, 5.0, 4.5, 4.0],
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#3b82f6',
+        },
+        {
+          label: 'Stripe',
+          data: [4.2, 4.5, 4.5, 3.5, 4.0, 4.5],
+          borderColor: '#8b5cf6',
+          backgroundColor: 'rgba(139,92,246,0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#8b5cf6',
+        },
+        {
+          label: 'Scale AI',
+          data: [3.8, 4.0, 4.0, 4.0, 3.5, 3.5],
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#f59e0b',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          beginAtZero: true,
+          max: 5,
+          ticks: { stepSize: 1, font: { size: 10 }, backdropColor: 'transparent' },
+          grid: { color: 'rgba(42,42,58,0.5)' },
+          angleLines: { color: 'rgba(42,42,58,0.5)' },
+          pointLabels: { font: { size: 11 } }
+        }
+      },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 16, font: { size: 11 } } } }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART.JS — MARKET INTEL COMP TREND
+// ═══════════════════════════════════════════════════════════
+
+let compTrendInit = false;
+function initCompTrend() {
+  if (compTrendInit) return;
+  compTrendInit = true;
+  new Chart(document.getElementById('compTrendChart'), {
+    type: 'line',
+    data: {
+      labels: ['Oct 25','Nov','Dec','Jan 26','Feb','Mar','Apr'],
+      datasets: [
+        {label:'Frontier AI',data:[250,252,255,258,260,262,265],borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.05)',fill:true,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#10b981'},
+        {label:'Big Tech',data:[240,242,243,245,248,250,252],borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.05)',fill:true,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#3b82f6'},
+        {label:'AI Infra',data:[225,226,228,230,232,234,237],borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,0.05)',fill:true,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#8b5cf6'},
+        {label:'SaaS/Fintech',data:[200,202,203,205,207,210,213],borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.05)',fill:true,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#f59e0b'},
+      ]
+    },
+    options: {
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12,font:{size:11}}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'rgba(42,42,58,0.5)'},ticks:{font:{size:11},callback:v=>'$'+v+'K'}}}
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildMatrix();
+  buildCompetencyBars();
+  buildFunnel();
+  buildHeatmap();
+  buildStrategyCompetency();
+  initDashboardCharts();
+});
+</script>
+
+</body>
+</html>

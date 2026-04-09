@@ -58,6 +58,13 @@ The system also **calibrates over time**. Every placement and rejection gets fed
 |------|-------------|
 | `strategy` | Client-facing talent strategy reports — org design, hiring sequences, workforce planning |
 
+### Data & Integrations
+
+| Mode | What It Does |
+|------|-------------|
+| `integrate` | Sync data from ATS (Greenhouse, Lever, Ashby, Merge.dev) and HRIS (BambooHR, Rippling) |
+| `market-intel` | Competitive landscape, comp hygiene, posting quality audit, talent flow analysis |
+
 ## Quick Start
 
 ### Prerequisites
@@ -109,6 +116,8 @@ claude /placement-ops analytics     # Funnel metrics + revenue analysis
 claude /placement-ops forecast      # Predict hiring needs 30-90 days out
 claude /placement-ops retention     # Track post-placement health
 claude /placement-ops strategy      # Generate talent strategy for a client
+claude /placement-ops integrate     # Sync ATS/HRIS data
+claude /placement-ops market-intel  # Competitive landscape + comp hygiene
 ```
 
 ---
@@ -218,10 +227,18 @@ placement-ops/
 │   ├── analytics.md            # Funnel metrics, revenue analytics, client scoreboard
 │   ├── forecast.md             # Hiring signal detection + expansion predictions
 │   ├── retention.md            # Post-placement tracking + retention health
-│   └── strategy.md             # Client-facing talent strategy + workforce plans
+│   ├── strategy.md             # Client-facing talent strategy + workforce plans
+│   ├── integrate.md            # ATS/HRIS data sync + webhook support
+│   └── market-intel.md         # Competitive intelligence + comp hygiene
 ├── taxonomy/
 │   ├── skills.yml              # 150+ skills with adjacency relationships
 │   └── competencies.yml        # Competency framework (14 competencies, 4 categories)
+├── config/
+│   ├── integrations.example.yml # ATS/HRIS/data source connection config
+│   └── ...
+├── ui/
+│   ├── dashboard.html          # Agency-side interactive dashboard (16 views)
+│   └── people-ops.html         # Company-side internal talent engineering dashboard
 ├── config/
 │   ├── profile.example.yml     # Your recruiter profile template
 │   └── portals.example.yml     # 150+ pre-loaded Data/ML/AI companies

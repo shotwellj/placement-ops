@@ -40,6 +40,10 @@ OPTIMIZATION
 
 STRATEGY
 14. strategy   — Client-facing talent strategy & workforce plans
+
+DATA & INTEGRATIONS
+15. integrate  — Sync ATS/HRIS data (Greenhouse, Lever, Merge.dev)
+16. market-intel — Competitive landscape, comp hygiene, talent flow
 ```
 
 The user can also jump straight to a mode: `/placement-ops scan`

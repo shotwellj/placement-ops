@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>People-Ops — Internal Talent Engineering Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   PEOPLE-OPS — INTERNAL TALENT ENGINEERING DASHBOARD
+   For companies tracking employee lifecycle, health,
+   development, retention, and workforce planning.
+   ═══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #09090b;
+  --bg-secondary: #0f0f13;
+  --bg-card: #141419;
+  --bg-card-hover: #1a1a22;
+  --bg-elevated: #1e1e28;
+  --bg-input: #0c0c10;
+  --border: #27272e;
+  --border-hover: #37373f;
+  --text-primary: #eaeaf0;
+  --text-secondary: #85859a;
+  --text-muted: #4e4e62;
+  --accent-emerald: #34d399;
+  --accent-blue: #60a5fa;
+  --accent-violet: #a78bfa;
+  --accent-amber: #fbbf24;
+  --accent-rose: #fb7185;
+  --accent-cyan: #22d3ee;
+  --accent-teal: #2dd4bf;
+  --accent-sky: #38bdf8;
+  --gradient-primary: linear-gradient(135deg, #34d399, #22d3ee);
+  --gradient-warm: linear-gradient(135deg, #fbbf24, #fb7185);
+  --gradient-cool: linear-gradient(135deg, #60a5fa, #a78bfa);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --radius: 8px;
+  --radius-lg: 12px;
+  --sidebar-w: 248px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg-primary); color:var(--text-primary); overflow:hidden; height:100vh; }
+
+/* ═══ LAYOUT ═══ */
+.app { display:flex; height:100vh; }
+
+/* ═══ SIDEBAR ═══ */
+.sidebar {
+  width:var(--sidebar-w); background:var(--bg-secondary); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; flex-shrink:0; z-index:10;
+}
+.sidebar-logo { padding:20px 20px 16px; border-bottom:1px solid var(--border); }
+.sidebar-logo h1 {
+  font-size:17px; font-weight:900; letter-spacing:-0.5px;
+  background:var(--gradient-primary); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.sidebar-logo span { font-size:10px; font-weight:500; color:var(--text-muted); text-transform:uppercase; letter-spacing:1.5px; display:block; margin-top:3px; }
+
+.sidebar-section { padding:16px 12px 4px; }
+.sidebar-section-title { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:1.2px; padding:0 8px; margin-bottom:4px; }
+.sidebar-nav { padding:4px 12px; }
+
+.nav-item {
+  display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px;
+  cursor:pointer; font-size:13px; font-weight:500; color:var(--text-secondary);
+  transition:all 0.15s ease; position:relative; user-select:none;
+}
+.nav-item:hover { background:var(--bg-card); color:var(--text-primary); }
+.nav-item.active { background:rgba(52,211,153,0.08); color:var(--accent-emerald); }
+.nav-item.active::before {
+  content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
+  width:3px; height:16px; background:var(--accent-emerald); border-radius:0 2px 2px 0;
+}
+.nav-icon { width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.nav-badge {
+  margin-left:auto; font-size:10px; font-weight:600; padding:1px 6px; border-radius:10px;
+}
+.nav-badge.green { background:rgba(52,211,153,0.12); color:var(--accent-emerald); }
+.nav-badge.amber { background:rgba(251,191,36,0.12); color:var(--accent-amber); }
+.nav-badge.rose { background:rgba(251,113,133,0.12); color:var(--accent-rose); }
+.nav-badge.blue { background:rgba(96,165,250,0.12); color:var(--accent-blue); }
+
+.sidebar-footer { margin-top:auto; padding:16px 20px; border-top:1px solid var(--border); }
+.sidebar-footer-text { font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+
+/* ═══ MAIN ═══ */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.header {
+  height:56px; border-bottom:1px solid var(--border); display:flex; align-items:center;
+  padding:0 24px; gap:16px; flex-shrink:0; background:var(--bg-secondary);
+}
+.header-title { font-size:14px; font-weight:600; }
+.header-breadcrumb { font-size:12px; color:var(--text-muted); }
+.header-right { margin-left:auto; display:flex; align-items:center; gap:12px; }
+.header-stat {
+  display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary);
+  padding:4px 10px; background:var(--bg-card); border-radius:6px; border:1px solid var(--border);
+}
+.header-stat .dot { width:6px; height:6px; border-radius:50%; background:var(--accent-emerald); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+.content { flex:1; overflow-y:auto; padding:24px; scroll-behavior:smooth; }
+.content::-webkit-scrollbar { width:6px; }
+.content::-webkit-scrollbar-track { background:transparent; }
+.content::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* ═══ VIEWS ═══ */
+.view { display:none; animation:fadeIn 0.3s ease; }
+.view.active { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ═══ CARDS ═══ */
+.card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; transition:border-color 0.2s; }
+.card:hover { border-color:var(--border-hover); }
+.card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.card-title { font-size:13px; font-weight:600; }
+.card-subtitle { font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+/* ═══ GRIDS ═══ */
+.grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+.grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.grid-2 { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+.grid-2-1 { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+
+/* ═══ KPI ═══ */
+.kpi { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; position:relative; overflow:hidden; }
+.kpi::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.kpi.emerald::before { background:var(--gradient-primary); }
+.kpi.blue::before { background:var(--gradient-cool); }
+.kpi.amber::before { background:var(--gradient-warm); }
+.kpi.violet::before { background:linear-gradient(135deg,#a78bfa,#f472b6); }
+.kpi-label { font-size:11px; font-weight:500; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
+.kpi-value { font-size:28px; font-weight:800; letter-spacing:-1px; line-height:1; }
+.kpi-value.emerald { color:var(--accent-emerald); }
+.kpi-value.blue { color:var(--accent-blue); }
+.kpi-value.amber { color:var(--accent-amber); }
+.kpi-value.violet { color:var(--accent-violet); }
+.kpi-value.rose { color:var(--accent-rose); }
+.kpi-change { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:600; margin-top:8px; padding:2px 6px; border-radius:4px; }
+.kpi-change.up { background:rgba(52,211,153,0.1); color:var(--accent-emerald); }
+.kpi-change.down { background:rgba(251,113,133,0.1); color:var(--accent-rose); }
+.kpi-change.neutral { background:rgba(96,165,250,0.1); color:var(--accent-blue); }
+
+/* ═══ TABLES ═══ */
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; padding:10px 12px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); border-bottom:1px solid var(--border); white-space:nowrap; }
+td { padding:12px; border-bottom:1px solid rgba(39,39,46,0.5); vertical-align:middle; }
+tr:hover td { background:rgba(52,211,153,0.02); }
+
+/* ═══ PILLS ═══ */
+.pill {
+  display:inline-flex; align-items:center; gap:5px; padding:3px 10px;
+  border-radius:20px; font-size:11px; font-weight:600;
+}
+.pill.healthy { background:rgba(52,211,153,0.12); color:var(--accent-emerald); }
+.pill.watch { background:rgba(251,191,36,0.12); color:var(--accent-amber); }
+.pill.risk { background:rgba(251,113,133,0.12); color:var(--accent-rose); }
+.pill.new { background:rgba(96,165,250,0.12); color:var(--accent-blue); }
+.pill.growing { background:rgba(167,139,250,0.12); color:var(--accent-violet); }
+.pill.thriving { background:rgba(52,211,153,0.15); color:var(--accent-emerald); }
+.pill.onboarding { background:rgba(34,211,238,0.12); color:var(--accent-cyan); }
+
+/* ═══ TAGS ═══ */
+.tag { display:inline-flex; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; margin-right:4px; margin-bottom:4px; }
+.tag.emerald { background:rgba(52,211,153,0.12); color:var(--accent-emerald); }
+.tag.blue { background:rgba(96,165,250,0.12); color:var(--accent-blue); }
+.tag.violet { background:rgba(167,139,250,0.12); color:var(--accent-violet); }
+.tag.amber { background:rgba(251,191,36,0.12); color:var(--accent-amber); }
+.tag.rose { background:rgba(251,113,133,0.12); color:var(--accent-rose); }
+.tag.cyan { background:rgba(34,211,238,0.12); color:var(--accent-cyan); }
+
+/* ═══ AVATAR ═══ */
+.avatar {
+  width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; flex-shrink:0;
+}
+
+/* ═══ PERSON ROW ═══ */
+.person-row { display:flex; align-items:center; gap:12px; }
+.person-info { }
+.person-name { font-weight:600; font-size:13px; }
+.person-role { font-size:11px; color:var(--text-muted); }
+
+/* ═══ PROGRESS RING ═══ */
+.ring-container { position:relative; width:140px; height:140px; }
+.ring-container svg { transform:rotate(-90deg); }
+.ring-label {
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.ring-value { font-size:28px; font-weight:900; font-family:'JetBrains Mono',monospace; }
+.ring-text { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
+
+/* ═══ TIMELINE ═══ */
+.timeline { position:relative; padding-left:24px; }
+.timeline::before { content:''; position:absolute; left:8px; top:0; bottom:0; width:2px; background:var(--border); }
+.tl-item { position:relative; padding-bottom:24px; }
+.tl-dot { position:absolute; left:-20px; top:2px; width:12px; height:12px; border-radius:50%; border:2px solid; }
+.tl-dot.done { background:var(--accent-emerald); border-color:var(--accent-emerald); }
+.tl-dot.active { background:var(--accent-blue); border-color:var(--accent-blue); animation:pulse 2s infinite; }
+.tl-dot.pending { background:transparent; border-color:var(--text-muted); }
+.tl-date { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
+.tl-title { font-size:13px; font-weight:600; margin-top:4px; }
+.tl-desc { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+
+/* ═══ SIGNAL CARDS ═══ */
+.signal { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:8px; display:flex; align-items:flex-start; gap:12px; transition:border-color 0.2s; }
+.signal:hover { border-color:var(--border-hover); }
+.signal-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.signal-content { flex:1; }
+.signal-title { font-size:13px; font-weight:600; }
+.signal-desc { font-size:12px; color:var(--text-secondary); margin-top:2px; line-height:1.5; }
+.signal-meta { font-size:10px; color:var(--text-muted); margin-top:6px; display:flex; gap:12px; }
+
+/* ═══ SCORE BAR ═══ */
+.score-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.score-label { font-size:12px; min-width:130px; color:var(--text-secondary); }
+.score-track { flex:1; height:7px; background:var(--bg-input); border-radius:4px; overflow:hidden; }
+.score-fill { height:100%; border-radius:4px; transition:width 1s cubic-bezier(0.4,0,0.2,1); }
+.score-val { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; min-width:28px; text-align:right; }
+
+/* ═══ CHART ═══ */
+.chart-container { position:relative; }
+
+/* ═══ ALERT BOX ═══ */
+.alert-box { padding:14px 16px; border-radius:var(--radius); font-size:12px; line-height:1.6; margin-bottom:8px; }
+.alert-box.rose { background:rgba(251,113,133,0.06); border:1px solid rgba(251,113,133,0.15); }
+.alert-box.amber { background:rgba(251,191,36,0.06); border:1px solid rgba(251,191,36,0.15); }
+.alert-box.emerald { background:rgba(52,211,153,0.06); border:1px solid rgba(52,211,153,0.15); }
+.alert-box.blue { background:rgba(96,165,250,0.06); border:1px solid rgba(96,165,250,0.15); }
+
+/* ═══ HEATMAP ═══ */
+.hm-row { display:flex; gap:3px; margin-bottom:3px; }
+.hm-cell { width:44px; height:32px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; cursor:pointer; transition:transform 0.15s; }
+.hm-cell:hover { transform:scale(1.15); z-index:2; }
+.hm-label { font-size:11px; color:var(--text-muted); width:100px; text-align:right; margin-right:8px; display:flex; align-items:center; justify-content:flex-end; }
+.hm-header { font-size:10px; color:var(--text-muted); font-weight:600; width:44px; text-align:center; }
+
+.mb-16 { margin-bottom:16px; }
+.mb-20 { margin-bottom:20px; }
+.mb-24 { margin-bottom:24px; }
+
+.section-header { margin-bottom:20px; }
+.section-title { font-size:18px; font-weight:800; letter-spacing:-0.5px; }
+.section-desc { font-size:13px; color:var(--text-secondary); margin-top:4px; }
+
+@media (max-width:1200px) { .grid-4{grid-template-columns:repeat(2,1fr);} }
+@media (max-width:900px) { .grid-3,.grid-2-1{grid-template-columns:1fr;} .sidebar{display:none;} }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>PEOPLE-OPS</h1>
+      <span>Internal Talent Engineering</span>
+    </div>
+    <div class="sidebar-section"><div class="sidebar-section-title">Overview</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="go('dashboard')"><span class="nav-icon">⬡</span> Dashboard</div>
+    </nav>
+    <div class="sidebar-section"><div class="sidebar-section-title">People</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="go('roster')"><span class="nav-icon">◉</span> Team Roster <span class="nav-badge green">47</span></div>
+      <div class="nav-item" onclick="go('onboarding')"><span class="nav-icon">◎</span> Onboarding <span class="nav-badge blue">4</span></div>
+      <div class="nav-item" onclick="go('retention')"><span class="nav-icon">◈</span> Retention <span class="nav-badge rose">2</span></div>
+    </nav>
+    <div class="sidebar-section"><div class="sidebar-section-title">Growth</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="go('development')"><span class="nav-icon">◬</span> Development</div>
+      <div class="nav-item" onclick="go('competency')"><span class="nav-icon">◧</span> Competency Map</div>
+      <div class="nav-item" onclick="go('engagement')"><span class="nav-icon">◐</span> Engagement <span class="nav-badge green">78</span></div>
+    </nav>
+    <div class="sidebar-section"><div class="sidebar-section-title">Planning</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="go('workforce')"><span class="nav-icon">◆</span> Workforce Plan</div>
+      <div class="nav-item" onclick="go('hiring')"><span class="nav-icon">▤</span> Hiring Pipeline <span class="nav-badge amber">6</span></div>
+      <div class="nav-item" onclick="go('analytics')"><span class="nav-icon">⧉</span> Analytics</div>
+    </nav>
+    <div class="sidebar-footer"><div class="sidebar-footer-text">v1.0 · Company Mode</div></div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <span class="header-title" id="hTitle">Dashboard</span>
+      <span class="header-breadcrumb" id="hBread">Overview</span>
+      <div class="header-right">
+        <div class="header-stat"><span class="dot"></span><span>47 employees</span></div>
+        <div class="header-stat"><span style="color:var(--accent-emerald);font-weight:700">93%</span><span>retention</span></div>
+        <div class="header-stat"><span style="color:var(--accent-amber);font-weight:700">6</span><span>open roles</span></div>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ═══════════════════════════════════════════════════
+           DASHBOARD
+           ═══════════════════════════════════════════════════ -->
+      <div class="view active" id="v-dashboard">
+        <div class="section-header">
+          <div class="section-title">Org Health Dashboard</div>
+          <div class="section-desc">Real-time pulse of your engineering organization</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald">
+            <div class="kpi-label">Total Headcount</div>
+            <div class="kpi-value emerald">47</div>
+            <div class="kpi-change up">↑ 5 this quarter</div>
+          </div>
+          <div class="kpi blue">
+            <div class="kpi-label">12-Mo Retention</div>
+            <div class="kpi-value blue">93%</div>
+            <div class="kpi-change up">↑ 2% from last quarter</div>
+          </div>
+          <div class="kpi amber">
+            <div class="kpi-label">Avg Tenure</div>
+            <div class="kpi-value amber">2.1y</div>
+            <div class="kpi-change neutral">→ stable</div>
+          </div>
+          <div class="kpi violet">
+            <div class="kpi-label">eNPS Score</div>
+            <div class="kpi-value violet">+42</div>
+            <div class="kpi-change up">↑ 8 from last survey</div>
+          </div>
+        </div>
+
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">Headcount Trend</div><div class="card-subtitle">Growth over the last 12 months</div></div>
+            </div>
+            <div class="chart-container" style="height:220px"><canvas id="headcountChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">Attrition by Quarter</div><div class="card-subtitle">Voluntary vs. involuntary departures</div></div>
+            </div>
+            <div class="chart-container" style="height:220px"><canvas id="attritionChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- ALERTS -->
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Action Items</div>
+              <span class="tag rose">3 urgent</span>
+            </div>
+            <div class="signal" style="border-left:3px solid var(--accent-rose)">
+              <div class="signal-content">
+                <div class="signal-title" style="color:var(--accent-rose)">Flight Risk: Sarah Kim (Staff MLE)</div>
+                <div class="signal-desc">Comp below P50, no promo in 18 months, manager 1:1s missed 3x. Flight risk model: 72%.</div>
+                <div class="signal-meta"><span>Risk Score: HIGH</span><span>Action: Schedule skip-level this week</span></div>
+              </div>
+            </div>
+            <div class="signal" style="border-left:3px solid var(--accent-amber)">
+              <div class="signal-content">
+                <div class="signal-title" style="color:var(--accent-amber)">Onboarding: 2 new hires need Day-30 check-in</div>
+                <div class="signal-desc">Alex Reyes (Data Eng) and Mia Torres (ML Eng) both started March 8. First milestone review due.</div>
+                <div class="signal-meta"><span>Due today</span><span>Onboarding health: both green so far</span></div>
+              </div>
+            </div>
+            <div class="signal" style="border-left:3px solid var(--accent-blue)">
+              <div class="signal-content">
+                <div class="signal-title">Promotion cycle: 6 candidates ready for review</div>
+                <div class="signal-desc">Q2 promo packet deadline is April 15. Engineering has 6 nominees — 3 have complete packets.</div>
+                <div class="signal-meta"><span>7 days remaining</span><span>3 packets incomplete</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Team Composition</div>
+            </div>
+            <div class="chart-container" style="height:260px"><canvas id="compositionChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- RECENT HIRES / DEPARTURES -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Recent Hires</div>
+              <span class="tag emerald">4 in last 60 days</span>
+            </div>
+            <table>
+              <thead><tr><th>Name</th><th>Role</th><th>Start</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Alex Reyes</strong></td><td>Data Engineer</td><td>Mar 8</td><td><span class="pill onboarding">● Day 30</span></td></tr>
+                <tr><td><strong>Mia Torres</strong></td><td>ML Engineer</td><td>Mar 8</td><td><span class="pill onboarding">● Day 30</span></td></tr>
+                <tr><td><strong>Dev Patel</strong></td><td>Sr. Agent Eng</td><td>Feb 20</td><td><span class="pill growing">● Day 47</span></td></tr>
+                <tr><td><strong>Clara Song</strong></td><td>Analytics Eng</td><td>Feb 3</td><td><span class="pill thriving">● Day 64</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Open Roles</div>
+              <span class="tag amber">6 active</span>
+            </div>
+            <table>
+              <thead><tr><th>Role</th><th>Team</th><th>Days Open</th><th>Candidates</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Staff ML Engineer</strong></td><td>Training</td><td style="color:var(--accent-rose)">45d</td><td>3</td></tr>
+                <tr><td><strong>Engineering Manager</strong></td><td>Platform</td><td style="color:var(--accent-amber)">32d</td><td>5</td></tr>
+                <tr><td><strong>ML Eval Engineer</strong></td><td>Evals</td><td>18d</td><td>2</td></tr>
+                <tr><td><strong>Data Engineer</strong></td><td>Infra</td><td>12d</td><td>8</td></tr>
+                <tr><td><strong>Agent Engineer</strong></td><td>Agents</td><td>8d</td><td>4</td></tr>
+                <tr><td><strong>Junior MLE</strong></td><td>Training</td><td>5d</td><td>12</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           TEAM ROSTER
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-roster">
+        <div class="section-header">
+          <div class="section-title">Team Roster</div>
+          <div class="section-desc">47 people across 5 teams · hover for health signals</div>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>Employee</th><th>Role</th><th>Team</th><th>Level</th><th>Tenure</th><th>Health</th><th>Last 1:1</th><th>Flight Risk</th></tr></thead>
+            <tbody>
+              <tr><td><div class="person-row"><div class="avatar" style="background:rgba(52,211,153,0.15);color:var(--accent-emerald)">SC</div><div><div class="person-name">Sarah Chen</div><div class="person-role">VP Engineering</div></div></div></td><td>VP Eng</td><td>Leadership</td><td>L8</td><td>3.2y</td><td><span class="pill thriving">● Thriving</span></td><td>Apr 5</td><td style="color:var(--accent-emerald);font-weight:700">Low</td></tr>
+              <tr><td><div class="person-row"><div class="avatar" style="background:rgba(96,165,250,0.15);color:var(--accent-blue)">JL</div><div><div class="person-name">James Liu</div><div class="person-role">EM — Training Pod</div></div></div></td><td>Eng Manager</td><td>Training</td><td>L7</td><td>2.8y</td><td><span class="pill healthy">● Healthy</span></td><td>Apr 7</td><td style="color:var(--accent-emerald);font-weight:700">Low</td></tr>
+              <tr><td><div class="person-row"><div class="avatar" style="background:rgba(251,113,133,0.15);color:var(--accent-rose)">SK</div><div><div class="person-name">Sarah Kim</div><div class="person-role">Staff MLE</div></div></div></td><td>Staff MLE</td><td>Training</td><td>L6</td><td>2.1y</td><td><span class="pill risk">● At Risk</span></td><td style="color:var(--accent-rose)">Mar 15</td><td style="color:var(--accent-rose);font-weight:700">72%</td></tr>
+              <tr><td><div class="person-row"><div class="avatar" style="background:rgba(167,139,250,0.15);color:var(--accent-violet)">MR</div><div><div class="person-name">Marcus Rivera</div><div class="person-role">Senior MLE</div></div></div></td><td>Sr MLE</td><td>Training</td><td>L5</td><td>1.5y</td><td><span class="pill healthy">● Healthy</span></td><td>Apr 6</td><td style="color:var(--accent-emerald);font-weight:700">Low</td></tr>
+              <tr><td><div class="person-row"><div class="avatar" style="background:rgba(34,211,238,0.15);color:var(--accent-cyan)">DP</div><div><div class="person-name">Dev Patel</div><div class="person-role">Sr. Agent Engineer</div></div></div></td><td>Sr Agent Eng</td><td>Agents</td><td>L5</td><td>47d</td><td><span class="pill onboarding">● Onboarding</span></td><td>Apr 4</td><td style="color:var(--accent-emerald);font-weight:700">Low</td></tr>
+              <tr><td><div class="person-row"><div class="avatar" style="background:rgba(251,191,36,0.15);color:var(--accent-amber)">WZ</div><div><div class="person-name">Wei Zhang</div><div class="person-role">Senior Data Eng</div></div></div></td><td>Sr Data Eng</td><td>Infra</td><td>L5</td><td>1.8y</td><td><span class="pill watch">● Watch</span></td><td>Apr 2</td><td style="color:var(--accent-amber);font-weight:700">38%</td></tr>
+              <tr><td><div class="person-row"><div class="avatar" style="background:rgba(96,165,250,0.15);color:var(--accent-blue)">AR</div><div><div class="person-name">Alex Reyes</div><div class="person-role">Data Engineer</div></div></div></td><td>Data Eng</td><td>Infra</td><td>L4</td><td>30d</td><td><span class="pill onboarding">● Onboarding</span></td><td>Apr 1</td><td style="color:var(--accent-emerald);font-weight:700">Low</td></tr>
+              <tr><td><div class="person-row"><div class="avatar" style="background:rgba(52,211,153,0.15);color:var(--accent-emerald)">CS</div><div><div class="person-name">Clara Song</div><div class="person-role">Analytics Engineer</div></div></div></td><td>Analytics Eng</td><td>Evals</td><td>L4</td><td>64d</td><td><span class="pill growing">● Growing</span></td><td>Apr 3</td><td style="color:var(--accent-emerald);font-weight:700">Low</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           ONBOARDING
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-onboarding">
+        <div class="section-header">
+          <div class="section-title">Onboarding Tracker</div>
+          <div class="section-desc">4 people currently onboarding · 30/60/90 day milestone tracking</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">Onboarding Now</div><div class="kpi-value emerald">4</div></div>
+          <div class="kpi blue"><div class="kpi-label">Avg Time-to-Productivity</div><div class="kpi-value blue">38d</div><div class="kpi-change up">↑ 5d faster than benchmark</div></div>
+          <div class="kpi amber"><div class="kpi-label">30-Day Satisfaction</div><div class="kpi-value amber">4.6</div><div class="kpi-change up">↑ out of 5.0</div></div>
+          <div class="kpi violet"><div class="kpi-label">Buddy Assignments</div><div class="kpi-value violet">4/4</div></div>
+        </div>
+
+        <div class="grid-2 mb-24">
+          <!-- PERSON 1 -->
+          <div class="card">
+            <div class="card-header">
+              <div class="person-row">
+                <div class="avatar" style="background:rgba(96,165,250,0.15);color:var(--accent-blue)">AR</div>
+                <div><div class="person-name">Alex Reyes</div><div class="person-role">Data Engineer · Infra Team · Day 30</div></div>
+              </div>
+              <span class="pill onboarding">● On Track</span>
+            </div>
+            <div class="timeline">
+              <div class="tl-item"><div class="tl-dot done"></div><div class="tl-date">Day 1 — Mar 8</div><div class="tl-title">First day setup</div><div class="tl-desc">Laptop, accounts, Slack channels, buddy assignment (Wei Zhang)</div></div>
+              <div class="tl-item"><div class="tl-dot done"></div><div class="tl-date">Day 7</div><div class="tl-title">First PR merged</div><div class="tl-desc">Bug fix in data pipeline — fast start signal</div></div>
+              <div class="tl-item"><div class="tl-dot active"></div><div class="tl-date">Day 30 — Today</div><div class="tl-title">30-Day Check-in</div><div class="tl-desc">Review: onboarding experience, team integration, first project scope</div></div>
+              <div class="tl-item"><div class="tl-dot pending"></div><div class="tl-date">Day 60</div><div class="tl-title">Ownership milestone</div><div class="tl-desc">Owns at least 1 pipeline end-to-end</div></div>
+              <div class="tl-item"><div class="tl-dot pending"></div><div class="tl-date">Day 90</div><div class="tl-title">Full ramp complete</div><div class="tl-desc">On-call ready, independent contributor, peer feedback collected</div></div>
+            </div>
+          </div>
+          <!-- PERSON 2 -->
+          <div class="card">
+            <div class="card-header">
+              <div class="person-row">
+                <div class="avatar" style="background:rgba(34,211,238,0.15);color:var(--accent-cyan)">MT</div>
+                <div><div class="person-name">Mia Torres</div><div class="person-role">ML Engineer · Training Team · Day 30</div></div>
+              </div>
+              <span class="pill onboarding">● On Track</span>
+            </div>
+            <div class="timeline">
+              <div class="tl-item"><div class="tl-dot done"></div><div class="tl-date">Day 1 — Mar 8</div><div class="tl-title">First day setup</div><div class="tl-desc">Paired with buddy Marcus Rivera. GPU access provisioned.</div></div>
+              <div class="tl-item"><div class="tl-dot done"></div><div class="tl-date">Day 14</div><div class="tl-title">First training run</div><div class="tl-desc">Successfully fine-tuned a small model on internal data — strong signal</div></div>
+              <div class="tl-item"><div class="tl-dot active"></div><div class="tl-date">Day 30 — Today</div><div class="tl-title">30-Day Check-in</div><div class="tl-desc">Review: technical ramp, team fit, identify first project ownership</div></div>
+              <div class="tl-item"><div class="tl-dot pending"></div><div class="tl-date">Day 60</div><div class="tl-title">Project ownership</div><div class="tl-desc">Owns eval pipeline for one model variant</div></div>
+              <div class="tl-item"><div class="tl-dot pending"></div><div class="tl-date">Day 90</div><div class="tl-title">Full ramp</div><div class="tl-desc">Ships production feature independently, peer calibration</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Onboarding Health Metrics</div></div>
+          <table>
+            <thead><tr><th>Employee</th><th>Day</th><th>First PR</th><th>Buddy Score</th><th>Manager Score</th><th>Self Score</th><th>Overall</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Alex Reyes</strong></td><td>30</td><td style="color:var(--accent-emerald)">Day 7 ✓</td><td>4.5</td><td>4.3</td><td>4.8</td><td><span style="color:var(--accent-emerald);font-weight:700;font-family:'JetBrains Mono'">4.5</span></td></tr>
+              <tr><td><strong>Mia Torres</strong></td><td>30</td><td style="color:var(--accent-emerald)">Day 14 ✓</td><td>4.7</td><td>4.5</td><td>4.2</td><td><span style="color:var(--accent-emerald);font-weight:700;font-family:'JetBrains Mono'">4.5</span></td></tr>
+              <tr><td><strong>Dev Patel</strong></td><td>47</td><td style="color:var(--accent-emerald)">Day 5 ✓</td><td>4.8</td><td>4.6</td><td>4.4</td><td><span style="color:var(--accent-emerald);font-weight:700;font-family:'JetBrains Mono'">4.6</span></td></tr>
+              <tr><td><strong>Clara Song</strong></td><td>64</td><td style="color:var(--accent-emerald)">Day 10 ✓</td><td>4.3</td><td>4.4</td><td>4.5</td><td><span style="color:var(--accent-emerald);font-weight:700;font-family:'JetBrains Mono'">4.4</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           RETENTION
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-retention">
+        <div class="section-header">
+          <div class="section-title">Retention Intelligence</div>
+          <div class="section-desc">Flight risk detection, satisfaction tracking, and churn prevention</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">12-Mo Retention</div><div class="kpi-value emerald">93%</div><div class="kpi-change up">↑ industry avg: 85%</div></div>
+          <div class="kpi amber"><div class="kpi-label">Flight Risk (High)</div><div class="kpi-value rose">2</div><div class="kpi-change down">⚠ needs attention</div></div>
+          <div class="kpi blue"><div class="kpi-label">Avg Engagement</div><div class="kpi-value blue">4.2</div><div class="kpi-change up">↑ out of 5.0</div></div>
+          <div class="kpi violet"><div class="kpi-label">Regrettable Attrition</div><div class="kpi-value violet">1</div><div class="kpi-change neutral">→ last 12 months</div></div>
+        </div>
+
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">Flight Risk Monitor</div><div class="card-subtitle">Predictive model based on comp, growth, engagement, and behavioral signals</div></div>
+            </div>
+
+            <div class="alert-box rose" style="margin-bottom:12px">
+              <div style="font-weight:700;color:var(--accent-rose);margin-bottom:4px">🔴 Sarah Kim — Staff MLE · 72% flight risk</div>
+              <div style="color:var(--text-secondary)">
+                <strong>Signals:</strong> Comp at P35 (should be P55+), passed over in last promo cycle, 1:1 with manager missed 3 consecutive weeks, updated LinkedIn profile last week, tenure at 2.1y (typical departure window).
+              </div>
+              <div style="margin-top:8px;color:var(--accent-rose);font-weight:600;font-size:11px">
+                → Recommended: Skip-level with VP this week. Prepare retention offer: comp adjustment to P55 + promotion timeline to L7.
+              </div>
+            </div>
+
+            <div class="alert-box amber" style="margin-bottom:12px">
+              <div style="font-weight:700;color:var(--accent-amber);margin-bottom:4px">🟡 Wei Zhang — Sr Data Eng · 38% flight risk</div>
+              <div style="color:var(--text-secondary)">
+                <strong>Signals:</strong> Expressed interest in ML work during last 1:1 but role is pure data eng, comp is fair (P50), engagement score dropped from 4.5→3.8 over 2 quarters.
+              </div>
+              <div style="margin-top:8px;color:var(--accent-amber);font-weight:600;font-size:11px">
+                → Recommended: Discuss ML rotation or hybrid project. Internal mobility is cheaper than replacement.
+              </div>
+            </div>
+
+            <div class="alert-box emerald">
+              <div style="font-weight:700;color:var(--accent-emerald);margin-bottom:4px">🟢 Remaining 45 employees — average risk 8%</div>
+              <div style="color:var(--text-secondary)">No other high-risk signals detected. 6 employees in the "watch" band (15-25%) — flagged for proactive 1:1 focus.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">Retention by Tenure Band</div><div class="card-subtitle">Where people leave — and why</div></div>
+            </div>
+            <div class="chart-container" style="height:260px"><canvas id="retentionChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Flight Risk Factors — Correlation with Actual Departures (Last 24 Months)</div></div>
+          <div id="riskFactors"></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           DEVELOPMENT
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-development">
+        <div class="section-header">
+          <div class="section-title">Growth & Development</div>
+          <div class="section-desc">Career progression, skill development, and promotion readiness</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">Promo Rate (Annual)</div><div class="kpi-value emerald">22%</div><div class="kpi-change up">↑ healthy for eng</div></div>
+          <div class="kpi blue"><div class="kpi-label">Avg Time-in-Level</div><div class="kpi-value blue">1.8y</div></div>
+          <div class="kpi amber"><div class="kpi-label">Promo Candidates (Q2)</div><div class="kpi-value amber">6</div></div>
+          <div class="kpi violet"><div class="kpi-label">IDPs Completed</div><div class="kpi-value violet">78%</div><div class="kpi-change up">↑ from 65% last Q</div></div>
+        </div>
+
+        <div class="card mb-24">
+          <div class="card-header">
+            <div><div class="card-title">Promotion Readiness — Q2 2026 Cycle</div><div class="card-subtitle">6 candidates · Packet deadline: April 15</div></div>
+          </div>
+          <table>
+            <thead><tr><th>Employee</th><th>Current</th><th>Target</th><th>Time in Level</th><th>Manager Rec</th><th>Peer Signal</th><th>Packet</th><th>Readiness</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Marcus Rivera</strong></td><td>L5</td><td>L6 (Staff)</td><td>1.5y</td><td style="color:var(--accent-emerald)">Strong Yes</td><td style="color:var(--accent-emerald)">4.7/5</td><td><span class="tag emerald">Complete</span></td><td><span style="color:var(--accent-emerald);font-weight:700;font-family:'JetBrains Mono'">92%</span></td></tr>
+              <tr><td><strong>Diana Torres</strong></td><td>L4</td><td>L5 (Senior)</td><td>2.0y</td><td style="color:var(--accent-emerald)">Strong Yes</td><td style="color:var(--accent-emerald)">4.5/5</td><td><span class="tag emerald">Complete</span></td><td><span style="color:var(--accent-emerald);font-weight:700;font-family:'JetBrains Mono'">88%</span></td></tr>
+              <tr><td><strong>Ryan Park</strong></td><td>L5</td><td>L6 (Staff)</td><td>1.2y</td><td style="color:var(--accent-blue)">Yes</td><td style="color:var(--accent-blue)">4.2/5</td><td><span class="tag emerald">Complete</span></td><td><span style="color:var(--accent-blue);font-weight:700;font-family:'JetBrains Mono'">75%</span></td></tr>
+              <tr><td><strong>Aisha Okafor</strong></td><td>L4</td><td>L5 (Senior)</td><td>1.8y</td><td style="color:var(--accent-blue)">Yes</td><td style="color:var(--accent-amber)">3.9/5</td><td><span class="tag amber">Incomplete</span></td><td><span style="color:var(--accent-amber);font-weight:700;font-family:'JetBrains Mono'">62%</span></td></tr>
+              <tr><td><strong>Kevin Wu</strong></td><td>L3</td><td>L4 (Mid)</td><td>1.1y</td><td style="color:var(--accent-blue)">Yes</td><td style="color:var(--accent-blue)">4.1/5</td><td><span class="tag amber">Incomplete</span></td><td><span style="color:var(--accent-amber);font-weight:700;font-family:'JetBrains Mono'">58%</span></td></tr>
+              <tr><td><strong>Lisa Nguyen</strong></td><td>L5</td><td>L6 (Staff)</td><td>2.3y</td><td style="color:var(--accent-amber)">Maybe</td><td style="color:var(--accent-blue)">4.0/5</td><td><span class="tag rose">Not Started</span></td><td><span style="color:var(--accent-rose);font-weight:700;font-family:'JetBrains Mono'">35%</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Level Distribution</div></div>
+          <div class="chart-container" style="height:220px"><canvas id="levelChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           COMPETENCY MAP
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-competency">
+        <div class="section-header">
+          <div class="section-title">Org Competency Map</div>
+          <div class="section-desc">Team-level strengths and gaps across 14 competencies</div>
+        </div>
+
+        <div class="card mb-24">
+          <div class="card-header"><div class="card-title">Competency Heat Map — Team × Competency</div></div>
+          <div id="compHeatmap" style="overflow-x:auto;padding:8px 0"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Org-Wide Strengths</div></div>
+            <div class="score-row"><span class="score-label">System Design</span><div class="score-track"><div class="score-fill" style="width:88%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">4.4</span></div>
+            <div class="score-row"><span class="score-label">Production Eng</span><div class="score-track"><div class="score-fill" style="width:84%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">4.2</span></div>
+            <div class="score-row"><span class="score-label">Project Execution</span><div class="score-track"><div class="score-fill" style="width:82%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">4.1</span></div>
+            <div class="score-row"><span class="score-label">Velocity</span><div class="score-track"><div class="score-fill" style="width:80%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">4.0</span></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Org-Wide Gaps</div></div>
+            <div class="score-row"><span class="score-label">Evaluation Design</span><div class="score-track"><div class="score-fill" style="width:40%;background:var(--accent-rose)"></div></div><span class="score-val" style="color:var(--accent-rose)">2.0</span></div>
+            <div class="score-row"><span class="score-label">Mentorship</span><div class="score-track"><div class="score-fill" style="width:50%;background:var(--accent-amber)"></div></div><span class="score-val" style="color:var(--accent-amber)">2.5</span></div>
+            <div class="score-row"><span class="score-label">Stakeholder Influence</span><div class="score-track"><div class="score-fill" style="width:52%;background:var(--accent-amber)"></div></div><span class="score-val" style="color:var(--accent-amber)">2.6</span></div>
+            <div class="score-row"><span class="score-label">Written Comm</span><div class="score-track"><div class="score-fill" style="width:56%;background:var(--accent-amber)"></div></div><span class="score-val" style="color:var(--accent-amber)">2.8</span></div>
+            <div style="margin-top:16px;padding:12px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:8px;font-size:12px;color:var(--text-secondary);line-height:1.6">
+              <strong style="color:var(--accent-amber)">Insight:</strong> Evaluation Design is a critical gap — you're hiring an ML Eval Engineer (open role #3), which will help. Mentorship gap suggests seniors are over-indexed on IC work and need protected time for coaching.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           ENGAGEMENT
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-engagement">
+        <div class="section-header">
+          <div class="section-title">Employee Engagement</div>
+          <div class="section-desc">Pulse surveys, eNPS tracking, and sentiment analysis</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">eNPS Score</div><div class="kpi-value emerald">+42</div><div class="kpi-change up">↑ excellent</div></div>
+          <div class="kpi blue"><div class="kpi-label">Engagement Index</div><div class="kpi-value blue">78%</div><div class="kpi-change up">↑ 5% from Q4</div></div>
+          <div class="kpi violet"><div class="kpi-label">Survey Participation</div><div class="kpi-value violet">91%</div></div>
+          <div class="kpi amber"><div class="kpi-label">1:1 Completion Rate</div><div class="kpi-value amber">87%</div><div class="kpi-change down">↓ target: 95%</div></div>
+        </div>
+
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Engagement Trend (Quarterly)</div></div>
+            <div class="chart-container" style="height:220px"><canvas id="engagementChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Engagement by Category</div></div>
+            <div style="padding-top:8px">
+              <div class="score-row"><span class="score-label">Manager Quality</span><div class="score-track"><div class="score-fill" style="width:88%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">4.4</span></div>
+              <div class="score-row"><span class="score-label">Career Growth</span><div class="score-track"><div class="score-fill" style="width:72%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">3.6</span></div>
+              <div class="score-row"><span class="score-label">Comp & Benefits</span><div class="score-track"><div class="score-fill" style="width:66%;background:var(--accent-amber)"></div></div><span class="score-val" style="color:var(--accent-amber)">3.3</span></div>
+              <div class="score-row"><span class="score-label">Work-Life Balance</span><div class="score-track"><div class="score-fill" style="width:80%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">4.0</span></div>
+              <div class="score-row"><span class="score-label">Mission Alignment</span><div class="score-track"><div class="score-fill" style="width:92%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">4.6</span></div>
+              <div class="score-row"><span class="score-label">Team Collaboration</span><div class="score-track"><div class="score-fill" style="width:86%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">4.3</span></div>
+            </div>
+            <div style="margin-top:16px;padding:12px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:8px;font-size:12px;color:var(--text-secondary)">
+              <strong style="color:var(--accent-amber)">Watch:</strong> Comp & Benefits at 3.3 is the lowest category. Correlates with Sarah Kim's flight risk. Consider mid-year comp review for below-P50 employees.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           WORKFORCE PLAN
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-workforce">
+        <div class="section-header">
+          <div class="section-title">Workforce Planning</div>
+          <div class="section-desc">Headcount plan, budget allocation, and growth roadmap — 47 → 60 by EOY</div>
+        </div>
+
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Hiring Roadmap — 2026</div>
+            <div class="timeline">
+              <div class="tl-item"><div class="tl-dot done"></div><div class="tl-date">Q1 (Done) — 5 Hires</div><div class="tl-title">Foundation hires completed</div><div class="tl-desc">2 Data Eng, 1 Sr Agent Eng, 1 Analytics Eng, 1 ML Eng</div></div>
+              <div class="tl-item"><div class="tl-dot active"></div><div class="tl-date">Q2 (Now) — 6 Open Roles</div><div class="tl-title">Scale the platform and agent teams</div><div class="tl-desc">Staff MLE, EM, ML Eval Eng, Data Eng, Agent Eng, Jr MLE</div></div>
+              <div class="tl-item"><div class="tl-dot pending"></div><div class="tl-date">Q3 — 4 Planned</div><div class="tl-title">Research and evaluation buildout</div><div class="tl-desc">2 Research Scientists, 1 Sr Eval Eng, 1 ML Platform Eng</div></div>
+              <div class="tl-item"><div class="tl-dot pending"></div><div class="tl-date">Q4 — 3 Planned</div><div class="tl-title">Leadership and scale</div><div class="tl-desc">1 EM (Agents), 1 Sr MLE, 1 Staff Data Eng</div></div>
+            </div>
+            <div style="margin-top:16px;padding:14px;background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.15);border-radius:8px;text-align:center">
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">EOY Target</div>
+              <div style="font-size:32px;font-weight:900;color:var(--accent-emerald);font-family:'JetBrains Mono';letter-spacing:-1px">60</div>
+              <div style="font-size:11px;color:var(--text-secondary)">+13 from current · $3.8M additional comp budget</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Team Size Targets</div>
+            <table>
+              <thead><tr><th>Team</th><th>Current</th><th>Q2 Target</th><th>EOY Target</th><th>Gap</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Training</strong></td><td>12</td><td>14</td><td>16</td><td style="color:var(--accent-amber);font-weight:700">+4</td></tr>
+                <tr><td><strong>Platform / Infra</strong></td><td>10</td><td>12</td><td>14</td><td style="color:var(--accent-amber);font-weight:700">+4</td></tr>
+                <tr><td><strong>Agents</strong></td><td>8</td><td>10</td><td>12</td><td style="color:var(--accent-amber);font-weight:700">+4</td></tr>
+                <tr><td><strong>Evals / Research</strong></td><td>5</td><td>6</td><td>9</td><td style="color:var(--accent-rose);font-weight:700">+4</td></tr>
+                <tr><td><strong>Leadership</strong></td><td>4</td><td>5</td><td>5</td><td style="color:var(--accent-emerald);font-weight:700">+1</td></tr>
+                <tr><td style="font-weight:700">Engineering Total</td><td style="font-weight:700">39</td><td style="font-weight:700">47</td><td style="font-weight:700">56</td><td style="color:var(--accent-amber);font-weight:700">+17</td></tr>
+                <tr><td><strong>Other (PM, Design, etc)</strong></td><td>8</td><td>8</td><td>4</td><td style="color:var(--text-muted)">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Budget Allocation by Team</div></div>
+          <div class="chart-container" style="height:220px"><canvas id="budgetChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           HIRING PIPELINE
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-hiring">
+        <div class="section-header">
+          <div class="section-title">Hiring Pipeline</div>
+          <div class="section-desc">6 open roles · 34 candidates in process · avg 28 days to hire</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">Open Roles</div><div class="kpi-value emerald">6</div></div>
+          <div class="kpi blue"><div class="kpi-label">Candidates Active</div><div class="kpi-value blue">34</div></div>
+          <div class="kpi amber"><div class="kpi-label">Avg Time-to-Hire</div><div class="kpi-value amber">28d</div><div class="kpi-change up">↑ 5d faster than last Q</div></div>
+          <div class="kpi violet"><div class="kpi-label">Offer Accept Rate</div><div class="kpi-value violet">82%</div></div>
+        </div>
+
+        <div class="card mb-24">
+          <div class="card-header"><div class="card-title">Pipeline by Role</div></div>
+          <table>
+            <thead><tr><th>Role</th><th>Sourced</th><th>Screen</th><th>Interview</th><th>Final</th><th>Offer</th><th>Days Open</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Staff ML Engineer</strong></td><td>12</td><td>5</td><td>3</td><td>1</td><td>0</td><td style="color:var(--accent-rose)">45d</td><td><span class="tag rose">Slow</span></td></tr>
+              <tr><td><strong>Engineering Manager</strong></td><td>18</td><td>8</td><td>5</td><td>2</td><td>1</td><td>32d</td><td><span class="tag amber">In Offer</span></td></tr>
+              <tr><td><strong>ML Eval Engineer</strong></td><td>8</td><td>4</td><td>2</td><td>0</td><td>0</td><td>18d</td><td><span class="tag blue">On Track</span></td></tr>
+              <tr><td><strong>Data Engineer</strong></td><td>22</td><td>10</td><td>4</td><td>2</td><td>0</td><td>12d</td><td><span class="tag emerald">Strong</span></td></tr>
+              <tr><td><strong>Agent Engineer</strong></td><td>15</td><td>6</td><td>3</td><td>0</td><td>0</td><td>8d</td><td><span class="tag blue">On Track</span></td></tr>
+              <tr><td><strong>Junior MLE</strong></td><td>35</td><td>12</td><td>0</td><td>0</td><td>0</td><td>5d</td><td><span class="tag emerald">New</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Hiring Funnel — Last 90 Days</div></div>
+          <div class="chart-container" style="height:240px"><canvas id="hiringFunnel"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           ANALYTICS
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-analytics">
+        <div class="section-header">
+          <div class="section-title">People Analytics</div>
+          <div class="section-desc">Cost metrics, diversity data, and organizational health indicators</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">Cost-per-Hire</div><div class="kpi-value emerald">$18K</div><div class="kpi-change up">↑ 12% below budget</div></div>
+          <div class="kpi blue"><div class="kpi-label">Time-to-Productivity</div><div class="kpi-value blue">38d</div></div>
+          <div class="kpi amber"><div class="kpi-label">Regrettable Turnover</div><div class="kpi-value amber">2.1%</div><div class="kpi-change up">↑ well below 5% target</div></div>
+          <div class="kpi violet"><div class="kpi-label">Manager Span</div><div class="kpi-value violet">6.2</div><div class="kpi-change neutral">→ healthy range (5-8)</div></div>
+        </div>
+
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Diversity Metrics</div></div>
+            <div style="padding-top:8px">
+              <div class="score-row"><span class="score-label">Gender Diversity</span><div class="score-track"><div class="score-fill" style="width:72%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">36%</span></div>
+              <div class="score-row"><span class="score-label">Underrep. Minority</span><div class="score-track"><div class="score-fill" style="width:56%;background:var(--accent-violet)"></div></div><span class="score-val" style="color:var(--accent-violet)">28%</span></div>
+              <div class="score-row"><span class="score-label">Women in Leadership</span><div class="score-track"><div class="score-fill" style="width:60%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">30%</span></div>
+              <div class="score-row"><span class="score-label">International</span><div class="score-track"><div class="score-fill" style="width:48%;background:var(--accent-cyan)"></div></div><span class="score-val" style="color:var(--accent-cyan)">24%</span></div>
+            </div>
+            <div style="margin-top:16px;padding:12px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:8px;font-size:12px;color:var(--text-secondary)">
+              <strong style="color:var(--accent-blue)">Note:</strong> Gender diversity in ML/AI teams averages 22% industry-wide. At 36%, we're above benchmark. Continue sourcing diversity-focused pipeline for open roles.
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Compensation Distribution</div></div>
+            <div class="chart-container" style="height:250px"><canvas id="compChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════════
+const titles = {
+  dashboard:['Dashboard','Overview'],roster:['Team Roster','People'],onboarding:['Onboarding Tracker','People › Onboarding'],
+  retention:['Retention Intelligence','People › Retention'],development:['Growth & Development','Growth'],
+  competency:['Competency Map','Growth › Competencies'],engagement:['Employee Engagement','Growth › Engagement'],
+  workforce:['Workforce Planning','Planning'],hiring:['Hiring Pipeline','Planning › Hiring'],analytics:['People Analytics','Planning › Analytics']
+};
+
+function go(name) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const v=document.getElementById('v-'+name);
+  if(v) v.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    const t=n.textContent.trim().toLowerCase().replace(/[^a-z]/g,'');
+    if(t.includes(name.substring(0,5))) n.classList.add('active');
+  });
+  const ti=titles[name]||[name,''];
+  document.getElementById('hTitle').textContent=ti[0];
+  document.getElementById('hBread').textContent=ti[1];
+  document.querySelector('.content').scrollTop=0;
+
+  if(name==='retention') setTimeout(initRetention,100);
+  if(name==='engagement') setTimeout(initEngagement,100);
+  if(name==='development') setTimeout(initLevel,100);
+  if(name==='competency') setTimeout(buildCompHeatmap,100);
+  if(name==='workforce') setTimeout(initBudget,100);
+  if(name==='hiring') setTimeout(initHiringFunnel,100);
+  if(name==='analytics') setTimeout(initAnalytics,100);
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════
+Chart.defaults.color='#85859a'; Chart.defaults.borderColor='#27272e'; Chart.defaults.font.family="'Inter',sans-serif";
+
+function initDashboard() {
+  // Headcount
+  new Chart(document.getElementById('headcountChart'),{
+    type:'line', data:{
+      labels:['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'],
+      datasets:[{label:'Headcount',data:[35,36,37,38,39,40,41,42,43,44,46,47],
+        borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.1)',fill:true,tension:0.4,borderWidth:2,pointRadius:0}]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'rgba(39,39,46,0.5)'},ticks:{font:{size:11}}}}}
+  });
+
+  // Attrition
+  new Chart(document.getElementById('attritionChart'),{
+    type:'bar', data:{
+      labels:['Q1 25','Q2 25','Q3 25','Q4 25','Q1 26'],
+      datasets:[
+        {label:'Voluntary',data:[2,1,2,1,1],backgroundColor:'rgba(251,113,133,0.5)',borderRadius:4},
+        {label:'Involuntary',data:[0,1,0,0,0],backgroundColor:'rgba(96,165,250,0.3)',borderRadius:4}
+      ]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12,font:{size:11}}}},
+      scales:{x:{grid:{display:false},stacked:true,ticks:{font:{size:11}}},y:{grid:{color:'rgba(39,39,46,0.5)'},stacked:true,ticks:{font:{size:11}}}}}
+  });
+
+  // Composition donut
+  new Chart(document.getElementById('compositionChart'),{
+    type:'doughnut', data:{
+      labels:['Training (12)','Platform (10)','Agents (8)','Evals (5)','Leadership (4)','Other (8)'],
+      datasets:[{data:[12,10,8,5,4,8],backgroundColor:['rgba(52,211,153,0.6)','rgba(96,165,250,0.6)','rgba(167,139,250,0.6)','rgba(34,211,238,0.6)','rgba(251,191,36,0.6)','rgba(251,113,133,0.3)'],borderWidth:0,spacing:3,borderRadius:4}]
+    }, options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10,font:{size:11}}}}}
+  });
+}
+
+let retInit=false;
+function initRetention(){
+  if(retInit)return; retInit=true;
+  new Chart(document.getElementById('retentionChart'),{
+    type:'bar', data:{
+      labels:['0-6 mo','6-12 mo','1-2 yr','2-3 yr','3+ yr'],
+      datasets:[{label:'Still Here',data:[6,5,14,12,7],backgroundColor:'rgba(52,211,153,0.5)',borderRadius:4},
+                {label:'Departed',data:[0,1,2,1,0],backgroundColor:'rgba(251,113,133,0.4)',borderRadius:4}]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},
+      scales:{x:{grid:{display:false},stacked:true},y:{grid:{color:'rgba(39,39,46,0.5)'},stacked:true}}}
+  });
+
+  // Risk factors
+  const factors=[
+    {name:'Comp below P40',corr:0.82,color:'var(--accent-rose)'},
+    {name:'No promo in 18+ mo',corr:0.71,color:'var(--accent-rose)'},
+    {name:'Manager 1:1 gaps',corr:0.65,color:'var(--accent-amber)'},
+    {name:'LinkedIn profile update',corr:0.58,color:'var(--accent-amber)'},
+    {name:'Low engagement score',corr:0.54,color:'var(--accent-amber)'},
+    {name:'Tenure 1.5-2.5 yr window',corr:0.48,color:'var(--accent-blue)'},
+    {name:'Team change in last 6 mo',corr:0.35,color:'var(--accent-blue)'},
+  ];
+  const el=document.getElementById('riskFactors');
+  factors.forEach(f=>{
+    el.innerHTML+=`<div class="score-row"><span class="score-label">${f.name}</span><div class="score-track"><div class="score-fill" style="width:${f.corr*100}%;background:${f.color}"></div></div><span class="score-val" style="color:${f.color}">${(f.corr*100).toFixed(0)}%</span></div>`;
+  });
+}
+
+let engInit=false;
+function initEngagement(){
+  if(engInit)return; engInit=true;
+  new Chart(document.getElementById('engagementChart'),{
+    type:'line', data:{
+      labels:['Q1 25','Q2 25','Q3 25','Q4 25','Q1 26'],
+      datasets:[
+        {label:'eNPS',data:[28,32,35,34,42],borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.1)',fill:true,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#34d399',yAxisID:'y'},
+        {label:'Engagement %',data:[68,71,73,73,78],borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,0.1)',fill:true,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#60a5fa',yAxisID:'y1'}
+      ]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},
+      scales:{x:{grid:{display:false}},y:{position:'left',grid:{color:'rgba(39,39,46,0.5)'},title:{display:true,text:'eNPS',font:{size:10}}},y1:{position:'right',grid:{display:false},title:{display:true,text:'Engagement %',font:{size:10}}}}}
+  });
+}
+
+let lvlInit=false;
+function initLevel(){
+  if(lvlInit)return; lvlInit=true;
+  new Chart(document.getElementById('levelChart'),{
+    type:'bar', data:{
+      labels:['L3 (Junior)','L4 (Mid)','L5 (Senior)','L6 (Staff)','L7 (Manager)','L8 (Director+)'],
+      datasets:[{data:[4,10,16,8,5,4],backgroundColor:['rgba(34,211,238,0.5)','rgba(96,165,250,0.5)','rgba(52,211,153,0.5)','rgba(167,139,250,0.5)','rgba(251,191,36,0.5)','rgba(251,113,133,0.5)'],borderRadius:6}]
+    }, options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'rgba(39,39,46,0.5)'}},y:{grid:{display:false}}}}
+  });
+}
+
+function buildCompHeatmap(){
+  const teams=['Training','Platform','Agents','Evals','Leadership'];
+  const comps=['Sys Design','Prod Eng','Research','Eval Design','Prob Decomp','People Mgmt','Tech Dir','Mentorship','Proj Exec','Velocity','Cross-Func','Written'];
+  const data=[
+    [4.5,4.2,4.0,2.5,4.3,3.0,3.8,2.5,4.0,4.2,3.5,2.8],
+    [4.8,4.8,2.5,1.5,4.2,2.0,3.5,2.0,4.5,4.0,3.0,3.0],
+    [4.0,3.8,3.5,2.0,4.5,2.0,3.0,2.5,4.2,4.8,3.2,2.5],
+    [3.5,3.0,4.5,3.5,4.0,2.0,2.5,3.0,3.5,3.5,3.8,3.5],
+    [4.5,3.5,3.0,2.5,4.5,4.8,4.8,4.0,4.5,3.0,4.5,4.0],
+  ];
+  function gc(v){if(v>=4)return'rgba(52,211,153,0.6)';if(v>=3)return'rgba(96,165,250,0.4)';if(v>=2)return'rgba(251,191,36,0.35)';return'rgba(251,113,133,0.3)';}
+  const el=document.getElementById('compHeatmap');
+  let h='<div class="hm-row"><span class="hm-label"></span>';
+  comps.forEach(c=>{h+=`<div class="hm-header" style="width:62px">${c}</div>`;});
+  h+='</div>';
+  teams.forEach((t,ti)=>{
+    h+=`<div class="hm-row"><span class="hm-label">${t}</span>`;
+    data[ti].forEach(v=>{h+=`<div class="hm-cell" style="width:62px;background:${gc(v)};color:${v>=3?'#fff':'var(--text-muted)'}">${v.toFixed(1)}</div>`;});
+    h+='</div>';
+  });
+  el.innerHTML=h;
+}
+
+let budInit=false;
+function initBudget(){
+  if(budInit)return; budInit=true;
+  new Chart(document.getElementById('budgetChart'),{
+    type:'bar', data:{
+      labels:['Training','Platform','Agents','Evals','Leadership'],
+      datasets:[
+        {label:'Current Spend',data:[3.2,2.6,1.8,1.1,1.8],backgroundColor:'rgba(52,211,153,0.5)',borderRadius:4},
+        {label:'EOY Budget',data:[4.2,3.6,2.8,2.2,2.0],backgroundColor:'rgba(52,211,153,0.15)',borderColor:'rgba(52,211,153,0.4)',borderWidth:1,borderRadius:4}
+      ]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(39,39,46,0.5)'},ticks:{callback:v=>'$'+v+'M'}}}}
+  });
+}
+
+let hirInit=false;
+function initHiringFunnel(){
+  if(hirInit)return; hirInit=true;
+  new Chart(document.getElementById('hiringFunnel'),{
+    type:'bar', data:{
+      labels:['Applied','Phone Screen','Technical','Onsite','Offer','Accepted'],
+      datasets:[{data:[210,86,42,18,11,9],backgroundColor:['rgba(96,165,250,0.3)','rgba(96,165,250,0.4)','rgba(167,139,250,0.4)','rgba(251,191,36,0.5)','rgba(52,211,153,0.5)','rgba(52,211,153,0.7)'],borderRadius:6}]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(39,39,46,0.5)'}}}}
+  });
+}
+
+let anaInit=false;
+function initAnalytics(){
+  if(anaInit)return; anaInit=true;
+  new Chart(document.getElementById('compChart'),{
+    type:'scatter', data:{
+      datasets:[
+        {label:'L3',data:[{x:130,y:1},{x:145,y:2},{x:140,y:3},{x:155,y:4}],backgroundColor:'rgba(34,211,238,0.6)',pointRadius:6},
+        {label:'L4',data:[{x:160,y:1},{x:175,y:2},{x:170,y:3},{x:180,y:4},{x:165,y:5},{x:185,y:6},{x:172,y:7},{x:178,y:8},{x:168,y:9},{x:190,y:10}],backgroundColor:'rgba(96,165,250,0.6)',pointRadius:6},
+        {label:'L5',data:[{x:200,y:1},{x:220,y:2},{x:215,y:3},{x:240,y:4},{x:210,y:5},{x:230,y:6},{x:225,y:7},{x:235,y:8},{x:205,y:9},{x:245,y:10},{x:218,y:11},{x:232,y:12},{x:208,y:13},{x:222,y:14},{x:238,y:15},{x:228,y:16}],backgroundColor:'rgba(52,211,153,0.6)',pointRadius:6},
+        {label:'L6+',data:[{x:260,y:1},{x:280,y:2},{x:300,y:3},{x:270,y:4},{x:290,y:5},{x:275,y:6},{x:310,y:7},{x:265,y:8}],backgroundColor:'rgba(167,139,250,0.6)',pointRadius:6},
+      ]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:8,font:{size:11}}}},
+      scales:{x:{title:{display:true,text:'Base Salary ($K)',font:{size:11}},grid:{color:'rgba(39,39,46,0.3)'}},y:{display:false}}}
+  });
+}
+
+// ═══ INIT ═══
+document.addEventListener('DOMContentLoaded', initDashboard);
+</script>
+</body>
+</html>
