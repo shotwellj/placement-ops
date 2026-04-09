@@ -283,6 +283,14 @@ tr:hover td { background:rgba(52,211,153,0.02); }
       <div class="nav-item" onclick="go('hiring')"><span class="nav-icon">▤</span> Hiring Pipeline <span class="nav-badge amber">6</span></div>
       <div class="nav-item" onclick="go('analytics')"><span class="nav-icon">⧉</span> Analytics</div>
     </nav>
+    <div class="sidebar-section"><div class="sidebar-section-title">Intelligence</div></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="go('scan')"><span class="nav-icon">◎</span> Scan <span class="nav-badge emerald">12</span></div>
+      <div class="nav-item" onclick="go('batch')"><span class="nav-icon">⧉</span> Batch Eval</div>
+      <div class="nav-item" onclick="go('marketintel')"><span class="nav-icon">◬</span> Market Intel <span class="nav-badge blue">87</span></div>
+      <div class="nav-item" onclick="go('calibrate')"><span class="nav-icon">◧</span> Calibration</div>
+      <div class="nav-item" onclick="go('integrations')"><span class="nav-icon">◐</span> Integrations <span class="nav-badge emerald">3</span></div>
+    </nav>
     <div class="sidebar-footer"><div class="sidebar-footer-text">SourcingNav v2.1 · Company</div></div>
   </aside>
 
@@ -769,6 +777,227 @@ tr:hover td { background:rgba(52,211,153,0.02); }
           <div class="card-header"><div class="card-title">Hiring Funnel — Last 90 Days</div></div>
           <div class="chart-container" style="height:240px"><canvas id="hiringFunnel"></canvas></div>
         </div>
+
+        <!-- ═══ CANDIDATES IN PIPELINE ═══ -->
+        <div class="card mb-24" style="margin-top:24px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Candidates in Pipeline</div>
+              <div class="card-subtitle">34 active · Resume benchmarks · Interview prep status</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <span class="tag emerald" style="cursor:pointer" onclick="filterCandidates('all')">All</span>
+              <span class="tag blue" style="cursor:pointer" onclick="filterCandidates('interview')">Interviewing</span>
+              <span class="tag amber" style="cursor:pointer" onclick="filterCandidates('final')">Final Round</span>
+              <span class="tag violet" style="cursor:pointer" onclick="filterCandidates('offer')">Offer</span>
+            </div>
+          </div>
+          <table id="candidateTable">
+            <thead><tr>
+              <th>Candidate</th>
+              <th>Role</th>
+              <th>Stage</th>
+              <th>Fit Score</th>
+              <th>Strengths</th>
+              <th>Gaps</th>
+              <th>Prep Status</th>
+              <th>Next Step</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>Marcus Rivera</strong><br><span style="font-size:10px;color:var(--text-muted)">Staff ML · Ex-Meta</span></td>
+                <td>Staff ML Engineer</td>
+                <td><span class="tag amber">Final Round</span></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:48px;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:88%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div>
+                    <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent-emerald)">4.4</span>
+                  </div>
+                </td>
+                <td><span class="tag emerald" style="font-size:10px">System Design</span> <span class="tag emerald" style="font-size:10px">PyTorch</span> <span class="tag emerald" style="font-size:10px">Scale</span></td>
+                <td><span class="tag rose" style="font-size:10px">Agent Frameworks</span></td>
+                <td><span class="tag emerald">Prep Sent</span></td>
+                <td style="font-size:11px;">System design panel · <strong>Thu 2pm</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Priya Sharma</strong><br><span style="font-size:10px;color:var(--text-muted)">Sr. MLE · Ex-Stripe</span></td>
+                <td>Staff ML Engineer</td>
+                <td><span class="tag blue">Interview</span></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:48px;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:76%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div>
+                    <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent-blue)">3.8</span>
+                  </div>
+                </td>
+                <td><span class="tag emerald" style="font-size:10px">ML Infra</span> <span class="tag emerald" style="font-size:10px">Python</span></td>
+                <td><span class="tag rose" style="font-size:10px">Team Size</span> <span class="tag rose" style="font-size:10px">LLMs</span></td>
+                <td><span class="tag amber">Pending</span></td>
+                <td style="font-size:11px;">Technical screen · <strong>Mon 11am</strong></td>
+              </tr>
+              <tr>
+                <td><strong>James Wu</strong><br><span style="font-size:10px;color:var(--text-muted)">EM · Ex-Databricks</span></td>
+                <td>Engineering Manager</td>
+                <td><span class="tag violet">Offer Extended</span></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:48px;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:92%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div>
+                    <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent-emerald)">4.6</span>
+                  </div>
+                </td>
+                <td><span class="tag emerald" style="font-size:10px">People Mgmt</span> <span class="tag emerald" style="font-size:10px">ML Ops</span> <span class="tag emerald" style="font-size:10px">Hiring</span></td>
+                <td><span style="font-size:10px;color:var(--text-muted)">None flagged</span></td>
+                <td><span class="tag emerald">Complete</span></td>
+                <td style="font-size:11px;">Awaiting response · <strong>deadline Fri</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Sofia Gonzalez</strong><br><span style="font-size:10px;color:var(--text-muted)">ML Eng · Ex-Google</span></td>
+                <td>ML Eval Engineer</td>
+                <td><span class="tag blue">Interview</span></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:48px;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:82%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div>
+                    <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent-emerald)">4.1</span>
+                  </div>
+                </td>
+                <td><span class="tag emerald" style="font-size:10px">Eval Design</span> <span class="tag emerald" style="font-size:10px">A/B Testing</span></td>
+                <td><span class="tag rose" style="font-size:10px">Small Team Exp</span></td>
+                <td><span class="tag emerald">Prep Sent</span></td>
+                <td style="font-size:11px;">Manager interview · <strong>Wed 3pm</strong></td>
+              </tr>
+              <tr>
+                <td><strong>David Kim</strong><br><span style="font-size:10px;color:var(--text-muted)">Data Eng · Ex-Snowflake</span></td>
+                <td>Data Engineer</td>
+                <td><span class="tag amber">Final Round</span></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:48px;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:86%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div>
+                    <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent-emerald)">4.3</span>
+                  </div>
+                </td>
+                <td><span class="tag emerald" style="font-size:10px">Spark</span> <span class="tag emerald" style="font-size:10px">dbt</span> <span class="tag emerald" style="font-size:10px">Airflow</span></td>
+                <td><span class="tag rose" style="font-size:10px">Streaming</span></td>
+                <td><span class="tag emerald">Prep Sent</span></td>
+                <td style="font-size:11px;">Team match panel · <strong>Tue 1pm</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Rachel Adams</strong><br><span style="font-size:10px;color:var(--text-muted)">Sr. DE · Ex-Uber</span></td>
+                <td>Data Engineer</td>
+                <td><span class="tag blue">Interview</span></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:48px;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:72%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div>
+                    <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent-blue)">3.6</span>
+                  </div>
+                </td>
+                <td><span class="tag emerald" style="font-size:10px">Kafka</span> <span class="tag emerald" style="font-size:10px">Python</span></td>
+                <td><span class="tag rose" style="font-size:10px">dbt</span> <span class="tag rose" style="font-size:10px">Cloud-Native</span></td>
+                <td><span class="tag amber">Pending</span></td>
+                <td style="font-size:11px;">Technical screen · <strong>Wed 10am</strong></td>
+              </tr>
+              <tr>
+                <td><strong>Alex Tanaka</strong><br><span style="font-size:10px;color:var(--text-muted)">Agent Dev · Ex-LangChain</span></td>
+                <td>Agent Engineer</td>
+                <td><span class="tag blue">Interview</span></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:48px;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:90%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div>
+                    <span style="font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--accent-emerald)">4.5</span>
+                  </div>
+                </td>
+                <td><span class="tag emerald" style="font-size:10px">LangChain</span> <span class="tag emerald" style="font-size:10px">Agents</span> <span class="tag emerald" style="font-size:10px">RAG</span></td>
+                <td><span style="font-size:10px;color:var(--text-muted)">None flagged</span></td>
+                <td><span class="tag emerald">Prep Sent</span></td>
+                <td style="font-size:11px;">Live coding · <strong>Thu 10am</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ═══ CANDIDATE DETAIL PANEL (expanded view) ═══ -->
+        <div class="card" style="margin-top:24px">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Candidate Deep Dive — Marcus Rivera</div>
+              <div class="card-subtitle">Staff ML Engineer · Final Round · System design panel Thursday</div>
+            </div>
+            <span class="card-badge" style="background:rgba(52,211,153,0.12);color:var(--accent-emerald)">STRONG CANDIDATE</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+            <!-- Resume Benchmark -->
+            <div style="background:var(--bg-elevated);border-radius:8px;padding:16px;">
+              <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.8px;">Resume Benchmark</div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:12px;color:var(--text-secondary)">Technical Depth</span>
+                  <div style="display:flex;align-items:center;gap:6px;"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:92%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div><span style="font-size:11px;font-weight:700;color:var(--accent-emerald);font-family:'JetBrains Mono'">92</span></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:12px;color:var(--text-secondary)">Seniority Signal</span>
+                  <div style="display:flex;align-items:center;gap:6px;"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:88%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div><span style="font-size:11px;font-weight:700;color:var(--accent-emerald);font-family:'JetBrains Mono'">88</span></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:12px;color:var(--text-secondary)">Scope of Impact</span>
+                  <div style="display:flex;align-items:center;gap:6px;"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:85%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div><span style="font-size:11px;font-weight:700;color:var(--accent-blue);font-family:'JetBrains Mono'">85</span></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:12px;color:var(--text-secondary)">Role Alignment</span>
+                  <div style="display:flex;align-items:center;gap:6px;"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:78%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div><span style="font-size:11px;font-weight:700;color:var(--accent-blue);font-family:'JetBrains Mono'">78</span></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:12px;color:var(--text-secondary)">Culture Indicators</span>
+                  <div style="display:flex;align-items:center;gap:6px;"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:80%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div><span style="font-size:11px;font-weight:700;color:var(--accent-blue);font-family:'JetBrains Mono'">80</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Skill Match -->
+            <div style="background:var(--bg-elevated);border-radius:8px;padding:16px;">
+              <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.8px;">Skill Match vs. Role Req</div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;">
+                <div style="display:flex;align-items:center;gap:8px;"><span class="tag emerald" style="font-size:10px;min-width:28px;text-align:center">1.0</span> <span style="color:var(--text-primary)">PyTorch</span> <span style="color:var(--text-muted);font-size:10px">· exact · production</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span class="tag emerald" style="font-size:10px;min-width:28px;text-align:center">1.0</span> <span style="color:var(--text-primary)">Python</span> <span style="color:var(--text-muted);font-size:10px">· exact</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span class="tag emerald" style="font-size:10px;min-width:28px;text-align:center">1.0</span> <span style="color:var(--text-primary)">System Design</span> <span style="color:var(--text-muted);font-size:10px">· exact · L6 signal</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span class="tag emerald" style="font-size:10px;min-width:28px;text-align:center">1.0</span> <span style="color:var(--text-primary)">Distributed Training</span> <span style="color:var(--text-muted);font-size:10px">· exact</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span class="tag blue" style="font-size:10px;min-width:28px;text-align:center">0.6</span> <span style="color:var(--text-primary)">LangChain</span> <span style="color:var(--text-muted);font-size:10px">· adjacent to agent frameworks</span></div>
+                <div style="display:flex;align-items:center;gap:8px;"><span class="tag rose" style="font-size:10px;min-width:28px;text-align:center">0.0</span> <span style="color:var(--text-secondary)">Agent Eval Frameworks</span> <span style="color:var(--text-muted);font-size:10px">· gap</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interview Prep Material -->
+          <div style="background:var(--bg-elevated);border-radius:8px;padding:16px;margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.8px;">Interview Prep Material</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+              <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;">
+                <div style="font-size:11px;font-weight:600;color:var(--accent-emerald);margin-bottom:6px;">System Design Panel</div>
+                <div style="font-size:11px;color:var(--text-secondary);line-height:1.5;">
+                  Probe: ML training pipeline at scale (Meta experience). Ask about failure modes in distributed PyTorch. Push on agent orchestration — this is the gap area.
+                </div>
+                <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">Interviewer: Sarah K. · Thu 2pm</div>
+              </div>
+              <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;">
+                <div style="font-size:11px;font-weight:600;color:var(--accent-blue);margin-bottom:6px;">Culture & Values</div>
+                <div style="font-size:11px;color:var(--text-secondary);line-height:1.5;">
+                  Previous role: 200-person ML org → our team is 47. Assess comfort with ambiguity, willingness to do IC work at staff level, cross-functional communication style.
+                </div>
+                <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">Interviewer: Director · Thu 3pm</div>
+              </div>
+              <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;">
+                <div style="font-size:11px;font-weight:600;color:var(--accent-amber);margin-bottom:6px;">Comp & Close Strategy</div>
+                <div style="font-size:11px;color:var(--text-secondary);line-height:1.5;">
+                  Current: ~$380K TC at Meta. Our range: $350-420K. Likely needs top-of-band + signing bonus. Competing offer from Anthropic (verbal). Move fast.
+                </div>
+                <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">Decision: offer by Friday EOD</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recommendation -->
+          <div style="padding:14px 16px;background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.15);border-radius:8px;font-size:12px;color:var(--accent-emerald);font-weight:500;line-height:1.6;">
+            <strong>Hiring Panel Recommendation:</strong> Strong hire. Technical depth exceeds bar for Staff ML. Only gap is agent framework experience — mitigatable given strong distributed systems foundation. Flight risk: competing Anthropic offer. Recommend extending offer by Friday with top-of-band comp + $40K signing bonus. Retention signal: wants to build from scratch (positive for our stage).
+          </div>
+        </div>
       </div>
 
       <!-- ═══════════════════════════════════════════════════
@@ -807,6 +1036,389 @@ tr:hover td { background:rgba(52,211,153,0.02); }
         </div>
       </div>
 
+      <!-- ═══════════════════════════════════════════════════
+           SCAN VIEW — Competitor Job Scanning
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-scan">
+        <div class="section-header">
+          <div class="section-title">Competitor Scan</div>
+          <div class="section-desc">Scanning competitor career portals for roles, comp ranges, and hiring velocity in your market</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">Competitors Tracked</div><div class="kpi-value emerald">23</div></div>
+          <div class="kpi blue"><div class="kpi-label">Open Roles Found</div><div class="kpi-value blue">187</div><div class="kpi-change up">↑ 14 new this week</div></div>
+          <div class="kpi amber"><div class="kpi-label">Roles Overlapping Ours</div><div class="kpi-value amber">32</div></div>
+          <div class="kpi violet"><div class="kpi-label">Avg Comp vs. Ours</div><div class="kpi-value violet">+8%</div><div class="kpi-change down">competitors pay more</div></div>
+        </div>
+
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);">
+            <div style="width:10px;height:10px;border-radius:50%;background:#ef4444"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#f59e0b"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#22c55e"></div>
+            <span style="margin-left:8px;font-size:11px;font-family:'JetBrains Mono';color:var(--text-muted)">sourcingnav scan --mode=company --industry=ai-ml --location=sf,remote</span>
+          </div>
+          <div style="padding:16px;font-family:'JetBrains Mono';font-size:12px;line-height:2;overflow-x:auto;">
+<span style="display:block;color:var(--accent-cyan);font-weight:700">COMPETITOR PORTAL SCAN <span style="color:var(--text-muted);font-weight:400">— 23 companies · AI/ML industry · SF + Remote</span></span>
+<span style="display:block;color:var(--text-muted)">═══════════════════════════════════════════════════════════</span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--text-primary);font-weight:700">DIRECT COMPETITORS (same roles you're hiring for)</span>
+<span style="display:block;"></span>
+<span style="display:block;">  <span style="color:var(--accent-rose);font-weight:700">Anthropic</span>       <span style="color:var(--accent-blue)">12 ML roles</span>  <span style="color:var(--accent-emerald)">$240-340K</span>  <span style="color:var(--accent-amber)">↑↑ surge hiring</span></span>
+<span style="display:block;">  <span style="color:var(--accent-rose);font-weight:700">OpenAI</span>          <span style="color:var(--accent-blue)"> 9 ML roles</span>  <span style="color:var(--accent-emerald)">$250-360K</span>  <span style="color:var(--accent-amber)">↑  growing</span></span>
+<span style="display:block;">  <span style="color:var(--accent-rose);font-weight:700">Databricks</span>      <span style="color:var(--accent-blue)"> 8 ML roles</span>  <span style="color:var(--accent-emerald)">$220-300K</span>  <span style="color:var(--text-muted)">→  stable</span></span>
+<span style="display:block;">  <span style="color:var(--accent-amber);font-weight:700">Scale AI</span>        <span style="color:var(--accent-blue)"> 6 ML roles</span>  <span style="color:var(--accent-emerald)">$200-280K</span>  <span style="color:var(--accent-amber)">↑  growing</span></span>
+<span style="display:block;">  <span style="color:var(--accent-amber);font-weight:700">Cohere</span>          <span style="color:var(--accent-blue)"> 4 ML roles</span>  <span style="color:var(--accent-emerald)">$210-290K</span>  <span style="color:var(--text-muted)">→  stable</span></span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--accent-amber);font-weight:700">  ⚠ ALERT: Anthropic posted 3 Agent Engineer roles this week.</span>
+<span style="display:block;color:var(--accent-amber)">    Direct competition for our open Agent Engineer req. Their comp is 15% above ours.</span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--text-primary);font-weight:700">ADJACENT COMPETITORS (talent overlap)</span>
+<span style="display:block;"></span>
+<span style="display:block;">  <span style="color:var(--accent-blue)">Stripe ML</span>        5 roles  $220-310K   <span style="color:var(--text-muted)">fintech ML overlap</span></span>
+<span style="display:block;">  <span style="color:var(--accent-blue)">Vercel AI</span>        3 roles  $200-280K   <span style="color:var(--text-muted)">infra overlap</span></span>
+<span style="display:block;">  <span style="color:var(--accent-blue)">Figma ML</span>        2 roles  $210-270K   <span style="color:var(--text-muted)">applied ML overlap</span></span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--accent-emerald);font-weight:700">Scan complete. 12 new roles since last scan (3 days ago).</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div><div class="card-title">Competitor Role Comparison</div><div class="card-subtitle">Your open roles vs. competitor postings for the same positions</div></div></div>
+          <table>
+            <thead><tr><th>Your Open Role</th><th>Your Comp Range</th><th>Competitor</th><th>Their Comp</th><th>Delta</th><th>Their JD Quality</th><th>Threat Level</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Staff ML Engineer</strong></td><td style="font-family:'JetBrains Mono'">$300-380K</td><td>Anthropic</td><td style="font-family:'JetBrains Mono';color:var(--accent-rose)">$320-420K</td><td style="color:var(--accent-rose);font-weight:700">-10%</td><td><span class="tag emerald">A</span></td><td><span class="tag rose">HIGH</span></td></tr>
+              <tr><td><strong>Agent Engineer</strong></td><td style="font-family:'JetBrains Mono'">$220-280K</td><td>OpenAI</td><td style="font-family:'JetBrains Mono';color:var(--accent-rose)">$250-320K</td><td style="color:var(--accent-rose);font-weight:700">-15%</td><td><span class="tag emerald">A</span></td><td><span class="tag rose">HIGH</span></td></tr>
+              <tr><td><strong>ML Eval Engineer</strong></td><td style="font-family:'JetBrains Mono'">$200-260K</td><td>Scale AI</td><td style="font-family:'JetBrains Mono';color:var(--accent-amber)">$210-270K</td><td style="color:var(--accent-amber);font-weight:700">-4%</td><td><span class="tag blue">B+</span></td><td><span class="tag amber">MED</span></td></tr>
+              <tr><td><strong>Data Engineer</strong></td><td style="font-family:'JetBrains Mono'">$190-240K</td><td>Databricks</td><td style="font-family:'JetBrains Mono'">$200-250K</td><td style="color:var(--accent-amber);font-weight:700">-5%</td><td><span class="tag blue">B</span></td><td><span class="tag amber">MED</span></td></tr>
+              <tr><td><strong>Engineering Manager</strong></td><td style="font-family:'JetBrains Mono'">$280-350K</td><td>Cohere</td><td style="font-family:'JetBrains Mono';color:var(--accent-emerald)">$260-320K</td><td style="color:var(--accent-emerald);font-weight:700">+8%</td><td><span class="tag amber">C+</span></td><td><span class="tag emerald">LOW</span></td></tr>
+              <tr><td><strong>Junior MLE</strong></td><td style="font-family:'JetBrains Mono'">$140-180K</td><td>No direct match</td><td style="color:var(--text-muted)">—</td><td style="color:var(--accent-emerald);font-weight:700">—</td><td>—</td><td><span class="tag emerald">LOW</span></td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:16px;padding:12px;background:rgba(251,113,133,0.06);border:1px solid rgba(251,113,133,0.15);border-radius:8px;font-size:12px;color:var(--text-secondary)">
+            <strong style="color:var(--accent-rose)">Action Required:</strong> Staff ML Engineer and Agent Engineer roles are 10-15% below market at Anthropic/OpenAI. Consider adjusting comp bands or adding differentiators (equity upside, scope, team size, mission) to stay competitive.
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           BATCH EVALUATION VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-batch">
+        <div class="section-header">
+          <div class="section-title">Batch Candidate Evaluation</div>
+          <div class="section-desc">Side-by-side candidate comparison with ranked scoring across all open roles</div>
+        </div>
+
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);">
+            <div style="width:10px;height:10px;border-radius:50%;background:#ef4444"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#f59e0b"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#22c55e"></div>
+            <span style="margin-left:8px;font-size:11px;font-family:'JetBrains Mono';color:var(--text-muted)">sourcingnav batch --role="Staff ML Engineer" --candidates=4</span>
+          </div>
+          <div style="padding:16px;font-family:'JetBrains Mono';font-size:12px;line-height:2;overflow-x:auto;">
+<span style="display:block;color:var(--accent-cyan);font-weight:700">BATCH EVALUATION <span style="color:var(--text-muted);font-weight:400">— Staff ML Engineer · 4 candidates</span></span>
+<span style="display:block;color:var(--text-muted)">═══════════════════════════════════════════════════════════</span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--text-primary);font-weight:700">RANKED RESULTS</span>
+<span style="display:block;"></span>
+<span style="display:block;">  <span style="color:var(--text-primary);font-weight:700">RANK  CANDIDATE            FIT     TECH    CULTURE  GROWTH   VERDICT</span></span>
+<span style="display:block;color:var(--text-muted)">  ─────────────────────────────────────────────────────────────────</span>
+<span style="display:block;">  <span style="color:var(--accent-emerald);font-weight:700"> #1</span>   Marcus Rivera        <span style="color:var(--accent-emerald);font-weight:700">4.4</span>     <span style="color:var(--accent-emerald)">4.6</span>     <span style="color:var(--accent-blue)">4.0</span>      <span style="color:var(--accent-emerald)">4.5</span>     <span style="color:var(--accent-emerald);font-weight:700">STRONG HIRE</span></span>
+<span style="display:block;">  <span style="color:var(--accent-blue);font-weight:700"> #2</span>   Priya Sharma         <span style="color:var(--accent-blue);font-weight:700">3.8</span>     <span style="color:var(--accent-blue)">4.0</span>     <span style="color:var(--accent-emerald)">4.2</span>      <span style="color:var(--accent-blue)">3.5</span>     <span style="color:var(--accent-blue);font-weight:700">HIRE</span></span>
+<span style="display:block;">  <span style="color:var(--accent-amber);font-weight:700"> #3</span>   Kevin Park           <span style="color:var(--accent-amber);font-weight:700">3.4</span>     <span style="color:var(--accent-amber)">3.8</span>     <span style="color:var(--accent-amber)">3.0</span>      <span style="color:var(--accent-blue)">3.5</span>     <span style="color:var(--accent-amber);font-weight:700">MAYBE</span></span>
+<span style="display:block;">  <span style="color:var(--accent-rose);font-weight:700"> #4</span>   Lisa Torres          <span style="color:var(--accent-rose);font-weight:700">2.8</span>     <span style="color:var(--accent-rose)">2.5</span>     <span style="color:var(--accent-emerald)">4.0</span>      <span style="color:var(--accent-rose)">2.0</span>     <span style="color:var(--accent-rose);font-weight:700">PASS</span></span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--text-primary);font-weight:700">HEAD-TO-HEAD: #1 vs #2</span>
+<span style="display:block;"></span>
+<span style="display:block;">  <span style="color:var(--text-muted)">Dimension            Marcus Rivera    Priya Sharma</span></span>
+<span style="display:block;color:var(--text-muted)">  ─────────────────────────────────────────────────</span>
+<span style="display:block;">  Technical Depth      <span style="color:var(--accent-emerald);font-weight:700">4.6 ████████</span>  <span style="color:var(--accent-blue)">4.0 ██████░░</span></span>
+<span style="display:block;">  System Design        <span style="color:var(--accent-emerald);font-weight:700">4.8 ████████</span>  <span style="color:var(--accent-blue)">3.5 █████░░░</span></span>
+<span style="display:block;">  Culture Fit          <span style="color:var(--accent-blue)">4.0 ██████░░</span>  <span style="color:var(--accent-emerald);font-weight:700">4.2 ███████░</span></span>
+<span style="display:block;">  Leadership Signal    <span style="color:var(--accent-emerald);font-weight:700">4.5 ███████░</span>  <span style="color:var(--accent-blue)">3.0 ████░░░░</span></span>
+<span style="display:block;">  Growth Trajectory    <span style="color:var(--accent-emerald);font-weight:700">4.5 ███████░</span>  <span style="color:var(--accent-blue)">3.5 █████░░░</span></span>
+<span style="display:block;">  Comp Alignment       <span style="color:var(--accent-amber)">3.5 █████░░░</span>  <span style="color:var(--accent-emerald);font-weight:700">4.5 ███████░</span></span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--accent-emerald);font-weight:700">  → RECOMMENDATION: Extend offer to Marcus. Priya is strong backup.</span>
+<span style="display:block;color:var(--text-muted)">    Marcus wins on 4/6 dimensions. Priya has better comp alignment</span>
+<span style="display:block;color:var(--text-muted)">    and stronger culture signals — consider for future Agent Eng role.</span>
+          </div>
+        </div>
+
+        <!-- Batch comparison cards -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">Marcus Rivera</div><div class="card-subtitle">Staff ML · Ex-Meta · 8 years exp</div></div>
+              <span style="padding:4px 10px;border-radius:6px;background:rgba(52,211,153,0.12);color:var(--accent-emerald);font-size:11px;font-weight:700">#1 STRONG HIRE</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;"><span style="color:var(--text-secondary)">Technical Depth</span><div style="display:flex;align-items:center;gap:6px"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:92%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent-emerald)">4.6</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;"><span style="color:var(--text-secondary)">System Design</span><div style="display:flex;align-items:center;gap:6px"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:96%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent-emerald)">4.8</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;"><span style="color:var(--text-secondary)">Culture Fit</span><div style="display:flex;align-items:center;gap:6px"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:80%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent-blue)">4.0</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;"><span style="color:var(--text-secondary)">Growth Trajectory</span><div style="display:flex;align-items:center;gap:6px"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:90%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent-emerald)">4.5</span></div></div>
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px"><strong style="color:var(--accent-emerald)">Strengths:</strong> Distributed training at Meta scale, system design for 200M+ param models, strong leadership signal</div>
+            <div style="font-size:11px;color:var(--text-secondary)"><strong style="color:var(--accent-rose)">Gap:</strong> No agent framework experience — mitigatable with strong distributed systems background</div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div><div class="card-title">Priya Sharma</div><div class="card-subtitle">Sr. MLE · Ex-Stripe · 6 years exp</div></div>
+              <span style="padding:4px 10px;border-radius:6px;background:rgba(96,165,250,0.12);color:var(--accent-blue);font-size:11px;font-weight:700">#2 HIRE</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;"><span style="color:var(--text-secondary)">Technical Depth</span><div style="display:flex;align-items:center;gap:6px"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:80%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent-blue)">4.0</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;"><span style="color:var(--text-secondary)">System Design</span><div style="display:flex;align-items:center;gap:6px"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:70%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent-blue)">3.5</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;"><span style="color:var(--text-secondary)">Culture Fit</span><div style="display:flex;align-items:center;gap:6px"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:84%;height:100%;background:var(--accent-emerald);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent-emerald)">4.2</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;"><span style="color:var(--text-secondary)">Growth Trajectory</span><div style="display:flex;align-items:center;gap:6px"><div style="width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:70%;height:100%;background:var(--accent-blue);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent-blue)">3.5</span></div></div>
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px"><strong style="color:var(--accent-emerald)">Strengths:</strong> ML infrastructure at Stripe scale, excellent culture fit, strong cross-functional communication</div>
+            <div style="font-size:11px;color:var(--text-secondary)"><strong style="color:var(--accent-rose)">Gaps:</strong> Smaller team experience (team of 8), less LLM-specific work — would need ramp time</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           MARKET INTEL VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-marketintel">
+        <div class="section-header">
+          <div class="section-title">Market Intelligence</div>
+          <div class="section-desc">Competitor landscape, comp benchmarks, and talent flow — your hiring hygiene report</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">Competitors Tracked</div><div class="kpi-value emerald">23</div></div>
+          <div class="kpi blue"><div class="kpi-label">Their Open ML Roles</div><div class="kpi-value blue">187</div><div class="kpi-change up">↑ 14 new this week</div></div>
+          <div class="kpi amber"><div class="kpi-label">Your Comp vs Market P50</div><div class="kpi-value amber">-8%</div><div class="kpi-change down">below market</div></div>
+          <div class="kpi violet"><div class="kpi-label">JD Quality Score</div><div class="kpi-value violet">B+</div><div class="kpi-change neutral">room to improve</div></div>
+        </div>
+
+        <!-- Comp Hygiene -->
+        <div class="card mb-24">
+          <div class="card-header"><div><div class="card-title">Compensation Hygiene Check</div><div class="card-subtitle">Your posted ranges vs. market P50 — are you competitive?</div></div></div>
+          <table>
+            <thead><tr><th>Your Role</th><th>Your Range</th><th>Market P25</th><th>Market P50</th><th>Market P75</th><th>Grade</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Staff ML Engineer</strong></td><td style="font-family:'JetBrains Mono'">$300-380K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$280K</td><td style="font-family:'JetBrains Mono';font-weight:700">$320K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$380K</td><td><span class="tag blue">B+</span></td><td style="font-size:11px;color:var(--text-secondary)">Competitive at top-of-band</td></tr>
+              <tr><td><strong>Agent Engineer</strong></td><td style="font-family:'JetBrains Mono'">$220-280K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$230K</td><td style="font-family:'JetBrains Mono';font-weight:700">$270K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$320K</td><td><span class="tag amber">C+</span></td><td style="font-size:11px;color:var(--accent-amber)">Raise floor to $240K</td></tr>
+              <tr><td><strong>Engineering Manager</strong></td><td style="font-family:'JetBrains Mono'">$280-350K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$260K</td><td style="font-family:'JetBrains Mono';font-weight:700">$300K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$340K</td><td><span class="tag emerald">A-</span></td><td style="font-size:11px;color:var(--accent-emerald)">Strong — well above P50</td></tr>
+              <tr><td><strong>ML Eval Engineer</strong></td><td style="font-family:'JetBrains Mono'">$200-260K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$190K</td><td style="font-family:'JetBrains Mono';font-weight:700">$230K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$270K</td><td><span class="tag blue">B</span></td><td style="font-size:11px;color:var(--text-secondary)">Competitive mid-range</td></tr>
+              <tr><td><strong>Data Engineer</strong></td><td style="font-family:'JetBrains Mono'">$190-240K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$180K</td><td style="font-family:'JetBrains Mono';font-weight:700">$215K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$250K</td><td><span class="tag emerald">A-</span></td><td style="font-size:11px;color:var(--accent-emerald)">Above P50 — strong</td></tr>
+              <tr><td><strong>Junior MLE</strong></td><td style="font-family:'JetBrains Mono'">$140-180K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$135K</td><td style="font-family:'JetBrains Mono';font-weight:700">$160K</td><td style="font-family:'JetBrains Mono';color:var(--text-muted)">$185K</td><td><span class="tag emerald">A</span></td><td style="font-size:11px;color:var(--accent-emerald)">Excellent range</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Talent Flow + Posting Quality -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+          <div class="card">
+            <div class="card-header"><div><div class="card-title">Talent Flow — Where ML Talent Goes</div><div class="card-subtitle">Last 90 days · LinkedIn data</div></div></div>
+            <div style="padding:8px 0;">
+              <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">You're Losing Talent To</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="min-width:100px;font-size:12px;color:var(--text-secondary)">Anthropic</span><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:85%;height:100%;background:rgba(251,113,133,0.5);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:var(--accent-rose)">4</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="min-width:100px;font-size:12px;color:var(--text-secondary)">OpenAI</span><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:55%;height:100%;background:rgba(251,113,133,0.4);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:var(--accent-rose)">2</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span style="min-width:100px;font-size:12px;color:var(--text-secondary)">Databricks</span><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:30%;height:100%;background:rgba(251,113,133,0.3);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:var(--accent-rose)">1</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">You're Winning Talent From</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="min-width:100px;font-size:12px;color:var(--text-secondary)">Meta AI</span><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:90%;height:100%;background:rgba(52,211,153,0.5);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:var(--accent-emerald)">5</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="min-width:100px;font-size:12px;color:var(--text-secondary)">Amazon ML</span><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:60%;height:100%;background:rgba(52,211,153,0.4);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:var(--accent-emerald)">3</span></div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="min-width:100px;font-size:12px;color:var(--text-secondary)">Scale AI</span><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:40%;height:100%;background:rgba(52,211,153,0.3);border-radius:3px"></div></div><span style="font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:var(--accent-emerald)">2</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div><div class="card-title">Your Posting Quality Audit</div><div class="card-subtitle">How your JDs compare to top competitors</div></div></div>
+            <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px;">
+              <div class="score-row"><span class="score-label">Comp Transparency</span><div class="score-track"><div class="score-fill" style="width:100%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">A</span></div>
+              <div class="score-row"><span class="score-label">Role Clarity</span><div class="score-track"><div class="score-fill" style="width:75%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">B+</span></div>
+              <div class="score-row"><span class="score-label">Tech Stack Specificity</span><div class="score-track"><div class="score-fill" style="width:85%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">A-</span></div>
+              <div class="score-row"><span class="score-label">DEI Language</span><div class="score-track"><div class="score-fill" style="width:60%;background:var(--accent-amber)"></div></div><span class="score-val" style="color:var(--accent-amber)">C+</span></div>
+              <div class="score-row"><span class="score-label">SEO Optimization</span><div class="score-track"><div class="score-fill" style="width:50%;background:var(--accent-amber)"></div></div><span class="score-val" style="color:var(--accent-amber)">C</span></div>
+              <div class="score-row"><span class="score-label">JD Length (optimal: 600-800 words)</span><div class="score-track"><div class="score-fill" style="width:70%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">B</span></div>
+            </div>
+            <div style="margin-top:16px;padding:12px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:8px;font-size:12px;color:var(--text-secondary)">
+              <strong style="color:var(--accent-amber)">Quick Wins:</strong> Add inclusive language to Agent Engineer JD (currently scores C+ on DEI). Optimize all JDs for Google Jobs SEO — add salary structured data and location tags.
+            </div>
+          </div>
+        </div>
+
+        <!-- Comp trend chart -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">Market Comp Trends — Senior ML Engineer (P50)</div></div>
+          <div class="chart-container" style="height:220px"><canvas id="compTrendChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           CALIBRATION ENGINE VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-calibrate">
+        <div class="section-header">
+          <div class="section-title">Hiring Calibration Engine</div>
+          <div class="section-desc">Learning from past hiring outcomes to improve your interview signal and reduce bad hires</div>
+        </div>
+
+        <div class="grid-4 mb-24">
+          <div class="kpi emerald"><div class="kpi-label">Hires Tracked</div><div class="kpi-value emerald">18</div></div>
+          <div class="kpi blue"><div class="kpi-label">Interview-to-Hire Rate</div><div class="kpi-value blue">21%</div><div class="kpi-change up">↑ 3% improvement</div></div>
+          <div class="kpi amber"><div class="kpi-label">Regrettable Hires</div><div class="kpi-value amber">2</div><div class="kpi-change down">both below 3.5 score</div></div>
+          <div class="kpi violet"><div class="kpi-label">Score Accuracy</div><div class="kpi-value violet">84%</div><div class="kpi-change up">↑ from 71% last year</div></div>
+        </div>
+
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);">
+            <div style="width:10px;height:10px;border-radius:50%;background:#ef4444"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#f59e0b"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#22c55e"></div>
+            <span style="margin-left:8px;font-size:11px;font-family:'JetBrains Mono';color:var(--text-muted)">sourcingnav calibrate --mode=company --outcomes=18</span>
+          </div>
+          <div style="padding:16px;font-family:'JetBrains Mono';font-size:12px;line-height:2;overflow-x:auto;">
+<span style="display:block;color:var(--accent-cyan);font-weight:700">HIRING CALIBRATION ANALYSIS <span style="color:var(--text-muted);font-weight:400">— 18 hires tracked (12 thriving, 4 adequate, 2 regrettable)</span></span>
+<span style="display:block;color:var(--text-muted)">═══════════════════════════════════════════════════════════</span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--text-primary);font-weight:700">INTERVIEW SCORE → PERFORMANCE CORRELATION</span>
+<span style="display:block;"></span>
+<span style="display:block;">  Score Range    Thriving  Adequate  Regrettable  <span style="font-weight:700">Success Rate</span></span>
+<span style="display:block;color:var(--text-muted)">  ──────────────────────────────────────────────────────</span>
+<span style="display:block;">  4.5+           <span style="color:var(--accent-emerald)">6</span>         <span style="color:var(--accent-blue)">0</span>         <span style="color:var(--accent-rose)">0</span>            <span style="color:var(--accent-emerald);font-weight:700">100%</span></span>
+<span style="display:block;">  4.0 – 4.4      <span style="color:var(--accent-emerald)">5</span>         <span style="color:var(--accent-blue)">2</span>         <span style="color:var(--accent-rose)">0</span>            <span style="color:var(--accent-emerald);font-weight:700"> 71%</span></span>
+<span style="display:block;">  3.5 – 3.9      <span style="color:var(--accent-emerald)">1</span>         <span style="color:var(--accent-blue)">2</span>         <span style="color:var(--accent-rose)">0</span>            <span style="color:var(--accent-amber);font-weight:700"> 33%</span></span>
+<span style="display:block;">  Below 3.5      <span style="color:var(--accent-emerald)">0</span>         <span style="color:var(--accent-blue)">0</span>         <span style="color:var(--accent-rose)">2</span>            <span style="color:var(--accent-rose);font-weight:700">  0%</span></span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--accent-amber);font-weight:700">  ⚠ INSIGHT: Your hiring bar of 3.5 is too low.</span>
+<span style="display:block;color:var(--accent-amber)">    Every hire below 3.5 has been regrettable. Raise bar to 4.0.</span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--text-primary);font-weight:700">INTERVIEWER SIGNAL QUALITY</span>
+<span style="display:block;"></span>
+<span style="display:block;">  <span style="color:var(--accent-emerald)">✓</span> Sarah K. (tech screen):     <span style="color:var(--accent-emerald);font-weight:700">91% signal accuracy</span>  <span style="color:var(--text-muted)">— best interviewer</span></span>
+<span style="display:block;">  <span style="color:var(--accent-emerald)">✓</span> Director panel:              <span style="color:var(--accent-emerald);font-weight:700">85% signal accuracy</span>  <span style="color:var(--text-muted)">— strong</span></span>
+<span style="display:block;">  <span style="color:var(--accent-amber)">~</span> Peer coding (avg):          <span style="color:var(--accent-amber);font-weight:700">62% signal accuracy</span>  <span style="color:var(--text-muted)">— needs calibration</span></span>
+<span style="display:block;">  <span style="color:var(--accent-rose)">✗</span> Culture fit panel:           <span style="color:var(--accent-rose);font-weight:700">48% signal accuracy</span>  <span style="color:var(--text-muted)">— weak predictor</span></span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--accent-amber);font-weight:700">  → RECOMMENDATION: Retrain culture fit interviewers. Current panel</span>
+<span style="display:block;color:var(--accent-amber)">    passes candidates who don't perform. Replace with structured behavioral.</span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--text-primary);font-weight:700">INTERVIEW PROCESS PATTERNS</span>
+<span style="display:block;"></span>
+<span style="display:block;">  <span style="color:var(--accent-emerald)">✓</span> Take-home → onsite:  <span style="color:var(--accent-emerald);font-weight:700">88% correlation</span> <span style="color:var(--text-muted)">with actual performance</span></span>
+<span style="display:block;">  <span style="color:var(--accent-rose)">✗</span> Whiteboard coding:   <span style="color:var(--accent-rose);font-weight:700">41% correlation</span> <span style="color:var(--text-muted)">with actual performance</span></span>
+<span style="display:block;">  <span style="color:var(--accent-emerald)">✓</span> References (structured): <span style="color:var(--accent-emerald);font-weight:700">79% correlation</span></span>
+<span style="display:block;"></span>
+<span style="display:block;color:var(--accent-emerald);font-weight:700">Calibration complete. Recommendations saved to hiring_calibration.yml</span>
+          </div>
+        </div>
+
+        <!-- Calibration insights -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">What Predicts Success at Your Company</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div class="score-row"><span class="score-label">System design (real-world)</span><div class="score-track"><div class="score-fill" style="width:91%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">91%</span></div>
+              <div class="score-row"><span class="score-label">Take-home project quality</span><div class="score-track"><div class="score-fill" style="width:88%;background:var(--accent-emerald)"></div></div><span class="score-val" style="color:var(--accent-emerald)">88%</span></div>
+              <div class="score-row"><span class="score-label">Prior startup experience</span><div class="score-track"><div class="score-fill" style="width:79%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">79%</span></div>
+              <div class="score-row"><span class="score-label">Structured references</span><div class="score-track"><div class="score-fill" style="width:79%;background:var(--accent-blue)"></div></div><span class="score-val" style="color:var(--accent-blue)">79%</span></div>
+              <div class="score-row"><span class="score-label">Pedigree / brand name</span><div class="score-track"><div class="score-fill" style="width:35%;background:var(--accent-rose)"></div></div><span class="score-val" style="color:var(--accent-rose)">35%</span></div>
+              <div class="score-row"><span class="score-label">Whiteboard coding</span><div class="score-track"><div class="score-fill" style="width:41%;background:var(--accent-rose)"></div></div><span class="score-val" style="color:var(--accent-rose)">41%</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:16px">Action Items from Calibration</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="padding:12px;background:rgba(251,113,133,0.06);border:1px solid rgba(251,113,133,0.12);border-radius:8px;font-size:12px;">
+                <div style="font-weight:600;color:var(--accent-rose);margin-bottom:4px">Raise Hiring Bar → 4.0 minimum</div>
+                <div style="color:var(--text-secondary)">Every hire scored below 3.5 became regrettable. 3.5-3.9 has only 33% success. Set 4.0 as the floor.</div>
+              </div>
+              <div style="padding:12px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.12);border-radius:8px;font-size:12px;">
+                <div style="font-weight:600;color:var(--accent-amber);margin-bottom:4px">Retrain Culture Fit Panel</div>
+                <div style="color:var(--text-secondary)">48% signal accuracy is coin-flip territory. Switch to structured behavioral interview with rubric.</div>
+              </div>
+              <div style="padding:12px;background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.12);border-radius:8px;font-size:12px;">
+                <div style="font-weight:600;color:var(--accent-emerald);margin-bottom:4px">Drop Whiteboard Coding</div>
+                <div style="color:var(--text-secondary)">41% correlation with performance. Replace with take-home (88% correlation) for all roles.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           INTEGRATIONS VIEW
+           ═══════════════════════════════════════════════════ -->
+      <div class="view" id="v-integrations">
+        <div class="section-header">
+          <div class="section-title">Integrations</div>
+          <div class="section-desc">ATS, HRIS, and market data connections feeding your talent engine</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;">
+          <!-- Greenhouse -->
+          <div class="card" style="border-color:rgba(52,211,153,0.3)">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:40px;height:40px;border-radius:10px;background:rgba(52,211,153,0.12);display:flex;align-items:center;justify-content:center;font-size:18px">🌿</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">Greenhouse</div>
+                <div style="font-size:11px;color:var(--accent-emerald);font-weight:600">● Connected</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">ATS — Syncing jobs, candidates, scorecards, and interview schedules every 30 minutes.</div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:8px 0;border-top:1px solid var(--border)"><span style="color:var(--text-muted)">Last sync</span><span style="color:var(--accent-emerald);font-weight:600">3 min ago</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text-muted)">Jobs synced</span><span style="font-weight:600">6</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text-muted)">Candidates</span><span style="font-weight:600">34</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text-muted)">Stage changes today</span><span style="font-weight:600;color:var(--accent-blue)">5</span></div>
+          </div>
+
+          <!-- BambooHR -->
+          <div class="card" style="border-color:rgba(52,211,153,0.3)">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:40px;height:40px;border-radius:10px;background:rgba(52,211,153,0.12);display:flex;align-items:center;justify-content:center;font-size:18px">🎋</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">BambooHR</div>
+                <div style="font-size:11px;color:var(--accent-emerald);font-weight:600">● Connected</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">HRIS — Employee data, org chart, comp data, time-off, and performance reviews.</div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:8px 0;border-top:1px solid var(--border)"><span style="color:var(--text-muted)">Last sync</span><span style="color:var(--accent-emerald);font-weight:600">1 hr ago</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text-muted)">Employees synced</span><span style="font-weight:600">47</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text-muted)">Comp records</span><span style="font-weight:600">47</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text-muted)">Reviews pending</span><span style="font-weight:600;color:var(--accent-amber)">3</span></div>
+          </div>
+
+          <!-- Google Jobs -->
+          <div class="card" style="border-color:rgba(52,211,153,0.3)">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:40px;height:40px;border-radius:10px;background:rgba(52,211,153,0.12);display:flex;align-items:center;justify-content:center;font-size:18px">🌐</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">Google Jobs (SerpAPI)</div>
+                <div style="font-size:11px;color:var(--accent-emerald);font-weight:600">● Connected</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px">Market intel — Scanning competitor postings for comp ranges, role velocity, and market trends.</div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:8px 0;border-top:1px solid var(--border)"><span style="color:var(--text-muted)">Last scan</span><span style="color:var(--accent-emerald);font-weight:600">Today 6:00 AM</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text-muted)">Competitors tracked</span><span style="font-weight:600">23</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text-muted)">Roles indexed</span><span style="font-weight:600">187</span></div>
+          </div>
+        </div>
+
+        <!-- Available -->
+        <div class="card">
+          <div class="card-header"><div><div class="card-title">Available Integrations</div><div class="card-subtitle">Connect additional data sources</div></div></div>
+          <table>
+            <thead><tr><th>Platform</th><th>Type</th><th>What You Get</th><th>Cost</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Merge.dev</strong></td><td>Universal ATS/HRIS</td><td>Connect 50+ platforms through one API</td><td>Free (3 accounts)</td><td><span class="tag" style="background:rgba(34,211,238,0.12);color:var(--accent-cyan)">Recommended</span></td></tr>
+              <tr><td><strong>Rippling</strong></td><td>HRIS</td><td>Employee data, payroll, benefits, device mgmt</td><td>Free (API)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+              <tr><td><strong>LinkedIn Jobs</strong></td><td>Intel</td><td>Competitor headcount, posting data, talent flow</td><td>Proxycurl ($50/mo)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+              <tr><td><strong>Levels.fyi</strong></td><td>Comp Data</td><td>Real-time compensation benchmarks by company/level</td><td>API ($99/mo)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+              <tr><td><strong>Lever</strong></td><td>ATS</td><td>Alternative ATS — candidates, opportunities, offers</td><td>Free (API)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+              <tr><td><strong>Lattice</strong></td><td>Performance</td><td>Performance reviews, goals, 1:1 notes, engagement surveys</td><td>Free (API)</td><td><span style="color:var(--text-muted)">Not connected</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -819,7 +1431,10 @@ const titles = {
   dashboard:['Dashboard','Overview'],roster:['Team Roster','People'],onboarding:['Onboarding Tracker','People › Onboarding'],
   retention:['Retention Intelligence','People › Retention'],development:['Growth & Development','Growth'],
   competency:['Competency Map','Growth › Competencies'],engagement:['Employee Engagement','Growth › Engagement'],
-  workforce:['Workforce Planning','Planning'],hiring:['Hiring Pipeline','Planning › Hiring'],analytics:['People Analytics','Planning › Analytics']
+  workforce:['Workforce Planning','Planning'],hiring:['Hiring Pipeline','Planning › Hiring'],analytics:['People Analytics','Planning › Analytics'],
+  scan:['Competitor Scan','Intelligence › Scan'],batch:['Batch Evaluation','Intelligence › Batch'],
+  marketintel:['Market Intelligence','Intelligence › Market Intel'],calibrate:['Calibration Engine','Intelligence › Calibrate'],
+  integrations:['Integrations','Intelligence › Connections']
 };
 
 function go(name) {
@@ -843,6 +1458,7 @@ function go(name) {
   if(name==='workforce') setTimeout(initBudget,100);
   if(name==='hiring') setTimeout(initHiringFunnel,100);
   if(name==='analytics') setTimeout(initAnalytics,100);
+  if(name==='marketintel') setTimeout(initCompTrend,100);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1000,6 +1616,22 @@ function initAnalytics(){
       ]
     }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:8,font:{size:11}}}},
       scales:{x:{title:{display:true,text:'Base Salary ($K)',font:{size:11}},grid:{color:'rgba(39,39,46,0.3)'}},y:{display:false}}}
+  });
+}
+
+let compTrendInit=false;
+function initCompTrend(){
+  if(compTrendInit)return; compTrendInit=true;
+  new Chart(document.getElementById('compTrendChart'),{
+    type:'line', data:{
+      labels:['Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26'],
+      datasets:[
+        {label:'Market P50',data:[245,248,250,255,258,260,265],borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.1)',fill:true,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#34d399'},
+        {label:'Your Midpoint',data:[240,240,245,245,250,250,255],borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,0.05)',fill:true,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#60a5fa'},
+        {label:'Anthropic P50',data:[255,260,265,270,275,278,282],borderColor:'#fb7185',backgroundColor:'rgba(251,113,133,0.05)',fill:false,tension:0.4,borderWidth:2,pointRadius:3,pointBackgroundColor:'#fb7185',borderDash:[4,4]}
+      ]
+    }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(39,39,46,0.5)'},ticks:{callback:v=>'$'+v+'K'}}}}
   });
 }
 
