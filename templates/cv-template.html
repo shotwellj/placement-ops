@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{NAME}} — Resume</title>
+  <style>
+    /* ATS-optimized single-column layout */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 11pt;
+      line-height: 1.4;
+      color: #1a1a1a;
+      max-width: 7.5in;
+      margin: 0 auto;
+      padding: 0.5in 0.6in;
+    }
+
+    /* Header — name and contact info */
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+      border-bottom: 1.5px solid #333;
+      padding-bottom: 10px;
+    }
+
+    .header h1 {
+      font-size: 20pt;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .header .contact {
+      font-size: 9.5pt;
+      color: #444;
+    }
+
+    .header .contact a {
+      color: #444;
+      text-decoration: none;
+    }
+
+    /* Section headers — ATS-standard names */
+    h2 {
+      font-size: 12pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #999;
+      padding-bottom: 2px;
+      margin-top: 14px;
+      margin-bottom: 8px;
+      color: #222;
+    }
+
+    /* Professional Summary */
+    .summary {
+      font-size: 10.5pt;
+      margin-bottom: 4px;
+    }
+
+    /* Competency grid — keyword-rich */
+    .competencies {
+      font-size: 10pt;
+      margin-bottom: 6px;
+      padding: 6px 0;
+    }
+
+    .competencies span {
+      display: inline;
+    }
+
+    /* Experience entries */
+    .role {
+      margin-bottom: 10px;
+    }
+
+    .role-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 2px;
+    }
+
+    .role-title {
+      font-weight: 700;
+      font-size: 11pt;
+    }
+
+    .role-date {
+      font-size: 10pt;
+      color: #555;
+      white-space: nowrap;
+    }
+
+    .role-company {
+      font-size: 10.5pt;
+      font-style: italic;
+      color: #333;
+      margin-bottom: 3px;
+    }
+
+    /* Bullet points */
+    ul {
+      padding-left: 18px;
+      margin-bottom: 4px;
+    }
+
+    li {
+      font-size: 10.5pt;
+      margin-bottom: 2px;
+    }
+
+    /* Education */
+    .education-entry {
+      margin-bottom: 6px;
+    }
+
+    .edu-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .edu-degree {
+      font-weight: 700;
+      font-size: 11pt;
+    }
+
+    .edu-date {
+      font-size: 10pt;
+      color: #555;
+    }
+
+    .edu-school {
+      font-size: 10.5pt;
+      font-style: italic;
+      color: #333;
+    }
+
+    /* Skills section */
+    .skills-list {
+      font-size: 10.5pt;
+    }
+
+    .skills-category {
+      margin-bottom: 3px;
+    }
+
+    .skills-category strong {
+      font-weight: 700;
+    }
+
+    /* Print optimization */
+    @media print {
+      body { padding: 0; }
+      @page { margin: 0.5in 0.6in; size: letter; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>{{NAME}}</h1>
+    <div class="contact">
+      {{EMAIL}} | {{PHONE}} | {{LOCATION}}
+      {{#LINKEDIN}} | <a href="{{LINKEDIN}}">LinkedIn</a>{{/LINKEDIN}}
+      {{#GITHUB}} | <a href="{{GITHUB}}">GitHub</a>{{/GITHUB}}
+    </div>
+  </div>
+
+  <!-- PROFESSIONAL SUMMARY -->
+  <h2>Professional Summary</h2>
+  <p class="summary">{{SUMMARY_TEXT}}</p>
+
+  <!-- CORE COMPETENCIES (keyword grid) -->
+  <div class="competencies">
+    {{COMPETENCIES}}
+  </div>
+
+  <!-- WORK EXPERIENCE -->
+  <h2>Work Experience</h2>
+
+  {{#EXPERIENCE}}
+  <div class="role">
+    <div class="role-header">
+      <span class="role-title">{{TITLE}}</span>
+      <span class="role-date">{{START_DATE}} — {{END_DATE}}</span>
+    </div>
+    <div class="role-company">{{COMPANY}}{{#LOCATION}}, {{LOCATION}}{{/LOCATION}}</div>
+    <ul>
+      {{#BULLETS}}
+      <li>{{.}}</li>
+      {{/BULLETS}}
+    </ul>
+  </div>
+  {{/EXPERIENCE}}
+
+  <!-- EDUCATION -->
+  <h2>Education</h2>
+
+  {{#EDUCATION}}
+  <div class="education-entry">
+    <div class="edu-header">
+      <span class="edu-degree">{{DEGREE}}</span>
+      <span class="edu-date">{{YEAR}}</span>
+    </div>
+    <div class="edu-school">{{SCHOOL}}</div>
+  </div>
+  {{/EDUCATION}}
+
+  <!-- TECHNICAL SKILLS -->
+  <h2>Technical Skills</h2>
+  <div class="skills-list">
+    {{#SKILLS}}
+    <div class="skills-category"><strong>{{CATEGORY}}:</strong> {{ITEMS}}</div>
+    {{/SKILLS}}
+  </div>
+
+</body>
+</html>

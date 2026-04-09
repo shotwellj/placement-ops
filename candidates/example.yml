@@ -1,0 +1,87 @@
+# ============================================================
+# Placement-Ops — Example Candidate File
+# ============================================================
+# One file per candidate. Store in candidates/ folder.
+#
+# Copy this file:
+#   cp candidates/example.yml candidates/firstname-lastname.yml
+#
+# Then fill in the real info.
+# ============================================================
+
+candidate:
+  name: "Jane Smith"
+  email: "jane.smith@email.com"
+  phone: "+1-555-0456"
+  location: "San Francisco, CA"
+  linkedin: "linkedin.com/in/janesmith"
+  github: "github.com/janesmith"
+
+target:
+  roles:
+    - Senior ML Engineer
+    - Staff Data Scientist
+    - ML Engineering Manager
+  min_compensation: 180000
+  max_compensation: 220000          # optional — helps with matching
+  remote_preference: hybrid          # remote | hybrid | onsite | flexible
+  locations:
+    - San Francisco
+    - New York
+    - Remote US
+  visa_status: "US Citizen"
+  notice_period: "2 weeks"
+  willing_to_relocate: false
+
+# You can either point to a separate resume file:
+resume_path: "candidates/resumes/jane-smith.md"
+
+# Or paste the full resume content here:
+# resume: |
+#   # Jane Smith
+#   Senior ML Engineer | 7 years experience
+#   jane.smith@email.com | SF, CA | linkedin.com/in/janesmith
+#
+#   ## Professional Summary
+#   ML Engineer with 7 years of experience building production ML systems...
+#
+#   ## Work Experience
+#
+#   ### Senior ML Engineer — Acme Corp (2022-Present)
+#   - Built recommendation system serving 50M daily predictions
+#   - Led migration from batch to real-time ML serving (90% latency reduction)
+#   - Mentored 3 junior engineers
+#
+#   ### ML Engineer — StartupCo (2019-2022)
+#   - Designed and deployed NLP pipeline for customer intent classification
+#   - Built A/B testing framework for ML model experiments
+#   - Reduced model training time by 60% via distributed training on GPU cluster
+#
+#   ### Data Scientist — BigCorp Inc (2017-2019)
+#   - Developed fraud detection model (95% precision, $2M annual savings)
+#   - Built automated feature engineering pipeline
+#
+#   ## Education
+#   M.S. Computer Science — Stanford University (2017)
+#   B.S. Mathematics — UC Berkeley (2015)
+#
+#   ## Technical Skills
+#   Languages: Python, SQL, Scala
+#   ML/AI: PyTorch, TensorFlow, scikit-learn, Hugging Face
+#   Infrastructure: Kubernetes, Docker, AWS (SageMaker, EMR), Spark
+#   Tools: MLflow, Airflow, dbt, Git
+
+# Notes — anything useful for matching or prepping this candidate
+notes: |
+  - Strong communicator. Did well in past mock interviews.
+  - Prefers product-oriented teams over pure infrastructure.
+  - Left Acme Corp due to RIF, not performance.
+  - Has competing interest from Databricks (move fast if submitting).
+
+# Submission history — track where this candidate has been submitted
+submissions:
+  # - company: Anthropic
+  #   role: Senior ML Engineer
+  #   date: 2026-03-15
+  #   status: Phone Screen
+  #   score: 4.3

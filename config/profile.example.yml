@@ -1,0 +1,140 @@
+# ============================================================
+# Placement-Ops — Recruiter Profile
+# ============================================================
+# This is YOUR profile. It tells the system who you are,
+# what roles you fill, and how you charge.
+#
+# Copy this file:
+#   cp config/profile.example.yml config/profile.yml
+#
+# Then fill in your real info.
+# ============================================================
+
+recruiter:
+  name: "Your Name"
+  agency: "Independent"             # or your agency name
+  email: "you@example.com"
+  phone: "+1-555-0123"
+  linkedin: "linkedin.com/in/yourprofile"
+  website: ""                        # optional
+
+# ------------------------------------------------------------
+# Your recruiting niche — what roles do you fill?
+# ------------------------------------------------------------
+niche:
+  # The role titles you recruit for
+  primary_roles:
+    - Data Scientist
+    - ML Engineer
+    - Data Engineer
+    - Analytics Engineer
+    - AI Engineer
+    - Machine Learning Manager
+    - Head of Data
+
+  # What seniority levels
+  levels:
+    - Mid (IC3)
+    - Senior (IC4-IC5)
+    - Staff (IC6)
+    - Manager
+    - Director
+    - VP
+
+  # Industries you serve (helps with company research)
+  industries:
+    - Technology
+    - Finance / Fintech
+    - Healthcare / Biotech
+    - E-commerce / Retail
+    - Enterprise SaaS
+
+  # Keywords that signal a role is in your niche
+  # Used by the scanner to filter job titles
+  positive_keywords:
+    - data scientist
+    - machine learning
+    - ML engineer
+    - data engineer
+    - analytics engineer
+    - AI engineer
+    - NLP
+    - computer vision
+    - deep learning
+    - LLM
+    - MLOps
+    - data platform
+
+  # Keywords that signal a role is NOT in your niche
+  negative_keywords:
+    - intern
+    - co-op
+    - junior
+    - entry level
+    - data entry
+    - data analyst I        # too junior
+    - business analyst
+
+  # Keywords that boost a role's priority (harder to fill = higher fee)
+  priority_boost_keywords:
+    - staff
+    - principal
+    - head of
+    - director
+    - VP
+    - founding
+    - LLM
+    - generative AI
+
+# ------------------------------------------------------------
+# Fee structure — how you get paid
+# ------------------------------------------------------------
+fees:
+  default_model: contingency         # contingency | retained | contract
+
+  # Contingency (perm placements)
+  contingency_rate: 0.20             # 20% of first-year base salary
+  retained_rate: 0.25                # 25% for retained/exclusive searches
+  minimum_fee: 15000                 # Walk-away minimum
+
+  # Contract / hourly
+  contract_markup: 1.45              # 45% markup on bill rate
+  contract_minimum_hourly: 25        # Don't take contracts below this margin
+
+  # Guarantee period
+  guarantee_period_days: 90          # Standard replacement guarantee
+
+  # Payment terms you prefer
+  preferred_payment_terms: net-30
+
+# ------------------------------------------------------------
+# Submission preferences
+# ------------------------------------------------------------
+preferences:
+  # Minimum composite score to submit a candidate (1-5 scale)
+  min_submit_score: 4.0
+
+  # Max candidates to present per req (quality > volume)
+  max_candidates_per_req: 4
+
+  # How often to scan portals for new reqs
+  scan_frequency: daily              # daily | weekly | manual
+
+  # Report output format
+  report_format: markdown            # markdown | pdf
+
+  # Candidate package format
+  package_format: pdf                # pdf | markdown
+
+  # Auto-log every action to the tracker?
+  auto_track: true
+
+# ------------------------------------------------------------
+# Geographic focus
+# ------------------------------------------------------------
+geography:
+  primary_markets:
+    - United States
+  time_zone: "America/New_York"
+  remote_friendly: true              # Do you fill remote roles?
+  relocation_support: false          # Do your clients sponsor relo?

@@ -1,0 +1,29 @@
+{
+  "name": "placement-ops",
+  "version": "1.0.0",
+  "description": "AI-powered recruiting operations pipeline built on Claude Code",
+  "main": "generate-pdf.mjs",
+  "scripts": {
+    "doctor": "node scripts/doctor.mjs",
+    "pdf": "node generate-pdf.mjs"
+  },
+  "keywords": [
+    "recruiting",
+    "staffing",
+    "ai",
+    "claude-code",
+    "automation",
+    "ats",
+    "resume",
+    "pipeline"
+  ],
+  "author": "Jason Shotwell",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.42.0",
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

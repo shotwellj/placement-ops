@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Config (contains personal info)
+config/profile.yml
+config/portals.yml
+
+# Candidate data (sensitive)
+candidates/*.yml
+!candidates/example.yml
+candidates/resumes/
+
+# Pipeline data
+data/
+
+# Generated reports and output
+reports/
+output/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,92 @@
+# ============================================================
+# Placement-Ops — Pipeline Status Definitions
+# ============================================================
+# Valid statuses and their allowed transitions.
+# Used by track mode for integrity checks.
+# ============================================================
+
+statuses:
+
+  # --- Req statuses ---
+  - name: New
+    description: "Req discovered or added, not yet worked"
+    transitions_to: [Evaluating, On Hold, Closed]
+
+  - name: Evaluating
+    description: "Actively evaluating candidates against this req"
+    transitions_to: [Submitting, On Hold, Closed]
+
+  - name: Submitting
+    description: "Candidates being prepped and submitted"
+    transitions_to: [Interviewing, On Hold, Closed]
+
+  - name: Interviewing
+    description: "At least one candidate in active interview process"
+    transitions_to: [Offer, Rejected, On Hold, Closed]
+
+  - name: Offer
+    description: "Offer extended to a candidate"
+    transitions_to: [Accepted, Rejected, Withdrawn]
+
+  - name: Accepted
+    description: "Offer accepted, awaiting start date"
+    transitions_to: [Started, Withdrawn]
+
+  - name: Started
+    description: "Candidate has started — guarantee clock begins"
+    transitions_to: [Guarantee Complete, Falloff]
+
+  - name: Guarantee Complete
+    description: "Candidate survived the guarantee period — fee is secured"
+    transitions_to: []
+
+  # --- Terminal statuses ---
+  - name: Rejected
+    description: "Client rejected the candidate or vice versa"
+    transitions_to: []
+
+  - name: Withdrawn
+    description: "Candidate pulled out of the process"
+    transitions_to: []
+
+  - name: On Hold
+    description: "Client paused the search"
+    transitions_to: [New, Evaluating, Closed]
+
+  - name: Closed
+    description: "Req filled internally or search cancelled"
+    transitions_to: []
+
+  - name: Falloff
+    description: "Candidate left during guarantee period — refund/replacement"
+    transitions_to: []
+
+# --- Follow-up rules ---
+follow_up_rules:
+  - status: Submitting
+    follow_up_after_days: 3
+    message: "No response from client — follow up on submission"
+
+  - status: Interviewing
+    follow_up_after_days: 2
+    message: "Get interview feedback from candidate and client"
+
+  - status: Offer
+    follow_up_after_days: 1
+    message: "Check if candidate has made a decision"
+
+  - status: Accepted
+    follow_up_after_days: 7
+    message: "Confirm start date and logistics"
+
+  - status: Started
+    follow_up_after_days: 30
+    message: "30-day check-in — how's the candidate performing?"
+
+  - status: Started
+    follow_up_after_days: 60
+    message: "60-day check-in — any concerns before guarantee expires?"
+
+  - status: Started
+    follow_up_after_days: 85
+    message: "Guarantee expires in 5 days — final check-in"

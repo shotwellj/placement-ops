@@ -1,0 +1,415 @@
+# ============================================================
+# Placement-Ops — Skill Taxonomy
+# ============================================================
+# This is the brain of the matching engine. It maps every
+# technology, tool, and concept into a structured hierarchy
+# with adjacency relationships.
+#
+# When the matching engine sees "PyTorch" on a resume and
+# "TensorFlow" in a JD, it knows they're adjacent ML frameworks
+# and gives partial credit instead of marking it as a gap.
+#
+# HOW SCORING WORKS:
+#   exact match    = 1.0 (candidate has exactly what the JD asks for)
+#   adjacent match = 0.6 (candidate has a closely related skill)
+#   parent match   = 0.3 (candidate has the broader category)
+#   no match       = 0.0
+#
+# CUSTOMIZE: Add skills relevant to YOUR niche. The defaults
+# cover Data/ML/AI. Fork and expand for other domains.
+# ============================================================
+
+# -----------------------------------------------
+# PROGRAMMING LANGUAGES
+# -----------------------------------------------
+programming_languages:
+  - name: Python
+    aliases: [python3, py]
+    adjacent: [R, Julia]
+    weight: high              # how important in Data/ML roles
+
+  - name: R
+    aliases: [r-lang, rlang]
+    adjacent: [Python, Julia]
+    weight: medium
+
+  - name: SQL
+    aliases: [sql, structured query language]
+    adjacent: [Spark SQL, BigQuery, Presto]
+    weight: high
+
+  - name: Scala
+    aliases: []
+    adjacent: [Java, Kotlin]
+    weight: medium
+
+  - name: Java
+    aliases: [java8, java11, java17]
+    adjacent: [Scala, Kotlin]
+    weight: low
+
+  - name: Julia
+    aliases: []
+    adjacent: [Python, R, MATLAB]
+    weight: low
+
+  - name: Go
+    aliases: [golang]
+    adjacent: [Rust]
+    weight: low
+
+  - name: Rust
+    aliases: []
+    adjacent: [Go, C++]
+    weight: low
+
+  - name: TypeScript
+    aliases: [ts, typescript]
+    adjacent: [JavaScript]
+    weight: low
+
+  - name: JavaScript
+    aliases: [js, node.js, nodejs]
+    adjacent: [TypeScript]
+    weight: low
+
+  - name: C++
+    aliases: [cpp, c plus plus]
+    adjacent: [C, Rust, CUDA]
+    weight: low
+
+# -----------------------------------------------
+# ML / AI FRAMEWORKS
+# -----------------------------------------------
+ml_frameworks:
+  - name: PyTorch
+    aliases: [torch]
+    adjacent: [TensorFlow, JAX]
+    weight: high
+
+  - name: TensorFlow
+    aliases: [tf, tensorflow2, keras]
+    adjacent: [PyTorch, JAX]
+    weight: high
+
+  - name: JAX
+    aliases: [google jax, flax]
+    adjacent: [PyTorch, TensorFlow]
+    weight: medium
+
+  - name: scikit-learn
+    aliases: [sklearn, scikit learn]
+    adjacent: [XGBoost, LightGBM]
+    weight: medium
+
+  - name: XGBoost
+    aliases: [xgb]
+    adjacent: [LightGBM, CatBoost, scikit-learn]
+    weight: medium
+
+  - name: LightGBM
+    aliases: [lgbm]
+    adjacent: [XGBoost, CatBoost, scikit-learn]
+    weight: medium
+
+  - name: Hugging Face
+    aliases: [huggingface, hf, transformers]
+    adjacent: [PyTorch, LangChain]
+    weight: high
+
+  - name: spaCy
+    aliases: []
+    adjacent: [NLTK, Hugging Face]
+    weight: low
+
+# -----------------------------------------------
+# LLM / GENERATIVE AI
+# -----------------------------------------------
+llm_genai:
+  - name: LangChain
+    aliases: [langchain]
+    adjacent: [LlamaIndex, CrewAI, AutoGen]
+    weight: high
+
+  - name: LlamaIndex
+    aliases: [llama-index, llamaindex]
+    adjacent: [LangChain]
+    weight: medium
+
+  - name: RAG
+    aliases: [retrieval augmented generation]
+    adjacent: [vector databases, LangChain, embeddings]
+    weight: high
+
+  - name: Prompt Engineering
+    aliases: [prompt design, prompt tuning]
+    adjacent: [LLM fine-tuning, RAG]
+    weight: medium
+
+  - name: LLM Fine-tuning
+    aliases: [fine tuning, finetuning, LoRA, QLoRA, PEFT]
+    adjacent: [Prompt Engineering, Hugging Face]
+    weight: high
+
+  - name: Agent Systems
+    aliases: [AI agents, agentic AI, multi-agent, autonomous agents]
+    adjacent: [LangChain, CrewAI, AutoGen]
+    weight: high
+
+  - name: CrewAI
+    aliases: [crew ai]
+    adjacent: [LangChain, AutoGen, Agent Systems]
+    weight: medium
+
+  - name: AutoGen
+    aliases: [autogen, microsoft autogen]
+    adjacent: [CrewAI, LangChain, Agent Systems]
+    weight: medium
+
+  - name: Vector Databases
+    aliases: [vector db, vector store, embeddings store]
+    adjacent: [Pinecone, Weaviate, Chroma, Milvus, RAG]
+    weight: medium
+
+# -----------------------------------------------
+# DATA ENGINEERING
+# -----------------------------------------------
+data_engineering:
+  - name: Apache Spark
+    aliases: [spark, pyspark, spark sql]
+    adjacent: [Databricks, Apache Flink, Presto]
+    weight: high
+
+  - name: Databricks
+    aliases: [databricks lakehouse]
+    adjacent: [Apache Spark, Delta Lake, Snowflake]
+    weight: high
+
+  - name: Snowflake
+    aliases: []
+    adjacent: [BigQuery, Redshift, Databricks]
+    weight: high
+
+  - name: BigQuery
+    aliases: [google bigquery, bq]
+    adjacent: [Snowflake, Redshift]
+    weight: medium
+
+  - name: Redshift
+    aliases: [amazon redshift, aws redshift]
+    adjacent: [Snowflake, BigQuery]
+    weight: medium
+
+  - name: dbt
+    aliases: [dbt core, dbt cloud, data build tool]
+    adjacent: [SQL, Snowflake, BigQuery]
+    weight: high
+
+  - name: Apache Airflow
+    aliases: [airflow]
+    adjacent: [Prefect, Dagster, Luigi]
+    weight: high
+
+  - name: Prefect
+    aliases: []
+    adjacent: [Apache Airflow, Dagster]
+    weight: medium
+
+  - name: Dagster
+    aliases: []
+    adjacent: [Apache Airflow, Prefect]
+    weight: medium
+
+  - name: Apache Kafka
+    aliases: [kafka]
+    adjacent: [Apache Flink, Kinesis, Pub/Sub]
+    weight: medium
+
+  - name: Apache Flink
+    aliases: [flink]
+    adjacent: [Apache Spark, Apache Kafka]
+    weight: medium
+
+  - name: Delta Lake
+    aliases: [delta, delta table]
+    adjacent: [Apache Iceberg, Apache Hudi, Databricks]
+    weight: medium
+
+  - name: Apache Iceberg
+    aliases: [iceberg]
+    adjacent: [Delta Lake, Apache Hudi]
+    weight: medium
+
+# -----------------------------------------------
+# ML OPS / INFRASTRUCTURE
+# -----------------------------------------------
+mlops:
+  - name: MLflow
+    aliases: [ml flow]
+    adjacent: [Weights & Biases, Neptune]
+    weight: high
+
+  - name: Weights & Biases
+    aliases: [wandb, w&b]
+    adjacent: [MLflow, Neptune]
+    weight: medium
+
+  - name: Kubeflow
+    aliases: []
+    adjacent: [MLflow, SageMaker, Vertex AI]
+    weight: medium
+
+  - name: SageMaker
+    aliases: [aws sagemaker, amazon sagemaker]
+    adjacent: [Vertex AI, Kubeflow]
+    weight: medium
+
+  - name: Vertex AI
+    aliases: [google vertex, gcp vertex]
+    adjacent: [SageMaker, Kubeflow]
+    weight: medium
+
+  - name: Feature Store
+    aliases: [feast, tecton, hopsworks]
+    adjacent: [MLflow, data engineering]
+    weight: medium
+
+  - name: Model Serving
+    aliases: [model deployment, inference, TorchServe, TF Serving, Triton]
+    adjacent: [Docker, Kubernetes, SageMaker]
+    weight: medium
+
+  - name: A/B Testing
+    aliases: [experimentation, experiment platform, online experiments]
+    adjacent: [statistics, causal inference]
+    weight: medium
+
+# -----------------------------------------------
+# CLOUD / INFRASTRUCTURE
+# -----------------------------------------------
+cloud_infra:
+  - name: AWS
+    aliases: [amazon web services, amazon cloud]
+    adjacent: [GCP, Azure]
+    weight: high
+
+  - name: GCP
+    aliases: [google cloud, google cloud platform]
+    adjacent: [AWS, Azure]
+    weight: medium
+
+  - name: Azure
+    aliases: [microsoft azure, azure cloud]
+    adjacent: [AWS, GCP]
+    weight: medium
+
+  - name: Docker
+    aliases: [containerization, containers]
+    adjacent: [Kubernetes, Podman]
+    weight: high
+
+  - name: Kubernetes
+    aliases: [k8s, kube]
+    adjacent: [Docker, ECS, GKE, EKS]
+    weight: high
+
+  - name: Terraform
+    aliases: [terraform, iac, infrastructure as code]
+    adjacent: [Pulumi, CloudFormation, CDK]
+    weight: medium
+
+  - name: CI/CD
+    aliases: [github actions, jenkins, circleci, gitlab ci]
+    adjacent: [Terraform, Docker]
+    weight: medium
+
+# -----------------------------------------------
+# DOMAIN KNOWLEDGE
+# -----------------------------------------------
+domain_knowledge:
+  - name: Recommendation Systems
+    aliases: [recommender systems, RecSys, personalization]
+    adjacent: [A/B Testing, collaborative filtering]
+    weight: high
+
+  - name: NLP
+    aliases: [natural language processing, text mining, text analytics]
+    adjacent: [LLMs, Hugging Face, spaCy]
+    weight: high
+
+  - name: Computer Vision
+    aliases: [CV, image recognition, object detection]
+    adjacent: [PyTorch, TensorFlow, CNNs]
+    weight: medium
+
+  - name: Fraud Detection
+    aliases: [anomaly detection, fraud modeling]
+    adjacent: [XGBoost, feature engineering, real-time systems]
+    weight: medium
+
+  - name: Search & Ranking
+    aliases: [information retrieval, search relevance, learning to rank]
+    adjacent: [NLP, Elasticsearch, recommendation systems]
+    weight: medium
+
+  - name: Time Series
+    aliases: [forecasting, time series forecasting, demand forecasting]
+    adjacent: [statistics, Prophet, ARIMA]
+    weight: medium
+
+  - name: Causal Inference
+    aliases: [causal ML, uplift modeling, treatment effects]
+    adjacent: [A/B Testing, statistics, econometrics]
+    weight: medium
+
+  - name: Reinforcement Learning
+    aliases: [RL, deep RL, multi-armed bandits]
+    adjacent: [PyTorch, optimization]
+    weight: low
+
+# -----------------------------------------------
+# SOFT SKILLS / LEADERSHIP
+# -----------------------------------------------
+leadership_skills:
+  - name: People Management
+    aliases: [team management, managing engineers, direct reports]
+    adjacent: [Hiring, Mentorship, Performance Management]
+    weight: high            # for MGR/HEAD archetypes
+
+  - name: Hiring
+    aliases: [interviewing, talent acquisition, building teams]
+    adjacent: [People Management]
+    weight: medium
+
+  - name: Mentorship
+    aliases: [coaching, mentoring, developing engineers]
+    adjacent: [People Management, Tech Lead]
+    weight: medium
+
+  - name: Cross-functional Communication
+    aliases: [stakeholder management, executive communication, presenting to leadership]
+    adjacent: [Product Thinking]
+    weight: medium
+
+  - name: Product Thinking
+    aliases: [product sense, product strategy, business impact]
+    adjacent: [Cross-functional Communication, A/B Testing]
+    weight: medium
+
+  - name: Technical Architecture
+    aliases: [system design, architecture decisions, technical vision]
+    adjacent: [Tech Lead]
+    weight: high            # for LEAD/STAFF archetypes
+
+# -----------------------------------------------
+# HOW TO EXTEND THIS FILE
+# -----------------------------------------------
+# 1. Add a new category section (e.g., "security:", "devops:")
+# 2. Each skill needs: name, aliases, adjacent skills, weight
+# 3. "adjacent" = skills that transfer. If a candidate knows one,
+#    they get partial credit for the other.
+# 4. "weight" = how important this skill is for your niche.
+#    high = core to most roles you fill
+#    medium = frequently seen but not always required
+#    low = nice-to-have, appears occasionally
+# 5. Run `/placement-ops calibrate` after changes to re-score
