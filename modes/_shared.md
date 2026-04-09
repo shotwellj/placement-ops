@@ -16,11 +16,13 @@ At the start of every mode, load these files in order:
 
 1. `config/profile.yml` — The recruiter's profile, niche, fee structure
 2. `taxonomy/skills.yml` — Skill taxonomy with adjacency relationships
-3. `modes/_matching-engine.md` — The formal matching algorithm (for evaluate/batch/prep)
-4. The relevant candidate file from `candidates/` (if evaluating/prepping)
-5. `data/calibration.yml` — Past outcomes and learned adjustments (if exists)
-6. `data/pipeline.md` — Current pipeline state (if tracking/updating)
-7. `data/scan-history.tsv` — Previous scan results (if scanning)
+3. `taxonomy/competencies.yml` — Competency framework (for evaluate/strategy/retention)
+4. `modes/_matching-engine.md` — The formal matching algorithm (for evaluate/batch/prep)
+5. The relevant candidate file from `candidates/` (if evaluating/prepping)
+6. `data/calibration.yml` — Past outcomes and learned adjustments (if exists)
+7. `data/pipeline.md` — Current pipeline state (if tracking/updating)
+8. `data/scan-history.tsv` — Previous scan results (if scanning)
+9. `data/retention.yml` — Retention tracking data (if running retention mode)
 
 ## Scoring Rubric (8 Dimensions, 1-5 Scale)
 
@@ -149,6 +151,17 @@ The matching engine improves over time. Every placement, rejection, and withdraw
 
 Run `/placement-ops calibrate` to feed outcomes back in and see pattern analysis.
 
+## Competency Framework
+
+Beyond technical skills, every candidate is also assessed on **competencies** — how they work, not just what they know. The full framework lives in `taxonomy/competencies.yml` and covers 4 categories:
+
+- **Technical Competencies**: System design thinking, production engineering, research methodology, evaluation design, problem decomposition
+- **Leadership Competencies**: People management, technical direction, hiring capability, mentorship
+- **Delivery Competencies**: Operational rigor, project execution, velocity & iteration speed
+- **Communication Competencies**: Cross-functional communication, stakeholder influence, written communication
+
+Competency scores feed into the Culture Signals and Fill Probability dimensions of the 8-dimension rubric. For IC roles, weight technical and delivery competencies higher. For management roles, weight leadership and communication higher.
+
 ## Rules
 
 1. **Never fabricate experience.** When tailoring a resume, reframe real experience using the JD's vocabulary. Never invent skills, projects, or achievements.
@@ -159,3 +172,5 @@ Run `/placement-ops calibrate` to feed outcomes back in and see pattern analysis
 6. **Use the taxonomy.** Never score a skill match as 0 without checking `taxonomy/skills.yml` for adjacency. The whole point of the matching engine is partial credit for related experience.
 7. **Show the math.** When presenting scores, show how each number was calculated. Recruiters need to trust the system, and transparency builds trust.
 8. **Calibrate regularly.** After every placement or rejection, prompt the recruiter to run `/placement-ops calibrate`. The system gets smarter with data.
+9. **Assess competencies.** For evaluate and strategy modes, assess candidates against the competency framework, not just the skill taxonomy. A candidate with the right skills but wrong competencies won't retain.
+10. **Track retention.** After every placement start date, prompt for `/placement-ops retention` check-ins. Long-term outcomes matter more than placements.

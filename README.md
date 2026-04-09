@@ -24,18 +24,39 @@ The system also **calibrates over time**. Every placement and rejection gets fed
 
 ## What It Does
 
+### Core Operations
+
 | Mode | What It Does |
 |------|-------------|
 | `scan` | Crawls 150+ company career pages for new openings matching your niche |
-| `evaluate` | Scores a candidate against a JD using taxonomy-driven matching across 8 dimensions |
+| `evaluate` | Scores a candidate against a JD using taxonomy-driven matching across 8 dimensions + competency framework |
 | `prep` | Generates a tailored resume + interview prep + match analysis |
 | `submit` | Creates a polished submission package (cover memo + tailored CV + scorecard) |
 | `track` | Maintains your pipeline — every req, candidate, submission, and status |
 | `pipeline` | Dashboard view of all active searches and where they stand |
 | `batch` | Evaluate multiple candidates against a role in parallel with ranked output |
+
+### Intelligence
+
+| Mode | What It Does |
+|------|-------------|
 | `research` | Deep-dive on a company — culture, comp data, hiring patterns, interview process |
 | `benchmark` | Market scarcity analysis + comp benchmarking for a candidate |
+| `forecast` | Predict hiring needs 30-90 days out using signal detection and expansion tracking |
+
+### Optimization
+
+| Mode | What It Does |
+|------|-------------|
 | `calibrate` | Feed placement/rejection outcomes back to improve matching accuracy |
+| `analytics` | Funnel conversion rates, time-to-fill trends, revenue per hour, client scoreboard |
+| `retention` | Post-placement tracking with structured check-in cadence and retention health scoring |
+
+### Strategy
+
+| Mode | What It Does |
+|------|-------------|
+| `strategy` | Client-facing talent strategy reports — org design, hiring sequences, workforce planning |
 
 ## Quick Start
 
@@ -84,6 +105,10 @@ claude /placement-ops evaluate      # Score a candidate (taxonomy-driven)
 claude /placement-ops benchmark     # Market scarcity for a candidate
 claude /placement-ops pipeline      # See your full pipeline
 claude /placement-ops calibrate     # Feed outcomes back
+claude /placement-ops analytics     # Funnel metrics + revenue analysis
+claude /placement-ops forecast      # Predict hiring needs 30-90 days out
+claude /placement-ops retention     # Track post-placement health
+claude /placement-ops strategy      # Generate talent strategy for a client
 ```
 
 ---
@@ -189,9 +214,14 @@ placement-ops/
 │   ├── batch.md                # Parallel candidate evaluation
 │   ├── research.md             # Company deep-dives
 │   ├── benchmark.md            # Market scarcity + comp analysis
-│   └── calibrate.md            # Outcome tracking + pattern learning
+│   ├── calibrate.md            # Outcome tracking + pattern learning
+│   ├── analytics.md            # Funnel metrics, revenue analytics, client scoreboard
+│   ├── forecast.md             # Hiring signal detection + expansion predictions
+│   ├── retention.md            # Post-placement tracking + retention health
+│   └── strategy.md             # Client-facing talent strategy + workforce plans
 ├── taxonomy/
-│   └── skills.yml              # 150+ skills with adjacency relationships
+│   ├── skills.yml              # 150+ skills with adjacency relationships
+│   └── competencies.yml        # Competency framework (14 competencies, 4 categories)
 ├── config/
 │   ├── profile.example.yml     # Your recruiter profile template
 │   └── portals.example.yml     # 150+ pre-loaded Data/ML/AI companies
@@ -217,6 +247,9 @@ placement-ops/
 ## Philosophy
 
 - **Talent engineering, not keyword matching.** Every score has a formula. Every recommendation has evidence. Every placement makes the next one better.
+- **Full lifecycle, not just placement.** Scan → evaluate → place → retain → expand. The system tracks outcomes from first submission through 12-month retention.
+- **Strategic, not transactional.** Generate workforce plans, predict hiring needs, and advise on org design. Be the partner, not the vendor.
+- **Skills + competencies.** Technical skills tell you what someone knows. Competencies tell you how they work. Both matter for long-term retention.
 - **Quality over volume.** Don't submit candidates below 4.0. The system explicitly prevents spray-and-pray.
 - **Human in the loop.** AI recommends; you decide. Every submission requires your review.
 - **Calibration is the moat.** After 20 placements, your system knows your market. That knowledge compounds.

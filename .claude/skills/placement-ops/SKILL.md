@@ -16,18 +16,30 @@ methodology to recruiting operations — not gut-feel keyword matching.
 When the user runs `/placement-ops`, present this menu:
 
 ```
-PLACEMENT-OPS — What do you want to do?
-────────────────────────────────────────
- 1. scan       — Crawl company portals for new openings
+PLACEMENT-OPS — Talent Engineering Platform
+════════════════════════════════════════════
+
+CORE OPERATIONS
+ 1. scan       — Crawl 150+ company portals for new openings
  2. evaluate   — Score a candidate against a JD (taxonomy-driven)
  3. prep       — Generate tailored resume + interview prep
  4. submit     — Create a submission package for the client
  5. track      — Update pipeline status
  6. pipeline   — Dashboard view of everything in motion
  7. batch      — Evaluate multiple candidates vs. a role
+
+INTELLIGENCE
  8. research   — Deep-dive on a company
  9. benchmark  — Market scarcity + comp analysis for a candidate
-10. calibrate  — Feed outcomes back to improve matching accuracy
+10. forecast   — Predict hiring needs 30-90 days out
+
+OPTIMIZATION
+11. calibrate  — Feed outcomes back to improve matching accuracy
+12. analytics  — Funnel metrics, conversion rates, $/hr analysis
+13. retention  — Post-placement tracking + retention health
+
+STRATEGY
+14. strategy   — Client-facing talent strategy & workforce plans
 ```
 
 The user can also jump straight to a mode: `/placement-ops scan`
@@ -36,11 +48,12 @@ The user can also jump straight to a mode: `/placement-ops scan`
 
 1. Load `modes/_shared.md` first (always)
 2. Load `taxonomy/skills.yml` (always — this is the matching brain)
-3. Load `modes/_matching-engine.md` (for evaluate/batch/prep/benchmark)
-4. Load `data/calibration.yml` if it exists (for learned adjustments)
-5. Load the mode file for the selected action
-6. Follow the instructions in that mode file exactly
-7. Always complete the "Post-" mandatory steps (save reports, update pipeline)
+3. Load `taxonomy/competencies.yml` (for evaluate/strategy/retention)
+4. Load `modes/_matching-engine.md` (for evaluate/batch/prep/benchmark)
+5. Load `data/calibration.yml` if it exists (for learned adjustments)
+6. Load the mode file for the selected action
+7. Follow the instructions in that mode file exactly
+8. Always complete the "Post-" mandatory steps (save reports, update pipeline)
 
 ## Key Rules
 

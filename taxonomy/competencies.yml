@@ -1,0 +1,358 @@
+# Competency Framework for Talent Engineering
+# =============================================
+# Skills tell you WHAT someone knows. Competencies tell you HOW they work.
+# A candidate with PyTorch (skill) + System Design Thinking (competency)
+# is fundamentally different from one with just PyTorch.
+#
+# Used by: evaluate, strategy, retention, calibrate
+# Each competency has:
+#   - name: human-readable label
+#   - category: grouping (technical, leadership, delivery, communication)
+#   - signals: what to look for in resumes and interviews
+#   - levels: how to score 1-5
+#   - weight: how much this matters (high/medium/low)
+#   - adjacent: related competencies (partial credit, like skill adjacency)
+
+categories:
+  - technical_competencies
+  - leadership_competencies
+  - delivery_competencies
+  - communication_competencies
+
+# ═══════════════════════════════════════════════════════════
+# TECHNICAL COMPETENCIES
+# Beyond "knows PyTorch" — how do they think about systems?
+# ═══════════════════════════════════════════════════════════
+
+technical_competencies:
+
+  - name: System Design Thinking
+    id: system-design
+    weight: high
+    archetypes: [IC-MLE, IC-DE, IC-AE, MGR, LEAD, HEAD]
+    signals:
+      - "Designed end-to-end ML pipeline"
+      - "Architected data platform serving N users"
+      - "Led system design for production serving layer"
+      - "Evaluated build vs. buy for infrastructure"
+      - References to tradeoff analysis, scalability, reliability
+    levels:
+      1: "No evidence of system-level thinking. Task-focused only."
+      2: "Understands components but hasn't designed systems. Follows existing architectures."
+      3: "Has designed subsystems or modules. Can articulate tradeoffs within a bounded scope."
+      4: "Has designed full systems in production. Considers scale, reliability, cost, and maintainability."
+      5: "Has designed systems used by large teams or at significant scale. Drives architectural decisions across an org."
+    adjacent: [production-engineering, technical-direction]
+
+  - name: Production Engineering
+    id: production-engineering
+    weight: high
+    archetypes: [IC-MLE, IC-DE, IC-AE, IC-AI]
+    signals:
+      - "Deployed models to production"
+      - "Maintained SLA of N%"
+      - "On-call rotation"
+      - "Reduced latency by X%"
+      - "Built monitoring and alerting"
+      - References to CI/CD, testing, observability
+    levels:
+      1: "Research or notebook-only work. No production experience."
+      2: "Has deployed code but not owned production systems. Limited ops exposure."
+      3: "Has deployed and maintained production systems. Understands monitoring, testing, rollback."
+      4: "Owns production ML systems. Has handled incidents, scaled services, maintained SLAs."
+      5: "Has built and scaled production ML infrastructure used across teams. Defines reliability standards."
+    adjacent: [system-design, operational-rigor]
+
+  - name: Research Methodology
+    id: research-methodology
+    weight: medium
+    archetypes: [IC-DS, IC-MLE, IC-AI]
+    signals:
+      - "Published papers"
+      - "Designed experiments with statistical rigor"
+      - "A/B testing frameworks"
+      - "Hypothesis-driven development"
+      - References to experiment design, statistical significance, ablation studies
+    levels:
+      1: "No evidence of structured experimentation."
+      2: "Runs experiments but without rigorous methodology. Ad hoc analysis."
+      3: "Designs experiments with controls. Understands statistical significance. Documents methodology."
+      4: "Leads research projects with clear hypotheses, rigorous evaluation, and reproducibility."
+      5: "Defines research agenda for a team. Published work or patents. Advances state of the art."
+    adjacent: [problem-decomposition, evaluation-design]
+
+  - name: Evaluation Design
+    id: evaluation-design
+    weight: medium
+    archetypes: [IC-MLE, IC-DS, IC-AI]
+    signals:
+      - "Built evaluation frameworks"
+      - "Designed benchmarks"
+      - "Established metrics for model quality"
+      - "Red teaming or adversarial testing"
+      - References to precision/recall tradeoffs, human evaluation, automated eval
+    levels:
+      1: "No evidence of evaluation beyond basic accuracy metrics."
+      2: "Uses standard metrics. Doesn't design custom evaluations."
+      3: "Designs task-specific evaluations. Understands metric limitations."
+      4: "Builds evaluation infrastructure. Automated pipelines. Multiple metric dimensions."
+      5: "Defines evaluation strategy for an org. Novel benchmark design. Evaluation as a product."
+    adjacent: [research-methodology, problem-decomposition]
+
+  - name: Problem Decomposition
+    id: problem-decomposition
+    weight: high
+    archetypes: [IC-DS, IC-MLE, IC-DE, IC-AE, IC-AI, MGR, LEAD, HEAD]
+    signals:
+      - "Broke complex project into phases"
+      - "Identified MVP vs. full solution"
+      - "Scoped work into milestones"
+      - "Reduced ambiguous problem to concrete steps"
+      - References to phased rollout, incremental delivery, risk-ordered approach
+    levels:
+      1: "Needs problems fully defined before starting. Struggles with ambiguity."
+      2: "Can decompose well-structured problems. Needs guidance on ambiguous ones."
+      3: "Independently breaks down moderately complex problems. Identifies dependencies and risks."
+      4: "Decomposes highly ambiguous problems into actionable plans. Others follow their breakdown."
+      5: "Defines problem structure for an entire team or org. Turns vague strategy into engineering roadmap."
+    adjacent: [system-design, technical-direction]
+
+# ═══════════════════════════════════════════════════════════
+# LEADERSHIP COMPETENCIES
+# Not just for managers — ICs lead too.
+# ═══════════════════════════════════════════════════════════
+
+leadership_competencies:
+
+  - name: People Management
+    id: people-management
+    weight: high
+    archetypes: [MGR, LEAD, HEAD]
+    signals:
+      - "Managed N direct reports"
+      - "Conducted performance reviews"
+      - "Hired and onboarded engineers"
+      - "Coached underperformers"
+      - "Grew engineers to next level"
+      - References to 1:1s, career development, team health
+    levels:
+      1: "No management experience."
+      2: "Has mentored or led interns/juniors. No formal management."
+      3: "Manages 2-5 direct reports. Conducts reviews. Handles basic people issues."
+      4: "Manages 5-10 reports. Track record of growing people. Handles difficult conversations."
+      5: "Manages managers. Builds teams from scratch. Defines engineering culture."
+    adjacent: [mentorship, hiring-capability]
+
+  - name: Technical Direction
+    id: technical-direction
+    weight: high
+    archetypes: [LEAD, HEAD, MGR, IC-MLE, IC-DE]
+    signals:
+      - "Defined technical strategy"
+      - "Led architecture review board"
+      - "Set coding standards"
+      - "Made build-vs-buy decisions"
+      - "Drove migration or platform transition"
+      - References to tech debt strategy, platform vision, technology roadmap
+    levels:
+      1: "Follows technical direction set by others."
+      2: "Contributes to technical decisions within their scope."
+      3: "Sets technical direction for a project or small team."
+      4: "Sets technical direction for a domain or large team. Influences org-wide decisions."
+      5: "Defines technical vision for an engineering org. Industry-recognized technical leadership."
+    adjacent: [system-design, problem-decomposition, stakeholder-influence]
+
+  - name: Hiring Capability
+    id: hiring-capability
+    weight: medium
+    archetypes: [MGR, LEAD, HEAD]
+    signals:
+      - "Designed interview process"
+      - "Built hiring rubrics"
+      - "Sourced and closed candidates"
+      - "Grew team from N to M"
+      - References to hiring bar, interview training, candidate pipeline
+    levels:
+      1: "No hiring experience."
+      2: "Has conducted interviews but not designed processes."
+      3: "Actively hires. Designs interview questions. Calibrates with team."
+      4: "Built hiring processes for a team. Track record of quality hires."
+      5: "Built hiring function for an org. Defined interview methodology. Trains other interviewers."
+    adjacent: [people-management, mentorship]
+
+  - name: Mentorship
+    id: mentorship
+    weight: medium
+    archetypes: [IC-MLE, IC-DE, IC-DS, MGR, LEAD, HEAD]
+    signals:
+      - "Mentored junior engineers"
+      - "Led onboarding for new hires"
+      - "Created training materials"
+      - "Ran knowledge-sharing sessions"
+      - "Code review with teaching focus"
+      - References to growing others, knowledge transfer, team uplift
+    levels:
+      1: "No evidence of mentoring others."
+      2: "Helps teammates when asked. Occasional code review."
+      3: "Actively mentors 1-2 juniors. Regular knowledge sharing."
+      4: "Known as a go-to mentor. Creates learning materials. Multiple mentees promoted."
+      5: "Builds mentorship culture across a team. Defines onboarding. Teaching is a core part of identity."
+    adjacent: [people-management, cross-functional-communication]
+
+# ═══════════════════════════════════════════════════════════
+# DELIVERY COMPETENCIES
+# Can they actually ship things?
+# ═══════════════════════════════════════════════════════════
+
+delivery_competencies:
+
+  - name: Operational Rigor
+    id: operational-rigor
+    weight: medium
+    archetypes: [IC-MLE, IC-DE, IC-AE, MGR]
+    signals:
+      - "Wrote runbooks"
+      - "Established incident response process"
+      - "Reduced incidents by N%"
+      - "Built automated monitoring"
+      - References to SLAs, error budgets, post-mortems, on-call
+    levels:
+      1: "No ops experience. Ships and moves on."
+      2: "Aware of operational concerns. Limited hands-on ops work."
+      3: "Maintains production systems. Writes documentation. Participates in on-call."
+      4: "Defines operational standards. Builds monitoring. Reduces operational burden."
+      5: "Sets reliability culture for a team/org. Designs incident response. Zero-downtime deployments."
+    adjacent: [production-engineering, project-execution]
+
+  - name: Project Execution
+    id: project-execution
+    weight: high
+    archetypes: [IC-MLE, IC-DE, IC-DS, IC-AE, IC-AI, MGR, LEAD, HEAD]
+    signals:
+      - "Delivered project on time"
+      - "Led cross-team initiative"
+      - "Managed technical project from concept to launch"
+      - "Unblocked team when stuck"
+      - References to milestones, sprints, delivery cadence, shipping
+    levels:
+      1: "Completes assigned tasks. Doesn't drive projects."
+      2: "Executes well-defined projects with guidance. Hits deadlines when scope is clear."
+      3: "Independently drives projects from start to finish. Manages scope and timeline."
+      4: "Drives complex, multi-team projects. Anticipates risks. Consistently delivers."
+      5: "Drives org-level initiatives. Defines project methodology. Known for making things happen."
+    adjacent: [problem-decomposition, stakeholder-influence]
+
+  - name: Velocity & Iteration Speed
+    id: velocity
+    weight: medium
+    archetypes: [IC-MLE, IC-DE, IC-DS, IC-AE, IC-AI]
+    signals:
+      - "Shipped N features in M months"
+      - "Rapid prototyping"
+      - "Built MVP in N weeks"
+      - "High PR throughput"
+      - References to fast iteration, bias to action, quick experimentation
+    levels:
+      1: "Slow to produce output. Analysis paralysis."
+      2: "Average pace. Delivers but not notably fast."
+      3: "Moves quickly without sacrificing quality. Ships regularly."
+      4: "Notably fast. High output with clean code. Team accelerator."
+      5: "10x velocity. Prototypes in days. Ships production quality at startup speed."
+    adjacent: [project-execution, production-engineering]
+
+# ═══════════════════════════════════════════════════════════
+# COMMUNICATION COMPETENCIES
+# The difference between a good engineer and a great hire.
+# ═══════════════════════════════════════════════════════════
+
+communication_competencies:
+
+  - name: Cross-Functional Communication
+    id: cross-functional-communication
+    weight: medium
+    archetypes: [IC-DS, IC-MLE, MGR, LEAD, HEAD]
+    signals:
+      - "Worked with product managers"
+      - "Presented to non-technical stakeholders"
+      - "Translated business requirements into technical specs"
+      - "Wrote design docs reviewed by multiple teams"
+      - References to product thinking, customer impact, business context
+    levels:
+      1: "Communicates only within engineering. Technical jargon heavy."
+      2: "Can explain work to non-engineers when asked."
+      3: "Regularly collaborates with PM/design/business. Clear communicator."
+      4: "Drives cross-functional projects. Trusted by non-engineering stakeholders."
+      5: "Bridges engineering and business strategy. Influences product direction."
+    adjacent: [stakeholder-influence, problem-decomposition]
+
+  - name: Stakeholder Influence
+    id: stakeholder-influence
+    weight: medium
+    archetypes: [MGR, LEAD, HEAD]
+    signals:
+      - "Influenced roadmap priorities"
+      - "Secured resources for projects"
+      - "Presented to executives"
+      - "Changed team direction based on data"
+      - References to buy-in, alignment, persuasion, executive communication
+    levels:
+      1: "No evidence of influencing beyond immediate team."
+      2: "Influences immediate teammates. Limited upward influence."
+      3: "Influences team-level decisions. Presents to management."
+      4: "Influences org-level decisions. Trusted by senior leadership."
+      5: "Influences company strategy. Executive presence. Shapes vision."
+    adjacent: [cross-functional-communication, technical-direction]
+
+  - name: Written Communication
+    id: written-communication
+    weight: low
+    archetypes: [IC-DS, IC-MLE, IC-DE, IC-AE, IC-AI, MGR, LEAD, HEAD]
+    signals:
+      - "Wrote design documents"
+      - "Published technical blog posts"
+      - "Clear documentation"
+      - "RFCs that drove decisions"
+      - References to writing, documentation culture, async communication
+    levels:
+      1: "Minimal written output. Prefers verbal."
+      2: "Writes when required. Basic documentation."
+      3: "Good writer. Clear design docs. Colleagues reference their writing."
+      4: "Strong writer. Design docs are exemplary. External blog posts or talks."
+      5: "Exceptional writer. Published work. Defines writing standards for team."
+    adjacent: [cross-functional-communication, mentorship]
+
+# ═══════════════════════════════════════════════════════════
+# SCORING INTEGRATION
+# How competencies combine with skills in the matching engine.
+# ═══════════════════════════════════════════════════════════
+
+scoring:
+  # Competency score is a separate dimension in the 8-dimension rubric.
+  # It feeds into "Culture Signals" and "Fill Probability" dimensions.
+  #
+  # For IC roles: weight technical + delivery competencies higher
+  # For MGR/LEAD/HEAD: weight leadership + communication higher
+  #
+  # Weighting by archetype:
+  ic_weights:
+    technical_competencies: 0.40
+    delivery_competencies: 0.30
+    communication_competencies: 0.15
+    leadership_competencies: 0.15
+
+  manager_weights:
+    leadership_competencies: 0.35
+    communication_competencies: 0.25
+    technical_competencies: 0.20
+    delivery_competencies: 0.20
+
+  # Minimum competency scores by level:
+  thresholds:
+    junior: 2.0      # Learning, needs structure
+    mid: 2.5         # Independent on defined work
+    senior: 3.5      # Drives projects, influences team
+    staff: 4.0       # Drives architecture, mentors others
+    principal: 4.5   # Org-level impact
+    manager: 3.5     # Competent across all dimensions
+    director: 4.0    # Strong leadership + communication
+    vp: 4.5          # Strategic + influential
