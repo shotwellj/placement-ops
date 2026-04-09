@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>People-Ops — Internal Talent Engineering Platform</title>
+<title>SourcingNav — Company Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════════
-   PEOPLE-OPS — INTERNAL TALENT ENGINEERING DASHBOARD
+   SOURCINGNAV — COMPANY DASHBOARD
    For companies tracking employee lifecycle, health,
    development, retention, and workforce planning.
    ═══════════════════════════════════════════════════════════ */
@@ -257,10 +257,10 @@ tr:hover td { background:rgba(52,211,153,0.02); }
 <div class="app">
   <!-- ═══ SIDEBAR ═══ -->
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <h1>PEOPLE-OPS</h1>
-      <span>Internal Talent Engineering</span>
-    </div>
+    <a href="index.html" class="sidebar-logo" style="text-decoration:none;cursor:pointer;">
+      <h1>SOURCINGNAV</h1>
+      <span>Company Dashboard</span>
+    </a>
     <div class="sidebar-section"><div class="sidebar-section-title">Overview</div></div>
     <nav class="sidebar-nav">
       <div class="nav-item active" onclick="go('dashboard')"><span class="nav-icon">⬡</span> Dashboard</div>
@@ -283,7 +283,7 @@ tr:hover td { background:rgba(52,211,153,0.02); }
       <div class="nav-item" onclick="go('hiring')"><span class="nav-icon">▤</span> Hiring Pipeline <span class="nav-badge amber">6</span></div>
       <div class="nav-item" onclick="go('analytics')"><span class="nav-icon">⧉</span> Analytics</div>
     </nav>
-    <div class="sidebar-footer"><div class="sidebar-footer-text">v1.0 · Company Mode</div></div>
+    <div class="sidebar-footer"><div class="sidebar-footer-text">SourcingNav v2.1 · Company</div></div>
   </aside>
 
   <div class="main">
