@@ -291,7 +291,13 @@ tr:hover td { background:rgba(52,211,153,0.02); }
       <div class="nav-item" onclick="go('calibrate')"><span class="nav-icon">◧</span> Calibration</div>
       <div class="nav-item" onclick="go('integrations')"><span class="nav-icon">◐</span> Integrations <span class="nav-badge emerald">3</span></div>
     </nav>
-    <div class="sidebar-footer"><div class="sidebar-footer-text">SourcingNav v2.1 · Company</div></div>
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-text">SourcingNav v2.1 · Company</div>
+      <div id="apiStatus" class="sidebar-footer-text" style="margin-top:6px;display:flex;align-items:center;gap:6px;">
+        <span id="apiDot" style="width:6px;height:6px;border-radius:50%;background:#64748b;display:inline-block;"></span>
+        <span id="apiLabel">API: connecting…</span>
+      </div>
+    </div>
   </aside>
 
   <div class="main">
@@ -1635,8 +1641,43 @@ function initCompTrend(){
   });
 }
 
+// ═══ API WIRING ═══
+// SourcingNav read-only API. On localhost uses http://localhost:8000, otherwise same-origin /api.
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:8000/api'
+  : '/api';
+
+async function apiGet(path) {
+  const res = await fetch(API_BASE + path);
+  if (!res.ok) throw new Error(`API ${path} → ${res.status}`);
+  return res.json();
+}
+
+async function checkApiHealth() {
+  const dot = document.getElementById('apiDot');
+  const label = document.getElementById('apiLabel');
+  try {
+    const data = await apiGet('/health');
+    if (data.status === 'ok') {
+      dot.style.background = '#34d399'; // emerald
+      label.textContent = 'API: live';
+      label.style.color = '#34d399';
+    } else {
+      throw new Error('unhealthy');
+    }
+  } catch (e) {
+    dot.style.background = '#fb7185'; // rose
+    label.textContent = 'API: offline';
+    label.style.color = '#fb7185';
+    console.warn('[SourcingNav] API health check failed:', e.message);
+  }
+}
+
 // ═══ INIT ═══
-document.addEventListener('DOMContentLoaded', initDashboard);
+document.addEventListener('DOMContentLoaded', () => {
+  initDashboard();
+  checkApiHealth();
+});
 </script>
 </body>
 </html>

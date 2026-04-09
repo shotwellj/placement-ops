@@ -1,0 +1,16 @@
+{
+  "batch_id": "batch_001",
+  "role": "Staff ML Engineer — Anthropic",
+  "evaluated_at": "2026-04-09T09:15:00Z",
+  "total_candidates": 12,
+  "ranked": [
+    {"rank": 1, "name": "Marcus Rivera", "score": 92, "tier": "Tier 1 — Submit", "note": "Exceptional distributed training background"},
+    {"rank": 2, "name": "Alex Tanaka", "score": 90, "tier": "Tier 1 — Submit", "note": "Strong training infra, CV→NLP transfer risk"},
+    {"rank": 3, "name": "David Kim", "score": 86, "tier": "Tier 1 — Submit", "note": "ML infra specialist, Ray + K8s strong"},
+    {"rank": 4, "name": "Jin Park", "score": 84, "tier": "Tier 2 — Review", "note": "Research pedigree, prod experience gap"},
+    {"rank": 5, "name": "Elena Volkov", "score": 82, "tier": "Tier 2 — Review", "note": "LLM fine-tuning strong, mentorship unclear"},
+    {"rank": 6, "name": "James Wu", "score": 81, "tier": "Tier 2 — Review", "note": "Research background, limited prod scale"},
+    {"rank": 7, "name": "Omar Hassan", "score": 76, "tier": "Tier 3 — Hold", "note": "Solid IC, seniority gap"},
+    {"rank": 8, "name": "Lin Zhao", "score": 74, "tier": "Tier 3 — Hold", "note": "Strong fundamentals, needs more scope"}
+  ]
+}

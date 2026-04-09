@@ -1,0 +1,18 @@
+{
+  "panel": "Senior ML Engineering",
+  "interviews_analyzed": 47,
+  "drift_detected": true,
+  "correlation": [
+    {"interviewer": "Alice Chen", "avg_score": 3.8, "hire_rate": "68%", "std_dev": 0.6, "drift": "aligned"},
+    {"interviewer": "Bob Martinez", "avg_score": 4.2, "hire_rate": "82%", "std_dev": 0.4, "drift": "lenient +0.4"},
+    {"interviewer": "Carlos Rivera", "avg_score": 3.1, "hire_rate": "31%", "std_dev": 0.9, "drift": "harsh -0.7"},
+    {"interviewer": "Diana Kwon", "avg_score": 3.7, "hire_rate": "64%", "std_dev": 0.5, "drift": "aligned"},
+    {"interviewer": "Evan Foster", "avg_score": 4.0, "hire_rate": "76%", "std_dev": 0.5, "drift": "aligned"}
+  ],
+  "action_items": [
+    "Recalibrate Bob Martinez — leniency drift +0.4 over 90 days",
+    "1:1 with Carlos Rivera — harshness drift -0.7, hire rate 31%",
+    "Schedule full panel calibration session (last: 6 mo ago)",
+    "Review 12 borderline rejections flagged by drift-adjusted rescoring"
+  ]
+}

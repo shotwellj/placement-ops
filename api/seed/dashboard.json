@@ -1,0 +1,50 @@
+{
+  "agency": {
+    "kpis": [
+      {"label": "Active Searches", "value": 12, "delta": "+3 this week"},
+      {"label": "Candidates in Pipeline", "value": 87, "delta": "+14 this week"},
+      {"label": "Submits This Month", "value": 23, "delta": "on pace"},
+      {"label": "Placements YTD", "value": 18, "delta": "+2 vs target"},
+      {"label": "Avg Fill Time", "value": "27d", "delta": "-4d vs Q1"},
+      {"label": "Win Rate", "value": "34%", "delta": "+6pts"}
+    ],
+    "pipeline_funnel": [
+      {"stage": "Sourced", "count": 342},
+      {"stage": "Screened", "count": 156},
+      {"stage": "Submitted", "count": 87},
+      {"stage": "Client Interview", "count": 34},
+      {"stage": "Offer", "count": 12},
+      {"stage": "Placed", "count": 8}
+    ],
+    "recent_activity": [
+      {"time": "09:42", "event": "Marcus Rivera advanced to Final at Stripe"},
+      {"time": "09:15", "event": "New scan complete: 23 candidates for Anthropic Staff ML"},
+      {"time": "08:58", "event": "Offer extended: Priya Sharma @ Databricks"},
+      {"time": "08:30", "event": "Batch eval complete: 12 ranked for Snowflake"}
+    ]
+  },
+  "company": {
+    "kpis": [
+      {"label": "Open Reqs", "value": 14, "delta": "2 critical"},
+      {"label": "Active Candidates", "value": 63, "delta": "+9 this week"},
+      {"label": "Interviews This Week", "value": 18, "delta": "5 final rounds"},
+      {"label": "Offers Out", "value": 4, "delta": "2 pending"},
+      {"label": "Time to Hire", "value": "38d", "delta": "-6d vs Q1"},
+      {"label": "Offer Accept Rate", "value": "82%", "delta": "+8pts"}
+    ],
+    "pipeline_funnel": [
+      {"stage": "Applied", "count": 1247},
+      {"stage": "Screened", "count": 312},
+      {"stage": "Phone Screen", "count": 89},
+      {"stage": "Onsite", "count": 34},
+      {"stage": "Offer", "count": 12},
+      {"stage": "Hired", "count": 7}
+    ],
+    "recent_activity": [
+      {"time": "10:02", "event": "Marcus Rivera — Final onsite scheduled Thu"},
+      {"time": "09:45", "event": "Calibration drift detected: Senior ML panel"},
+      {"time": "09:18", "event": "Market intel: comp range shifted +4% for Staff MLE"},
+      {"time": "08:55", "event": "Greenhouse sync complete: 12 new applicants"}
+    ]
+  }
+}

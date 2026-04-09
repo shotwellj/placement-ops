@@ -1,0 +1,108 @@
+{
+  "candidates": [
+    {
+      "id": "c_001",
+      "name": "Marcus Rivera",
+      "role_target": "Staff ML Engineer",
+      "fit_score": 92,
+      "stage": "Final Round",
+      "next_step": "Panel interview Thu 2pm",
+      "prep_status": "Complete",
+      "strengths": ["Distributed training", "PyTorch", "Production ML", "Mentorship"],
+      "gaps": ["Ray unfamiliar"],
+      "resume_benchmark": {
+        "technical_depth": 92,
+        "seniority": 88,
+        "scope": 85,
+        "role_alignment": 78,
+        "culture": 80
+      },
+      "skill_match": [
+        {"skill": "PyTorch", "score": 1.0, "label": "exact"},
+        {"skill": "Distributed Training", "score": 1.0, "label": "exact"},
+        {"skill": "Kubernetes", "score": 0.6, "label": "adjacent"},
+        {"skill": "Ray", "score": 0.0, "label": "gap"},
+        {"skill": "MLOps", "score": 1.0, "label": "exact"}
+      ],
+      "prep_cards": [
+        {"title": "System Design", "focus": "LLM inference at scale — KV cache, batching, quantization"},
+        {"title": "Culture & Values", "focus": "Ownership, mentorship examples, cross-team influence"},
+        {"title": "Comp & Close", "focus": "Target 385-420 TC, equity-heavy offer likely, competing offer Anthropic"}
+      ],
+      "panel_recommendation": "STRONG HIRE — align panel on distributed training deep dive, skip surface-level ML fundamentals"
+    },
+    {
+      "id": "c_002",
+      "name": "Priya Sharma",
+      "role_target": "Senior Data Engineer",
+      "fit_score": 88,
+      "stage": "Onsite",
+      "next_step": "Final loop Mon",
+      "prep_status": "Complete",
+      "strengths": ["Spark", "dbt", "Snowflake", "Data modeling"],
+      "gaps": ["No Airflow experience"],
+      "resume_benchmark": {"technical_depth": 85, "seniority": 82, "scope": 88, "role_alignment": 90, "culture": 78},
+      "skill_match": [
+        {"skill": "Spark", "score": 1.0, "label": "exact"},
+        {"skill": "dbt", "score": 1.0, "label": "exact"},
+        {"skill": "Airflow", "score": 0.0, "label": "gap"},
+        {"skill": "Prefect", "score": 0.6, "label": "adjacent"}
+      ]
+    },
+    {
+      "id": "c_003",
+      "name": "James Wu",
+      "role_target": "Staff ML Engineer",
+      "fit_score": 81,
+      "stage": "Phone Screen",
+      "next_step": "Technical screen Wed",
+      "prep_status": "In progress",
+      "strengths": ["LLMs", "RAG", "Research background"],
+      "gaps": ["Limited prod experience"]
+    },
+    {
+      "id": "c_004",
+      "name": "Sofia Gonzalez",
+      "role_target": "Senior Data Engineer",
+      "fit_score": 79,
+      "stage": "Phone Screen",
+      "next_step": "Hiring mgr screen Fri",
+      "prep_status": "Not started",
+      "strengths": ["dbt", "Analytics engineering"],
+      "gaps": ["Scale experience"]
+    },
+    {
+      "id": "c_005",
+      "name": "David Kim",
+      "role_target": "ML Infrastructure",
+      "fit_score": 86,
+      "stage": "Onsite",
+      "next_step": "Tech deep dive Tue",
+      "prep_status": "Complete",
+      "strengths": ["K8s", "GPU scheduling", "Ray"],
+      "gaps": []
+    },
+    {
+      "id": "c_006",
+      "name": "Rachel Adams",
+      "role_target": "Senior ML Engineer",
+      "fit_score": 74,
+      "stage": "Screened",
+      "next_step": "Awaiting hiring mgr review",
+      "prep_status": "Not started",
+      "strengths": ["Recommender systems"],
+      "gaps": ["No LLM experience"]
+    },
+    {
+      "id": "c_007",
+      "name": "Alex Tanaka",
+      "role_target": "Staff ML Engineer",
+      "fit_score": 90,
+      "stage": "Onsite",
+      "next_step": "System design Thu",
+      "prep_status": "Complete",
+      "strengths": ["Training infra", "PyTorch", "Mentorship"],
+      "gaps": ["Domain transfer from CV to NLP"]
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "searches": [
+    {
+      "id": "s_001",
+      "title": "Staff ML Engineer",
+      "client": "Anthropic",
+      "status": "Active",
+      "days_open": 14,
+      "candidates_submitted": 3,
+      "stage": "Final round",
+      "fee": "$68,000",
+      "probability": 72
+    },
+    {
+      "id": "s_002",
+      "title": "Senior Data Engineer",
+      "client": "Databricks",
+      "status": "Active",
+      "days_open": 9,
+      "candidates_submitted": 4,
+      "stage": "Onsite",
+      "fee": "$48,000",
+      "probability": 58
+    },
+    {
+      "id": "s_003",
+      "title": "ML Infrastructure Lead",
+      "client": "Stripe",
+      "status": "Active",
+      "days_open": 21,
+      "candidates_submitted": 2,
+      "stage": "Phone screen",
+      "fee": "$72,000",
+      "probability": 45
+    },
+    {
+      "id": "s_004",
+      "title": "Applied Scientist",
+      "client": "Snowflake",
+      "status": "Active",
+      "days_open": 6,
+      "candidates_submitted": 5,
+      "stage": "Hiring mgr review",
+      "fee": "$55,000",
+      "probability": 38
+    }
+  ]
+}

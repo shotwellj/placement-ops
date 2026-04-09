@@ -1,0 +1,39 @@
+{
+  "connected": [
+    {
+      "name": "Greenhouse",
+      "category": "ATS",
+      "status": "healthy",
+      "last_sync": "2026-04-09T09:18:00Z",
+      "records_synced": 1247,
+      "type": "bi-directional"
+    },
+    {
+      "name": "BambooHR",
+      "category": "HRIS",
+      "status": "healthy",
+      "last_sync": "2026-04-09T06:00:00Z",
+      "records_synced": 284,
+      "type": "read-only"
+    },
+    {
+      "name": "Google Jobs",
+      "category": "Job Board",
+      "status": "healthy",
+      "last_sync": "2026-04-09T08:30:00Z",
+      "records_synced": 14,
+      "type": "outbound"
+    }
+  ],
+  "available": [
+    {"name": "Lever", "category": "ATS", "difficulty": "Easy"},
+    {"name": "Ashby", "category": "ATS", "difficulty": "Easy"},
+    {"name": "Workday", "category": "ATS", "difficulty": "Medium"},
+    {"name": "iCIMS", "category": "ATS", "difficulty": "Medium"},
+    {"name": "SmartRecruiters", "category": "ATS", "difficulty": "Easy"},
+    {"name": "Rippling", "category": "HRIS", "difficulty": "Easy"},
+    {"name": "Merge.dev", "category": "Unified API", "difficulty": "Easy"},
+    {"name": "LinkedIn Recruiter", "category": "Sourcing", "difficulty": "Hard"},
+    {"name": "Gem", "category": "Outbound", "difficulty": "Medium"}
+  ]
+}

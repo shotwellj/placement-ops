@@ -1,0 +1,34 @@
+{
+  "recent_scans": [
+    {
+      "id": "scan_001",
+      "target": "Anthropic Careers Portal",
+      "scanned_at": "2026-04-09T08:42:00Z",
+      "roles_found": 23,
+      "relevance": 87,
+      "highlights": [
+        "3 Staff ML Eng roles opened this week",
+        "New 'Research Engineer, Alignment' req",
+        "Comp bands disclosed on all SF roles"
+      ]
+    },
+    {
+      "id": "scan_002",
+      "target": "Databricks Jobs",
+      "scanned_at": "2026-04-08T14:15:00Z",
+      "roles_found": 41,
+      "relevance": 78,
+      "highlights": [
+        "ML Platform team hiring 5",
+        "New Applied Scientist role",
+        "Remote OK on 60% of reqs"
+      ]
+    }
+  ],
+  "role_comparison": [
+    {"dimension": "Staff ML Eng TC", "you": "340-390", "anthropic": "400-460", "databricks": "385-440", "openai": "410-475"},
+    {"dimension": "Remote policy", "you": "Hybrid 3d", "anthropic": "SF only", "databricks": "Remote OK", "openai": "SF only"},
+    {"dimension": "Equity vesting", "you": "4yr / 1yr cliff", "anthropic": "4yr / 1yr", "databricks": "4yr / 1yr", "openai": "4yr / 1yr"},
+    {"dimension": "Interview loops", "you": "5 rounds", "anthropic": "4 rounds", "databricks": "6 rounds", "openai": "5 rounds"}
+  ]
+}

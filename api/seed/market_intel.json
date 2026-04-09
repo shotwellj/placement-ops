@@ -1,0 +1,38 @@
+{
+  "comp_hygiene": [
+    {"role": "Staff ML Engineer", "your_range": "340-390", "market_p50": "385", "market_p75": "435", "status": "under", "action": "raise band"},
+    {"role": "Senior Data Engineer", "your_range": "210-250", "market_p50": "235", "market_p75": "270", "status": "aligned", "action": "hold"},
+    {"role": "ML Infra Eng", "your_range": "295-345", "market_p50": "310", "market_p75": "360", "status": "aligned", "action": "hold"},
+    {"role": "Applied Scientist", "your_range": "265-310", "market_p50": "295", "market_p75": "340", "status": "under", "action": "raise band"},
+    {"role": "Analytics Engineer", "your_range": "165-200", "market_p50": "180", "market_p75": "215", "status": "aligned", "action": "hold"}
+  ],
+  "talent_flow": {
+    "inbound_from": [
+      {"company": "Meta", "count": 14},
+      {"company": "Google", "count": 11},
+      {"company": "Amazon", "count": 9},
+      {"company": "Stripe", "count": 6},
+      {"company": "Airbnb", "count": 5}
+    ],
+    "outbound_to": [
+      {"company": "Anthropic", "count": 8},
+      {"company": "OpenAI", "count": 6},
+      {"company": "Databricks", "count": 4},
+      {"company": "xAI", "count": 3},
+      {"company": "Mistral", "count": 2}
+    ]
+  },
+  "posting_quality": [
+    {"req": "Staff ML Eng (SF)", "clarity": 72, "inclusivity": 88, "comp_disclosed": true, "flags": ["Seniority mismatch in responsibilities"]},
+    {"req": "Senior DE (NYC)", "clarity": 91, "inclusivity": 95, "comp_disclosed": true, "flags": []},
+    {"req": "ML Infra (Remote)", "clarity": 65, "inclusivity": 82, "comp_disclosed": false, "flags": ["Missing comp band", "Vague scope"]},
+    {"req": "Analytics Eng", "clarity": 84, "inclusivity": 90, "comp_disclosed": true, "flags": []}
+  ],
+  "comp_trend": {
+    "labels": ["Q1 '25", "Q2 '25", "Q3 '25", "Q4 '25", "Q1 '26"],
+    "series": [
+      {"name": "Staff MLE p50", "data": [340, 355, 368, 375, 385]},
+      {"name": "Staff MLE p75", "data": [395, 408, 418, 425, 435]}
+    ]
+  }
+}

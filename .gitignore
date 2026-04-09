@@ -28,3 +28,13 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Python (backend)
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Vercel
+.vercel
