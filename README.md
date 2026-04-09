@@ -26,7 +26,7 @@ The system also **calibrates over time**. Every placement and rejection gets fed
 
 | Mode | What It Does |
 |------|-------------|
-| `scan` | Crawls 45+ company career pages for new openings matching your niche |
+| `scan` | Crawls 150+ company career pages for new openings matching your niche |
 | `evaluate` | Scores a candidate against a JD using taxonomy-driven matching across 8 dimensions |
 | `prep` | Generates a tailored resume + interview prep + match analysis |
 | `submit` | Creates a polished submission package (cover memo + tailored CV + scorecard) |
@@ -65,7 +65,7 @@ cp config/profile.example.yml config/profile.yml
 
 # 2. Set up your target company list
 cp config/portals.example.yml config/portals.yml
-# Pre-loaded with 45+ Data/ML/AI companies. Add your own.
+# Pre-loaded with 150+ Data/ML/AI companies across 14 categories. Add your own.
 
 # 3. Add your first candidate
 cp candidates/example.yml candidates/jane-doe.yml
@@ -194,7 +194,7 @@ placement-ops/
 │   └── skills.yml              # 150+ skills with adjacency relationships
 ├── config/
 │   ├── profile.example.yml     # Your recruiter profile template
-│   └── portals.example.yml     # 45+ pre-loaded Data/ML/AI companies
+│   └── portals.example.yml     # 150+ pre-loaded Data/ML/AI companies
 ├── templates/
 │   ├── compatibility-matrix.md # Visual scoring output template
 │   ├── submission-memo.md      # Client cover memo template

@@ -1,64 +1,81 @@
 # ============================================================
-# Placement-Ops — Target Company Portals
+# Placement-Ops — Target Company Portals (200+ Companies)
 # ============================================================
-# These are companies you want to monitor for new openings.
-# The scanner crawls these career pages and flags roles
-# that match your niche keywords.
+# Companies organized by category with career page URLs,
+# ATS types, and scan methods. Pre-loaded for Data/ML/AI
+# recruiting. Fork and customize for your niche.
 #
 # Copy this file:
 #   cp config/portals.example.yml config/portals.yml
 #
-# Then add/remove companies for your market.
+# Stats: 200+ companies across 15 categories
+# Last updated: 2026-04-08
 #
 # Fields:
 #   name          — Company name
 #   careers_url   — Direct URL to their careers/jobs page
 #   api           — (optional) Greenhouse API endpoint
 #   scan_method   — playwright | greenhouse_api | websearch
-#   notes         — Location, what they do, context for you
+#   notes         — Location, what they do, context
 #   enabled       — true/false toggle
-#   priority      — high | medium | low (how badly you want their business)
+#   priority      — high | medium | low
+#   headcount     — approx employee count (helps gauge hiring volume)
 # ============================================================
 
-# -----------------------------------------------
-# AI LABS & LLM PROVIDERS
-# -----------------------------------------------
+
+# ═══════════════════════════════════════════════════════════
+# 1. FRONTIER AI LABS & LLM PROVIDERS (13)
+# ═══════════════════════════════════════════════════════════
 
 - name: Anthropic
   careers_url: https://job-boards.greenhouse.io/anthropic
   api: https://boards-api.greenhouse.io/v1/boards/anthropic/jobs
   scan_method: greenhouse_api
-  notes: "SF. Frontier AI lab. Always hiring ML researchers + engineers. Hard to place but huge fees."
+  notes: "SF. Claude maker. Frontier AI lab. $183B valuation."
   enabled: true
   priority: high
+  headcount: 1500
 
 - name: OpenAI
-  careers_url: https://openai.com/careers
-  scan_method: websearch
-  notes: "SF. The big one. Extremely competitive. Look for applied/platform roles, not research."
+  careers_url: https://jobs.ashbyhq.com/openai
+  scan_method: playwright
+  notes: "SF. GPT maker. Largest AI lab. $500B valuation."
   enabled: true
   priority: high
+  headcount: 3000
 
 - name: Google DeepMind
-  careers_url: https://deepmind.google/careers/
-  scan_method: playwright
-  notes: "London/SF/NYC. Research + applied ML. Long interview loops."
+  careers_url: https://job-boards.greenhouse.io/deepmind
+  api: https://boards-api.greenhouse.io/v1/boards/deepmind/jobs
+  scan_method: greenhouse_api
+  notes: "London/SF/NYC. AlphaFold team. Research + applied ML."
   enabled: true
-  priority: medium
+  priority: high
+  headcount: 3000
 
 - name: Meta AI (FAIR)
   careers_url: https://www.metacareers.com/jobs
   scan_method: playwright
-  notes: "NYC/Menlo Park. Open-source focused. Llama team growing fast."
+  notes: "NYC/Menlo Park. Open-source Llama team."
   enabled: true
-  priority: medium
+  priority: high
+  headcount: 70000
+
+- name: xAI
+  careers_url: https://boards.greenhouse.io/xai
+  scan_method: playwright
+  notes: "SF/Memphis. Grok. $200B+ valuation. Hiring aggressively."
+  enabled: true
+  priority: high
+  headcount: 500
 
 - name: Cohere
-  careers_url: https://jobs.lever.co/cohere
+  careers_url: https://jobs.ashbyhq.com/cohere
   scan_method: playwright
-  notes: "Toronto/SF. Enterprise LLMs. Smaller but growing."
+  notes: "Toronto/SF. Enterprise LLMs."
   enabled: true
   priority: medium
+  headcount: 500
 
 - name: Mistral AI
   careers_url: https://jobs.ashbyhq.com/mistralai
@@ -66,48 +83,103 @@
   notes: "Paris. European frontier lab. Open-weight models."
   enabled: true
   priority: medium
+  headcount: 300
 
-# -----------------------------------------------
-# AI INFRASTRUCTURE & TOOLING
-# -----------------------------------------------
+- name: AI21 Labs
+  careers_url: https://jobs.lever.co/ai21
+  scan_method: playwright
+  notes: "Tel Aviv/NYC. Jamba models. Enterprise focused."
+  enabled: true
+  priority: medium
+  headcount: 300
+
+- name: Perplexity
+  careers_url: https://jobs.ashbyhq.com/perplexity
+  scan_method: playwright
+  notes: "SF. AI search engine. Applied ML team."
+  enabled: true
+  priority: high
+  headcount: 400
+
+- name: Inflection AI
+  careers_url: https://jobs.ashbyhq.com/inflection
+  scan_method: playwright
+  notes: "SF. Pi chatbot. Microsoft partnership."
+  enabled: true
+  priority: low
+  headcount: 100
+
+- name: Adept AI
+  careers_url: https://jobs.ashbyhq.com/adept
+  scan_method: playwright
+  notes: "SF. Action-model AI. Amazon acquisition."
+  enabled: true
+  priority: low
+  headcount: 100
+
+- name: Stability AI
+  careers_url: https://jobs.lever.co/stabilityai
+  scan_method: playwright
+  notes: "London. Stable Diffusion. Generative image/video."
+  enabled: true
+  priority: low
+  headcount: 200
+
+- name: Reka AI
+  careers_url: https://jobs.ashbyhq.com/reka
+  scan_method: playwright
+  notes: "SF/London. Multimodal AI. DeepMind alumni."
+  enabled: true
+  priority: low
+  headcount: 50
+
+
+# ═══════════════════════════════════════════════════════════
+# 2. AI INFRASTRUCTURE & DEVELOPER TOOLS (25)
+# ═══════════════════════════════════════════════════════════
 
 - name: Databricks
   careers_url: https://job-boards.greenhouse.io/databricks
   api: https://boards-api.greenhouse.io/v1/boards/databricks/jobs
   scan_method: greenhouse_api
-  notes: "SF/Remote. Data + AI platform. Mosaic ML team. Always hiring data engineers."
+  notes: "SF/Remote. Data + AI platform. Mosaic ML. $134B valuation."
   enabled: true
   priority: high
+  headcount: 7000
 
 - name: Snowflake
   careers_url: https://careers.snowflake.com
   scan_method: playwright
-  notes: "Bozeman/SF/Remote. Data cloud. Big ML/AI push lately."
+  notes: "Bozeman/SF. Data cloud. Cortex AI. Public."
   enabled: true
   priority: high
+  headcount: 6000
 
-- name: dbt Labs
-  careers_url: https://job-boards.greenhouse.io/dbtlabsinc
-  api: https://boards-api.greenhouse.io/v1/boards/dbtlabsinc/jobs
+- name: Scale AI
+  careers_url: https://job-boards.greenhouse.io/scaleai
+  api: https://boards-api.greenhouse.io/v1/boards/scaleai/jobs
   scan_method: greenhouse_api
-  notes: "Philly/Remote. Analytics engineering. Smaller teams = harder to place."
+  notes: "SF. Data labeling + AI infra. Government contracts."
   enabled: true
-  priority: medium
+  priority: high
+  headcount: 1500
 
 - name: Weights & Biases
   careers_url: https://jobs.ashbyhq.com/wandb
   scan_method: playwright
-  notes: "SF. ML experiment tracking. Developer-loved. Great culture fit questions."
+  notes: "SF. ML experiment tracking."
   enabled: true
   priority: medium
+  headcount: 400
 
-- name: Anyscale (Ray)
+- name: Anyscale
   careers_url: https://job-boards.greenhouse.io/anyscale
   api: https://boards-api.greenhouse.io/v1/boards/anyscale/jobs
   scan_method: greenhouse_api
-  notes: "SF. Distributed computing for ML. Deep systems + ML hybrid roles."
+  notes: "SF. Ray distributed computing."
   enabled: true
   priority: medium
+  headcount: 300
 
 - name: LangChain
   careers_url: https://jobs.ashbyhq.com/langchain
@@ -115,94 +187,436 @@
   notes: "SF/Remote. LLM framework. Small team, high bar."
   enabled: true
   priority: medium
+  headcount: 100
 
 - name: Pinecone
   careers_url: https://job-boards.greenhouse.io/pinecone
   api: https://boards-api.greenhouse.io/v1/boards/pinecone/jobs
   scan_method: greenhouse_api
-  notes: "NYC/Remote. Vector database. AI infrastructure."
+  notes: "NYC/Remote. Vector database."
   enabled: true
   priority: medium
-
-- name: Scale AI
-  careers_url: https://job-boards.greenhouse.io/scaleai
-  api: https://boards-api.greenhouse.io/v1/boards/scaleai/jobs
-  scan_method: greenhouse_api
-  notes: "SF. Data labeling + AI infrastructure. Government contracts. Fast growing."
-  enabled: true
-  priority: high
+  headcount: 300
 
 - name: Modal
   careers_url: https://jobs.ashbyhq.com/modal
   scan_method: playwright
-  notes: "NYC. Serverless ML infrastructure. Small team, technical bar is high."
+  notes: "NYC. Serverless ML infrastructure."
+  enabled: true
+  priority: medium
+  headcount: 50
+
+- name: Hugging Face
+  careers_url: https://apply.workable.com/huggingface/
+  scan_method: playwright
+  notes: "NYC/Paris. Open-source ML hub. Transformers."
+  enabled: true
+  priority: medium
+  headcount: 400
+
+- name: Snorkel AI
+  careers_url: https://job-boards.greenhouse.io/snorkelai
+  api: https://boards-api.greenhouse.io/v1/boards/snorkelai/jobs
+  scan_method: greenhouse_api
+  notes: "Redwood City. Data-centric AI. Stanford spinout."
+  enabled: true
+  priority: medium
+  headcount: 250
+
+- name: dbt Labs
+  careers_url: https://job-boards.greenhouse.io/dbtlabsinc
+  api: https://boards-api.greenhouse.io/v1/boards/dbtlabsinc/jobs
+  scan_method: greenhouse_api
+  notes: "Philly/Remote. Analytics engineering standard."
+  enabled: true
+  priority: medium
+  headcount: 500
+
+- name: Fivetran
+  careers_url: https://job-boards.greenhouse.io/fivetran
+  api: https://boards-api.greenhouse.io/v1/boards/fivetran/jobs
+  scan_method: greenhouse_api
+  notes: "Oakland/Remote. Data integration. ELT pipelines."
+  enabled: true
+  priority: medium
+  headcount: 1000
+
+- name: Prefect
+  careers_url: https://job-boards.greenhouse.io/prefect
+  api: https://boards-api.greenhouse.io/v1/boards/prefect/jobs
+  scan_method: greenhouse_api
+  notes: "DC/Remote. Workflow orchestration."
   enabled: true
   priority: low
+  headcount: 150
 
-# -----------------------------------------------
-# ENTERPRISE / SAAS (Data/ML teams)
-# -----------------------------------------------
-
-- name: Stripe
-  careers_url: https://stripe.com/jobs
+- name: Dagster
+  careers_url: https://jobs.ashbyhq.com/dagster
   scan_method: playwright
-  notes: "SF/Remote. Payments. Strong ML team for fraud detection + revenue optimization."
+  notes: "SF/Remote. Data orchestration."
+  enabled: true
+  priority: low
+  headcount: 100
+
+- name: Tecton
+  careers_url: https://job-boards.greenhouse.io/tecloninc
+  api: https://boards-api.greenhouse.io/v1/boards/tecloninc/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Feature platform. Uber ML founders."
+  enabled: true
+  priority: low
+  headcount: 150
+
+- name: Hex
+  careers_url: https://job-boards.greenhouse.io/hex
+  api: https://boards-api.greenhouse.io/v1/boards/hex/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Collaborative data notebooks."
+  enabled: true
+  priority: low
+  headcount: 150
+
+- name: Weaviate
+  careers_url: https://jobs.ashbyhq.com/weaviate
+  scan_method: playwright
+  notes: "Amsterdam/Remote. Open-source vector database."
+  enabled: true
+  priority: low
+  headcount: 100
+
+- name: SandboxAQ
+  careers_url: https://jobs.ashbyhq.com/sandboxaq
+  scan_method: playwright
+  notes: "Palo Alto. Quantum + AI. Google spinout."
+  enabled: true
+  priority: medium
+  headcount: 400
+
+- name: Cerebras
+  careers_url: https://job-boards.greenhouse.io/cerebaboratories
+  scan_method: greenhouse_api
+  notes: "Sunnyvale. AI chips. Wafer-scale engine."
+  enabled: true
+  priority: medium
+  headcount: 500
+
+- name: Together AI
+  careers_url: https://jobs.ashbyhq.com/togetherai
+  scan_method: playwright
+  notes: "SF. Open-source AI cloud. GPU inference."
+  enabled: true
+  priority: medium
+  headcount: 200
+
+- name: Groq
+  careers_url: https://jobs.ashbyhq.com/groq
+  scan_method: playwright
+  notes: "Mountain View. LPU inference chips. Fastest inference."
+  enabled: true
+  priority: medium
+  headcount: 300
+
+- name: Replicate
+  careers_url: https://jobs.ashbyhq.com/replicate
+  scan_method: playwright
+  notes: "SF/Remote. Run ML models via API."
+  enabled: true
+  priority: low
+  headcount: 50
+
+- name: Baseten
+  careers_url: https://jobs.ashbyhq.com/baseten
+  scan_method: playwright
+  notes: "SF. ML model deployment platform."
+  enabled: true
+  priority: low
+  headcount: 80
+
+- name: Unstructured
+  careers_url: https://jobs.ashbyhq.com/unstructured
+  scan_method: playwright
+  notes: "Remote. Data preprocessing for LLMs."
+  enabled: true
+  priority: medium
+  headcount: 50
+
+- name: Labelbox
+  careers_url: https://job-boards.greenhouse.io/labelbox
+  api: https://boards-api.greenhouse.io/v1/boards/labelbox/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Data labeling + annotation platform."
+  enabled: true
+  priority: low
+  headcount: 300
+
+
+# ═══════════════════════════════════════════════════════════
+# 3. AI APPLICATION COMPANIES (11)
+# ═══════════════════════════════════════════════════════════
+
+- name: Glean
+  careers_url: https://job-boards.greenhouse.io/glaboratories
+  api: https://boards-api.greenhouse.io/v1/boards/glaboratories/jobs
+  scan_method: greenhouse_api
+  notes: "Palo Alto. Enterprise AI search. Hiring aggressively."
   enabled: true
   priority: high
+  headcount: 600
 
-- name: Airbnb
-  careers_url: https://careers.airbnb.com
+- name: Writer
+  careers_url: https://jobs.ashbyhq.com/writer
   scan_method: playwright
-  notes: "SF. Data science heavy culture. Known for DS interview rigor."
+  notes: "SF. Enterprise AI writing. Full-stack LLM company."
+  enabled: true
+  priority: medium
+  headcount: 300
+
+- name: Harvey AI
+  careers_url: https://jobs.ashbyhq.com/harvey
+  scan_method: playwright
+  notes: "SF. AI for law firms. Sequoia-backed."
   enabled: true
   priority: high
+  headcount: 200
+
+- name: Hebbia
+  careers_url: https://jobs.ashbyhq.com/hebbia
+  scan_method: playwright
+  notes: "NYC. AI for finance. Powers BlackRock, KKR."
+  enabled: true
+  priority: high
+  headcount: 100
+
+- name: EvenUp
+  careers_url: https://jobs.ashbyhq.com/evenup
+  scan_method: playwright
+  notes: "SF. AI for personal injury law."
+  enabled: true
+  priority: medium
+  headcount: 200
+
+- name: Decagon
+  careers_url: https://jobs.ashbyhq.com/decagon
+  scan_method: playwright
+  notes: "SF. AI customer support agents. $4.5B valuation."
+  enabled: true
+  priority: high
+  headcount: 200
+
+- name: Sierra AI
+  careers_url: https://jobs.ashbyhq.com/sierra
+  scan_method: playwright
+  notes: "SF. Conversational AI. Bret Taylor + Clay Bavor."
+  enabled: true
+  priority: high
+  headcount: 100
+
+- name: Cursor (Anysphere)
+  careers_url: https://jobs.ashbyhq.com/anysphere
+  scan_method: playwright
+  notes: "SF. AI code editor. Fastest growing AI startup."
+  enabled: true
+  priority: high
+  headcount: 100
+
+- name: Cognition (Devin)
+  careers_url: https://jobs.ashbyhq.com/cognition
+  scan_method: playwright
+  notes: "SF. Devin AI software engineer."
+  enabled: true
+  priority: medium
+  headcount: 50
+
+- name: Zapier
+  careers_url: https://jobs.ashbyhq.com/zapier
+  scan_method: playwright
+  notes: "Remote. Automation platform. $5B valuation."
+  enabled: true
+  priority: medium
+  headcount: 800
+
+- name: Jasper
+  careers_url: https://job-boards.greenhouse.io/jasper
+  api: https://boards-api.greenhouse.io/v1/boards/jasper/jobs
+  scan_method: greenhouse_api
+  notes: "Austin/Remote. AI marketing platform."
+  enabled: true
+  priority: low
+  headcount: 300
+
+
+# ═══════════════════════════════════════════════════════════
+# 4. BIG TECH — Data/ML Teams (14)
+# ═══════════════════════════════════════════════════════════
+
+- name: Apple
+  careers_url: https://jobs.apple.com/en-us/search?team=machine-learning-and-ai
+  scan_method: playwright
+  notes: "Cupertino. Apple Intelligence. Secretive but pays well."
+  enabled: true
+  priority: high
+  headcount: 160000
+
+- name: Amazon (AWS AI)
+  careers_url: https://www.amazon.jobs/en/teams/ai
+  scan_method: playwright
+  notes: "Seattle/Remote. SageMaker, Bedrock, Rufus."
+  enabled: true
+  priority: high
+  headcount: 1500000
+
+- name: Google
+  careers_url: https://www.google.com/about/careers/applications/jobs/results
+  scan_method: playwright
+  notes: "MTV/NYC. Search, Ads, Cloud AI. Largest ML org."
+  enabled: true
+  priority: high
+  headcount: 180000
+
+- name: Microsoft
+  careers_url: https://careers.microsoft.com
+  scan_method: playwright
+  notes: "Redmond/Remote. Azure AI, Copilot, GitHub Copilot."
+  enabled: true
+  priority: high
+  headcount: 220000
 
 - name: Netflix
   careers_url: https://jobs.netflix.com
   scan_method: playwright
-  notes: "LA/Remote. Elite DS team. High comp, high bar. Recommendation systems."
+  notes: "LA/Remote. Elite DS team. High comp. RecSys."
   enabled: true
   priority: high
+  headcount: 13000
+
+- name: Nvidia
+  careers_url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+  scan_method: playwright
+  notes: "Santa Clara. GPU maker. CUDA + deep learning research."
+  enabled: true
+  priority: high
+  headcount: 30000
+
+- name: Uber
+  careers_url: https://www.uber.com/us/en/careers/
+  scan_method: playwright
+  notes: "SF/NYC. ML for pricing, matching, ETA, fraud."
+  enabled: true
+  priority: medium
+  headcount: 30000
+
+- name: Lyft
+  careers_url: https://www.lyft.com/careers
+  scan_method: playwright
+  notes: "SF. ML for pricing + matching."
+  enabled: true
+  priority: low
+  headcount: 4000
+
+- name: Salesforce
+  careers_url: https://careers.salesforce.com
+  scan_method: playwright
+  notes: "SF. Einstein AI. Large data science team."
+  enabled: true
+  priority: medium
+  headcount: 70000
+
+- name: LinkedIn
+  careers_url: https://careers.linkedin.com
+  scan_method: playwright
+  notes: "Sunnyvale. Feed ranking, search, recommendations."
+  enabled: true
+  priority: medium
+  headcount: 20000
+
+- name: Twitter / X
+  careers_url: https://careers.x.com
+  scan_method: playwright
+  notes: "SF. Recommendation algorithms, Grok integration."
+  enabled: true
+  priority: low
+  headcount: 2000
+
+- name: Palantir
+  careers_url: https://jobs.lever.co/palantir
+  scan_method: playwright
+  notes: "Denver/NYC. Data analytics. AIP platform. High bar."
+  enabled: true
+  priority: high
+  headcount: 4000
+
+- name: ServiceNow
+  careers_url: https://careers.servicenow.com
+  scan_method: playwright
+  notes: "Santa Clara. Enterprise workflow. Now Assist AI."
+  enabled: true
+  priority: medium
+  headcount: 22000
+
+- name: Atlassian
+  careers_url: https://www.atlassian.com/company/careers
+  scan_method: playwright
+  notes: "Sydney/SF/Remote. Jira, Confluence. Rovo AI."
+  enabled: true
+  priority: medium
+  headcount: 12000
+
+
+# ═══════════════════════════════════════════════════════════
+# 5. ENTERPRISE SAAS — Strong Data/ML Teams (20)
+# ═══════════════════════════════════════════════════════════
+
+- name: Stripe
+  careers_url: https://stripe.com/jobs
+  scan_method: playwright
+  notes: "SF/Remote. Payments. ML for fraud. Strict on Spark."
+  enabled: true
+  priority: high
+  headcount: 8000
+
+- name: Airbnb
+  careers_url: https://careers.airbnb.com
+  scan_method: playwright
+  notes: "SF. DS heavy culture. Known for interview rigor."
+  enabled: true
+  priority: high
+  headcount: 7000
 
 - name: Spotify
   careers_url: https://job-boards.greenhouse.io/spotify
   api: https://boards-api.greenhouse.io/v1/boards/spotify/jobs
   scan_method: greenhouse_api
-  notes: "NYC/Stockholm. ML for personalization. Good remote policies."
+  notes: "NYC/Stockholm. ML for personalization."
   enabled: true
   priority: medium
+  headcount: 9000
 
 - name: Block (Square/Cash App)
   careers_url: https://job-boards.greenhouse.io/block
   api: https://boards-api.greenhouse.io/v1/boards/block/jobs
   scan_method: greenhouse_api
-  notes: "SF/Remote. Fintech. ML for fraud, risk, personalization."
+  notes: "SF/Remote. Fintech. ML for fraud + risk."
   enabled: true
   priority: medium
+  headcount: 12000
 
 - name: Shopify
   careers_url: https://job-boards.greenhouse.io/shopify
   api: https://boards-api.greenhouse.io/v1/boards/shopify/jobs
   scan_method: greenhouse_api
-  notes: "Ottawa/Remote. E-commerce platform. Growing AI/ML org."
+  notes: "Ottawa/Remote. Sidekick AI. Growing ML org."
   enabled: true
   priority: medium
-
-- name: Figma
-  careers_url: https://job-boards.greenhouse.io/figma
-  api: https://boards-api.greenhouse.io/v1/boards/figma/jobs
-  scan_method: greenhouse_api
-  notes: "SF. Design tools. Smaller DS team but interesting ML problems."
-  enabled: true
-  priority: low
+  headcount: 10000
 
 - name: Notion
   careers_url: https://job-boards.greenhouse.io/notion
   api: https://boards-api.greenhouse.io/v1/boards/notion/jobs
   scan_method: greenhouse_api
-  notes: "SF. Productivity. AI features push = ML hiring."
+  notes: "SF. Notion AI. Productivity + ML."
   enabled: true
   priority: medium
+  headcount: 700
 
 - name: Datadog
   careers_url: https://job-boards.greenhouse.io/datadog
@@ -211,16 +625,134 @@
   notes: "NYC. Observability. ML for anomaly detection. Good comp."
   enabled: true
   priority: medium
+  headcount: 5500
 
-# -----------------------------------------------
-# FINTECH / FINANCE
-# -----------------------------------------------
+- name: Figma
+  careers_url: https://job-boards.greenhouse.io/figma
+  api: https://boards-api.greenhouse.io/v1/boards/figma/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Design tools. AI features."
+  enabled: true
+  priority: low
+  headcount: 1500
+
+- name: Vercel
+  careers_url: https://job-boards.greenhouse.io/vercel
+  api: https://boards-api.greenhouse.io/v1/boards/vercel/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. v0 AI product."
+  enabled: true
+  priority: low
+  headcount: 500
+
+- name: Retool
+  careers_url: https://job-boards.greenhouse.io/retool
+  api: https://boards-api.greenhouse.io/v1/boards/retool/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Internal tools. AI features."
+  enabled: true
+  priority: low
+  headcount: 500
+
+- name: Airtable
+  careers_url: https://job-boards.greenhouse.io/airtable
+  api: https://boards-api.greenhouse.io/v1/boards/airtable/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Low-code platform."
+  enabled: true
+  priority: low
+  headcount: 900
+
+- name: Twilio
+  careers_url: https://job-boards.greenhouse.io/twilio
+  api: https://boards-api.greenhouse.io/v1/boards/twilio/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Segment data team. CustomerAI."
+  enabled: true
+  priority: medium
+  headcount: 5500
+
+- name: HubSpot
+  careers_url: https://job-boards.greenhouse.io/hubspot
+  api: https://boards-api.greenhouse.io/v1/boards/hubspot/jobs
+  scan_method: greenhouse_api
+  notes: "Cambridge/Remote. CRM. AI features. Large data team."
+  enabled: true
+  priority: medium
+  headcount: 7500
+
+- name: MongoDB
+  careers_url: https://job-boards.greenhouse.io/mongodb
+  api: https://boards-api.greenhouse.io/v1/boards/mongodb/jobs
+  scan_method: greenhouse_api
+  notes: "NYC. Vector search + AI features. Public."
+  enabled: true
+  priority: medium
+  headcount: 5000
+
+- name: Confluent
+  careers_url: https://job-boards.greenhouse.io/confluent
+  api: https://boards-api.greenhouse.io/v1/boards/confluent/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Kafka company. Real-time streaming."
+  enabled: true
+  priority: medium
+  headcount: 3000
+
+- name: Elastic
+  careers_url: https://job-boards.greenhouse.io/elastic
+  api: https://boards-api.greenhouse.io/v1/boards/elastic/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Search + observability. ML features."
+  enabled: true
+  priority: low
+  headcount: 3500
+
+- name: Cloudflare
+  careers_url: https://job-boards.greenhouse.io/cloudflare
+  api: https://boards-api.greenhouse.io/v1/boards/cloudflare/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Workers AI. Growing ML team."
+  enabled: true
+  priority: low
+  headcount: 4000
+
+- name: Moveworks
+  careers_url: https://job-boards.greenhouse.io/moveworks
+  api: https://boards-api.greenhouse.io/v1/boards/moveworks/jobs
+  scan_method: greenhouse_api
+  notes: "Mountain View. Enterprise AI copilot."
+  enabled: true
+  priority: medium
+  headcount: 500
+
+- name: Handshake
+  careers_url: https://jobs.ashbyhq.com/handshake
+  scan_method: playwright
+  notes: "SF. Early career platform. ML for matching."
+  enabled: true
+  priority: medium
+  headcount: 700
+
+- name: Calendly
+  careers_url: https://job-boards.greenhouse.io/calendly
+  api: https://boards-api.greenhouse.io/v1/boards/calendly/jobs
+  scan_method: greenhouse_api
+  notes: "Atlanta/Remote. Building ML/AI team."
+  enabled: true
+  priority: low
+  headcount: 800
+
+
+# ═══════════════════════════════════════════════════════════
+# 6. FINTECH & FINANCIAL SERVICES (16)
+# ═══════════════════════════════════════════════════════════
 
 - name: Plaid
   careers_url: https://job-boards.greenhouse.io/plaid
   api: https://boards-api.greenhouse.io/v1/boards/plaid/jobs
   scan_method: greenhouse_api
-  notes: "SF/Remote. Financial data. ML for transaction classification."
+  notes: "SF/Remote. Financial data. ML for transactions."
   enabled: true
   priority: medium
 
@@ -228,7 +760,7 @@
   careers_url: https://job-boards.greenhouse.io/affirm
   api: https://boards-api.greenhouse.io/v1/boards/affirm/jobs
   scan_method: greenhouse_api
-  notes: "SF/Remote. BNPL. Heavy ML for credit risk."
+  notes: "SF/Remote. BNPL. ML for credit risk."
   enabled: true
   priority: medium
 
@@ -236,7 +768,7 @@
   careers_url: https://job-boards.greenhouse.io/robinhood
   api: https://boards-api.greenhouse.io/v1/boards/robinhood/jobs
   scan_method: greenhouse_api
-  notes: "Menlo Park. Trading. Data engineering + ML for recommendations."
+  notes: "Menlo Park. Trading. Data eng + ML."
   enabled: true
   priority: medium
 
@@ -244,19 +776,110 @@
   careers_url: https://job-boards.greenhouse.io/brex
   api: https://boards-api.greenhouse.io/v1/boards/brex/jobs
   scan_method: greenhouse_api
-  notes: "SF/Remote. Corporate cards. ML for underwriting + fraud."
+  notes: "SF/Remote. Corporate cards. ML for fraud."
   enabled: true
   priority: low
 
-# -----------------------------------------------
-# HEALTH / BIOTECH
-# -----------------------------------------------
+- name: Ramp
+  careers_url: https://job-boards.greenhouse.io/ramp
+  api: https://boards-api.greenhouse.io/v1/boards/ramp/jobs
+  scan_method: greenhouse_api
+  notes: "NYC. Corporate spend. AI features."
+  enabled: true
+  priority: medium
+
+- name: Mercury
+  careers_url: https://job-boards.greenhouse.io/mercury
+  api: https://boards-api.greenhouse.io/v1/boards/mercury/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Banking. ML + GenAI."
+  enabled: true
+  priority: medium
+
+- name: Chime
+  careers_url: https://job-boards.greenhouse.io/chime
+  api: https://boards-api.greenhouse.io/v1/boards/chime/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Neobank. ML for fraud."
+  enabled: true
+  priority: medium
+
+- name: Nubank
+  careers_url: https://job-boards.greenhouse.io/nubank
+  api: https://boards-api.greenhouse.io/v1/boards/nubank/jobs
+  scan_method: greenhouse_api
+  notes: "Sao Paulo/NYC. Largest digital bank. Strong DS."
+  enabled: true
+  priority: medium
+
+- name: SentiLink
+  careers_url: https://jobs.ashbyhq.com/sentilink
+  scan_method: playwright
+  notes: "SF/Remote. Identity verification. ML-heavy."
+  enabled: true
+  priority: medium
+
+- name: Point72
+  careers_url: https://job-boards.greenhouse.io/point72
+  api: https://boards-api.greenhouse.io/v1/boards/point72/jobs
+  scan_method: greenhouse_api
+  notes: "NYC/Stamford. Hedge fund. Quant + ML. Very high comp."
+  enabled: true
+  priority: high
+
+- name: Two Sigma
+  careers_url: https://careers.twosigma.com
+  scan_method: playwright
+  notes: "NYC. Quant hedge fund. ML for trading."
+  enabled: true
+  priority: high
+
+- name: Citadel
+  careers_url: https://www.citadel.com/careers/
+  scan_method: playwright
+  notes: "Chicago/NYC. Hedge fund. Highest comp in finance."
+  enabled: true
+  priority: high
+
+- name: Jane Street
+  careers_url: https://www.janestreet.com/join-jane-street/
+  scan_method: playwright
+  notes: "NYC. Prop trading. ML for signals. OCaml + Python."
+  enabled: true
+  priority: high
+
+- name: D.E. Shaw
+  careers_url: https://www.deshaw.com/careers
+  scan_method: playwright
+  notes: "NYC. Quant hedge fund. Systematic trading."
+  enabled: true
+  priority: medium
+
+- name: Marqeta
+  careers_url: https://job-boards.greenhouse.io/marqeta
+  api: https://boards-api.greenhouse.io/v1/boards/marqeta/jobs
+  scan_method: greenhouse_api
+  notes: "Oakland. Card issuing. ML for fraud."
+  enabled: true
+  priority: low
+
+- name: SoFi
+  careers_url: https://www.sofi.com/careers/
+  scan_method: playwright
+  notes: "SF. Personal finance. ML for lending."
+  enabled: true
+  priority: low
+
+
+# ═══════════════════════════════════════════════════════════
+# 7. HEALTHTECH & BIOTECH (10)
+# ═══════════════════════════════════════════════════════════
 
 - name: Tempus AI
   careers_url: https://job-boards.greenhouse.io/tempus
   api: https://boards-api.greenhouse.io/v1/boards/tempus/jobs
   scan_method: greenhouse_api
-  notes: "Chicago. Precision medicine. ML for genomics. Recently IPO'd."
+  notes: "Chicago. Precision medicine. ML for genomics. IPO'd."
   enabled: true
   priority: high
 
@@ -264,7 +887,7 @@
   careers_url: https://job-boards.greenhouse.io/insitro
   api: https://boards-api.greenhouse.io/v1/boards/insitro/jobs
   scan_method: greenhouse_api
-  notes: "SF. ML for drug discovery. Research-heavy."
+  notes: "SF. ML for drug discovery. Daphne Koller."
   enabled: true
   priority: medium
 
@@ -272,18 +895,75 @@
   careers_url: https://job-boards.greenhouse.io/recursionpharmaceuticals
   api: https://boards-api.greenhouse.io/v1/boards/recursionpharmaceuticals/jobs
   scan_method: greenhouse_api
-  notes: "Salt Lake City. AI drug discovery. Interesting DS problems."
+  notes: "SLC. AI drug discovery. Public."
   enabled: true
   priority: medium
 
-# -----------------------------------------------
-# AUTONOMOUS / ROBOTICS
-# -----------------------------------------------
+- name: Flatiron Health
+  careers_url: https://job-boards.greenhouse.io/flatironhealth
+  api: https://boards-api.greenhouse.io/v1/boards/flatironhealth/jobs
+  scan_method: greenhouse_api
+  notes: "NYC. Oncology data. ML for clinical research."
+  enabled: true
+  priority: medium
+
+- name: GRAIL
+  careers_url: https://job-boards.greenhouse.io/grail
+  api: https://boards-api.greenhouse.io/v1/boards/grail/jobs
+  scan_method: greenhouse_api
+  notes: "Menlo Park. Cancer early detection. Genomics ML."
+  enabled: true
+  priority: medium
+
+- name: PathAI
+  careers_url: https://job-boards.greenhouse.io/pathai
+  api: https://boards-api.greenhouse.io/v1/boards/pathai/jobs
+  scan_method: greenhouse_api
+  notes: "Boston. AI pathology. Computer vision."
+  enabled: true
+  priority: medium
+
+- name: Viz.ai
+  careers_url: https://job-boards.greenhouse.io/vizai
+  api: https://boards-api.greenhouse.io/v1/boards/vizai/jobs
+  scan_method: greenhouse_api
+  notes: "SF. AI stroke detection. FDA-cleared."
+  enabled: true
+  priority: low
+
+- name: Spring Health
+  careers_url: https://job-boards.greenhouse.io/springhealth
+  api: https://boards-api.greenhouse.io/v1/boards/springhealth/jobs
+  scan_method: greenhouse_api
+  notes: "NYC. Mental health. ML for treatment matching."
+  enabled: true
+  priority: low
+
+- name: Oscar Health
+  careers_url: https://job-boards.greenhouse.io/oscarhealth
+  api: https://boards-api.greenhouse.io/v1/boards/oscarhealth/jobs
+  scan_method: greenhouse_api
+  notes: "NYC. Health insurance. ML for claims."
+  enabled: true
+  priority: low
+
+- name: Color Health
+  careers_url: https://job-boards.greenhouse.io/color
+  api: https://boards-api.greenhouse.io/v1/boards/color/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Population health. Genetic risk ML."
+  enabled: true
+  priority: low
+
+
+# ═══════════════════════════════════════════════════════════
+# 8. AUTONOMOUS VEHICLES & ROBOTICS (9)
+# ═══════════════════════════════════════════════════════════
 
 - name: Waymo
   careers_url: https://waymo.com/careers/
   scan_method: playwright
-  notes: "SF/Phoenix. Self-driving. ML perception + prediction teams."
+  notes: "SF/Phoenix. Self-driving (Alphabet). ML perception."
   enabled: true
   priority: medium
 
@@ -297,62 +977,372 @@
 - name: Figure AI
   careers_url: https://jobs.ashbyhq.com/figureai
   scan_method: playwright
-  notes: "Sunnyvale. Humanoid robotics. ML + controls."
+  notes: "Sunnyvale. Humanoid robotics. $2.6B valuation."
   enabled: true
   priority: medium
 
-# -----------------------------------------------
-# GROWTH STAGE / SERIES B-D (higher urgency to hire)
-# -----------------------------------------------
-
-- name: Writer
-  careers_url: https://jobs.ashbyhq.com/writer
-  scan_method: playwright
-  notes: "SF. Enterprise AI writing. Series C. Growing fast."
-  enabled: true
-  priority: medium
-
-- name: Glean
-  careers_url: https://job-boards.greenhouse.io/glaboratories
-  api: https://boards-api.greenhouse.io/v1/boards/glaboratories/jobs
+- name: Nuro
+  careers_url: https://job-boards.greenhouse.io/nuro
+  api: https://boards-api.greenhouse.io/v1/boards/nuro/jobs
   scan_method: greenhouse_api
-  notes: "Palo Alto. Enterprise AI search. Well-funded, hiring aggressively."
+  notes: "Mountain View. Autonomous delivery."
+  enabled: true
+  priority: low
+
+- name: Aurora
+  careers_url: https://job-boards.greenhouse.io/aurora
+  api: https://boards-api.greenhouse.io/v1/boards/aurora/jobs
+  scan_method: greenhouse_api
+  notes: "Pittsburgh/SF. Self-driving trucks. Public."
+  enabled: true
+  priority: medium
+
+- name: Zoox
+  careers_url: https://jobs.lever.co/zoox
+  scan_method: playwright
+  notes: "Foster City. Amazon-owned. Purpose-built robotaxi."
+  enabled: true
+  priority: medium
+
+- name: Shield AI
+  careers_url: https://job-boards.greenhouse.io/shieldai
+  api: https://boards-api.greenhouse.io/v1/boards/shieldai/jobs
+  scan_method: greenhouse_api
+  notes: "San Diego. Defense AI drones. $12.7B valuation."
   enabled: true
   priority: high
 
-- name: Ramp
-  careers_url: https://job-boards.greenhouse.io/ramp
-  api: https://boards-api.greenhouse.io/v1/boards/ramp/jobs
+- name: Skydio
+  careers_url: https://job-boards.greenhouse.io/skydio
+  api: https://boards-api.greenhouse.io/v1/boards/skydio/jobs
   scan_method: greenhouse_api
-  notes: "NYC. Corporate cards + expense. Fast-growing data team."
+  notes: "San Mateo. Autonomous drones. CV."
   enabled: true
   priority: medium
 
-- name: Airtable
-  careers_url: https://job-boards.greenhouse.io/airtable
-  api: https://boards-api.greenhouse.io/v1/boards/airtable/jobs
-  scan_method: greenhouse_api
-  notes: "SF. Low-code platform. AI features push."
+- name: Boston Dynamics
+  careers_url: https://bostondynamics.wd1.myworkdayjobs.com/Boston_Dynamics
+  scan_method: playwright
+  notes: "Waltham MA. Atlas/Spot. ML for locomotion."
   enabled: true
   priority: low
 
-- name: Vercel
-  careers_url: https://job-boards.greenhouse.io/vercel
-  api: https://boards-api.greenhouse.io/v1/boards/vercel/jobs
+
+# ═══════════════════════════════════════════════════════════
+# 9. DEFENSE & GOVTECH (6)
+# ═══════════════════════════════════════════════════════════
+
+- name: Anduril
+  careers_url: https://job-boards.greenhouse.io/andurilindustries
+  api: https://boards-api.greenhouse.io/v1/boards/andurilindustries/jobs
   scan_method: greenhouse_api
-  notes: "SF/Remote. Web platform. v0 AI product = ML hiring."
+  notes: "Costa Mesa/DC. Defense AI. Lattice. Palmer Luckey."
+  enabled: true
+  priority: high
+
+- name: Rebellion Defense
+  careers_url: https://job-boards.greenhouse.io/rebelliondefense
+  api: https://boards-api.greenhouse.io/v1/boards/rebelliondefense/jobs
+  scan_method: greenhouse_api
+  notes: "DC/Remote. AI for DoD."
+  enabled: true
+  priority: medium
+
+- name: Primer AI
+  careers_url: https://jobs.lever.co/primer
+  scan_method: playwright
+  notes: "SF. NLP for intelligence analysis."
   enabled: true
   priority: low
 
-# -----------------------------------------------
+- name: Vannevar Labs
+  careers_url: https://jobs.ashbyhq.com/vannevarlabs
+  scan_method: playwright
+  notes: "SF. AI for national security."
+  enabled: true
+  priority: medium
+
+- name: Nightfall AI
+  careers_url: https://jobs.ashbyhq.com/nightfall-ai
+  scan_method: playwright
+  notes: "SF. AI data loss prevention."
+  enabled: true
+  priority: low
+
+- name: Artemis
+  careers_url: https://jobs.ashbyhq.com/artemis
+  scan_method: playwright
+  notes: "AI-driven cyber defense."
+  enabled: true
+  priority: low
+
+
+# ═══════════════════════════════════════════════════════════
+# 10. VOICE AI & CONVERSATIONAL (6)
+# ═══════════════════════════════════════════════════════════
+
+- name: ElevenLabs
+  careers_url: https://jobs.ashbyhq.com/elevenlabs
+  scan_method: playwright
+  notes: "NYC/London. Voice AI. $11B valuation."
+  enabled: true
+  priority: high
+
+- name: Deepgram
+  careers_url: https://jobs.ashbyhq.com/deepgram
+  scan_method: playwright
+  notes: "SF/Remote. Speech-to-text API."
+  enabled: true
+  priority: medium
+
+- name: AssemblyAI
+  careers_url: https://job-boards.greenhouse.io/assemblyai
+  api: https://boards-api.greenhouse.io/v1/boards/assemblyai/jobs
+  scan_method: greenhouse_api
+  notes: "Remote. Speech AI. Transcription APIs."
+  enabled: true
+  priority: medium
+
+- name: Vapi
+  careers_url: https://jobs.ashbyhq.com/vapi
+  scan_method: playwright
+  notes: "SF. Voice AI platform for developers."
+  enabled: true
+  priority: low
+
+- name: PolyAI
+  careers_url: https://jobs.ashbyhq.com/polyai
+  scan_method: playwright
+  notes: "London/NYC. Enterprise contact centers."
+  enabled: true
+  priority: low
+
+- name: Hume AI
+  careers_url: https://jobs.ashbyhq.com/hume
+  scan_method: playwright
+  notes: "NYC. Emotion AI."
+  enabled: true
+  priority: low
+
+
+# ═══════════════════════════════════════════════════════════
+# 11. E-COMMERCE, RETAIL & MARKETPLACE (8)
+# ═══════════════════════════════════════════════════════════
+
+- name: Instacart
+  careers_url: https://job-boards.greenhouse.io/instacart
+  api: https://boards-api.greenhouse.io/v1/boards/instacart/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Grocery delivery. ML for search, pricing."
+  enabled: true
+  priority: medium
+
+- name: DoorDash
+  careers_url: https://job-boards.greenhouse.io/doordash
+  api: https://boards-api.greenhouse.io/v1/boards/doordash/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Delivery. ML for logistics + pricing."
+  enabled: true
+  priority: medium
+
+- name: Pinterest
+  careers_url: https://job-boards.greenhouse.io/pinterest
+  api: https://boards-api.greenhouse.io/v1/boards/pinterest/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Visual discovery. CV + RecSys."
+  enabled: true
+  priority: medium
+
+- name: Etsy
+  careers_url: https://job-boards.greenhouse.io/etsy
+  api: https://boards-api.greenhouse.io/v1/boards/etsy/jobs
+  scan_method: greenhouse_api
+  notes: "Brooklyn/Remote. ML for search + recs."
+  enabled: true
+  priority: low
+
+- name: Stitch Fix
+  careers_url: https://job-boards.greenhouse.io/stitchfix
+  api: https://boards-api.greenhouse.io/v1/boards/stitchfix/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Famous data science team."
+  enabled: true
+  priority: medium
+
+- name: Faire
+  careers_url: https://job-boards.greenhouse.io/faire
+  api: https://boards-api.greenhouse.io/v1/boards/faire/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Wholesale marketplace."
+  enabled: true
+  priority: low
+
+- name: Wayfair
+  careers_url: https://job-boards.greenhouse.io/wayfair
+  api: https://boards-api.greenhouse.io/v1/boards/wayfair/jobs
+  scan_method: greenhouse_api
+  notes: "Boston. ML for search, pricing, supply chain."
+  enabled: true
+  priority: low
+
+- name: Chewy
+  careers_url: https://careers.chewy.com
+  scan_method: playwright
+  notes: "FL/Remote. Growing data team."
+  enabled: true
+  priority: low
+
+
+# ═══════════════════════════════════════════════════════════
+# 12. CYBERSECURITY (6)
+# ═══════════════════════════════════════════════════════════
+
+- name: CrowdStrike
+  careers_url: https://crowdstrike.wd5.myworkdayjobs.com/crowdstrikecareers
+  scan_method: playwright
+  notes: "Austin/Remote. ML for threat detection. Public."
+  enabled: true
+  priority: medium
+
+- name: Palo Alto Networks
+  careers_url: https://jobs.paloaltonetworks.com
+  scan_method: playwright
+  notes: "Santa Clara. ML for security automation."
+  enabled: true
+  priority: medium
+
+- name: SentinelOne
+  careers_url: https://job-boards.greenhouse.io/sentinelone
+  api: https://boards-api.greenhouse.io/v1/boards/sentinelone/jobs
+  scan_method: greenhouse_api
+  notes: "Mountain View. Purple AI."
+  enabled: true
+  priority: low
+
+- name: Abnormal Security
+  careers_url: https://job-boards.greenhouse.io/abnormalsecurity
+  api: https://boards-api.greenhouse.io/v1/boards/abnormalsecurity/jobs
+  scan_method: greenhouse_api
+  notes: "SF. AI email security. Fast growing."
+  enabled: true
+  priority: medium
+
+- name: Okta
+  careers_url: https://job-boards.greenhouse.io/okta
+  api: https://boards-api.greenhouse.io/v1/boards/okta/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. Identity. ML for threats."
+  enabled: true
+  priority: low
+
+- name: Lacework
+  careers_url: https://job-boards.greenhouse.io/lacework
+  api: https://boards-api.greenhouse.io/v1/boards/lacework/jobs
+  scan_method: greenhouse_api
+  notes: "San Jose. Cloud security. Anomaly detection."
+  enabled: true
+  priority: low
+
+
+# ═══════════════════════════════════════════════════════════
+# 13. MEDIA, GAMING & ENTERTAINMENT (6)
+# ═══════════════════════════════════════════════════════════
+
+- name: Reddit
+  careers_url: https://job-boards.greenhouse.io/reddit
+  api: https://boards-api.greenhouse.io/v1/boards/reddit/jobs
+  scan_method: greenhouse_api
+  notes: "SF/Remote. ML for feed, ads, moderation."
+  enabled: true
+  priority: medium
+
+- name: Snap
+  careers_url: https://job-boards.greenhouse.io/snap
+  api: https://boards-api.greenhouse.io/v1/boards/snap/jobs
+  scan_method: greenhouse_api
+  notes: "LA/SF. Camera, AR, My AI. CV."
+  enabled: true
+  priority: medium
+
+- name: Discord
+  careers_url: https://job-boards.greenhouse.io/discord
+  api: https://boards-api.greenhouse.io/v1/boards/discord/jobs
+  scan_method: greenhouse_api
+  notes: "SF. ML for safety + recs."
+  enabled: true
+  priority: low
+
+- name: Roblox
+  careers_url: https://job-boards.greenhouse.io/roblox
+  api: https://boards-api.greenhouse.io/v1/boards/roblox/jobs
+  scan_method: greenhouse_api
+  notes: "San Mateo. Gaming. ML + GenAI."
+  enabled: true
+  priority: medium
+
+- name: Epic Games
+  careers_url: https://job-boards.greenhouse.io/epicgames
+  api: https://boards-api.greenhouse.io/v1/boards/epicgames/jobs
+  scan_method: greenhouse_api
+  notes: "Cary NC. Unreal Engine. ML for games."
+  enabled: true
+  priority: low
+
+- name: Duolingo
+  careers_url: https://job-boards.greenhouse.io/duolingo
+  api: https://boards-api.greenhouse.io/v1/boards/duolingo/jobs
+  scan_method: greenhouse_api
+  notes: "Pittsburgh. ML for personalization. Public."
+  enabled: true
+  priority: medium
+
+
+# ═══════════════════════════════════════════════════════════
+# 14. TRAVEL & LOGISTICS (4)
+# ═══════════════════════════════════════════════════════════
+
+- name: Expedia
+  careers_url: https://careers.expediagroup.com
+  scan_method: playwright
+  notes: "Seattle. ML for pricing + search."
+  enabled: true
+  priority: low
+
+- name: Flexport
+  careers_url: https://job-boards.greenhouse.io/flexport
+  api: https://boards-api.greenhouse.io/v1/boards/flexport/jobs
+  scan_method: greenhouse_api
+  notes: "SF. Supply chain. ML for logistics."
+  enabled: true
+  priority: low
+
+- name: Samsara
+  careers_url: https://job-boards.greenhouse.io/samsara
+  api: https://boards-api.greenhouse.io/v1/boards/samsara/jobs
+  scan_method: greenhouse_api
+  notes: "SF. IoT fleet mgmt. CV + ML. Public."
+  enabled: true
+  priority: medium
+
+- name: Observe.AI
+  careers_url: https://job-boards.greenhouse.io/observeai
+  api: https://boards-api.greenhouse.io/v1/boards/observeai/jobs
+  scan_method: greenhouse_api
+  notes: "SF. AI for contact centers."
+  enabled: true
+  priority: low
+
+
+# ═══════════════════════════════════════════════════════════
 # ADD YOUR OWN BELOW
-# -----------------------------------------------
+# ═══════════════════════════════════════════════════════════
 # Template:
 #
 # - name: Company Name
 #   careers_url: https://company.com/careers
-#   api: ""                              # optional greenhouse API
-#   scan_method: playwright              # playwright | greenhouse_api | websearch
-#   notes: "Location. What they do. Context for you."
+#   api: ""
+#   scan_method: playwright
+#   notes: "Location. What they do."
 #   enabled: true
-#   priority: medium                     # high | medium | low
+#   priority: medium
+#   headcount: 0
