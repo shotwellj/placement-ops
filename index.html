@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SourcingNav — Talent Engineering Platform</title>
+<meta name="description" content="SourcingNav: The talent engineering platform for agencies and companies. Pipeline intelligence, workforce analytics, and competitive insights — all in one place.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   SOURCINGNAV — LANDING PAGE
+   Brand: Deep navy + electric blue/cyan gradient
+   Typography: Inter + JetBrains Mono
+   Design: Premium dark SaaS — Vercel/Linear aesthetic
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --bg-base: #06060b;
+  --bg-surface: #0c0c14;
+  --bg-card: #111119;
+  --bg-card-hover: #17171f;
+  --border: #1e1e2e;
+  --border-hover: #2e2e42;
+  --text-primary: #eaeaf2;
+  --text-secondary: #8b8ba8;
+  --text-muted: #55556e;
+  --brand-blue: #3b82f6;
+  --brand-cyan: #06b6d4;
+  --brand-emerald: #34d399;
+  --brand-violet: #8b5cf6;
+  --brand-amber: #f59e0b;
+  --brand-rose: #fb7185;
+  --gradient-brand: linear-gradient(135deg, #3b82f6, #06b6d4);
+  --gradient-green: linear-gradient(135deg, #34d399, #22d3ee);
+  --gradient-warm: linear-gradient(135deg, #f59e0b, #fb7185);
+  --glow-blue: 0 0 60px rgba(59,130,246,0.12);
+  --glow-cyan: 0 0 60px rgba(6,182,212,0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* ═══ NAV ═══ */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: rgba(6,6,11,0.8);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+  max-width: 1200px; margin: 0 auto; padding: 0 32px;
+  display: flex; align-items: center; height: 64px;
+}
+
+.nav-brand {
+  font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  text-decoration: none;
+}
+
+.nav-brand small {
+  font-size: 10px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase;
+  -webkit-text-fill-color: var(--text-muted); display: block; margin-top: -2px;
+}
+
+.nav-links {
+  margin-left: auto; display: flex; align-items: center; gap: 32px;
+}
+
+.nav-links a {
+  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+  text-decoration: none; transition: color 0.2s;
+}
+
+.nav-links a:hover { color: var(--text-primary); }
+
+.nav-cta {
+  padding: 8px 20px !important; border-radius: 6px;
+  background: var(--gradient-brand) !important;
+  -webkit-text-fill-color: #fff !important; color: #fff !important;
+  font-weight: 600 !important; font-size: 13px !important;
+  transition: opacity 0.2s !important;
+}
+
+.nav-cta:hover { opacity: 0.9; }
+
+/* ═══ HERO ═══ */
+.hero {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 120px 32px 80px;
+  position: relative; overflow: hidden;
+}
+
+.hero::before {
+  content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+  width: 800px; height: 800px;
+  background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(180deg, transparent 60%, var(--bg-base) 100%);
+  pointer-events: none;
+}
+
+.hero > * { position: relative; z-index: 1; }
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 16px; border-radius: 100px;
+  background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2);
+  font-size: 12px; font-weight: 600; color: var(--brand-blue);
+  margin-bottom: 32px; letter-spacing: 0.5px;
+}
+
+.hero-badge span { font-size: 14px; }
+
+.hero h1 {
+  font-size: clamp(40px, 6vw, 72px); font-weight: 900;
+  letter-spacing: -2px; line-height: 1.05; margin-bottom: 24px;
+  max-width: 800px;
+}
+
+.hero h1 .gradient {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+.hero p {
+  font-size: 18px; color: var(--text-secondary); max-width: 560px;
+  margin-bottom: 48px; line-height: 1.7;
+}
+
+.hero-buttons {
+  display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+}
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 28px; border-radius: 8px;
+  font-size: 14px; font-weight: 600; font-family: inherit;
+  text-decoration: none; cursor: pointer; border: none;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--gradient-brand); color: #fff;
+  box-shadow: var(--glow-blue);
+}
+
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 80px rgba(59,130,246,0.2); }
+
+.btn-green {
+  background: var(--gradient-green); color: #0a0a0f;
+  box-shadow: var(--glow-cyan);
+}
+
+.btn-green:hover { transform: translateY(-1px); box-shadow: 0 0 80px rgba(52,211,153,0.2); }
+
+.btn-ghost {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-ghost:hover { border-color: var(--border-hover); color: var(--text-primary); }
+
+.btn-icon { font-size: 18px; }
+
+/* ═══ METRICS STRIP ═══ */
+.metrics {
+  padding: 0 32px 80px; position: relative; z-index: 1;
+}
+
+.metrics-inner {
+  max-width: 1000px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--border); border-radius: 12px; overflow: hidden;
+}
+
+.metric-card {
+  background: var(--bg-card); padding: 32px; text-align: center;
+}
+
+.metric-value {
+  font-size: 32px; font-weight: 800; letter-spacing: -1px;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 4px;
+}
+
+.metric-value.blue { color: var(--brand-blue); }
+.metric-value.cyan { color: var(--brand-cyan); }
+.metric-value.emerald { color: var(--brand-emerald); }
+.metric-value.violet { color: var(--brand-violet); }
+
+.metric-label {
+  font-size: 12px; font-weight: 500; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+/* ═══ SECTIONS ═══ */
+.section {
+  padding: 100px 32px;
+  position: relative;
+}
+
+.section-header {
+  text-align: center; max-width: 640px; margin: 0 auto 64px;
+}
+
+.section-tag {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 2px; margin-bottom: 16px;
+}
+
+.section-tag.blue { color: var(--brand-blue); }
+.section-tag.green { color: var(--brand-emerald); }
+
+.section-header h2 {
+  font-size: clamp(28px, 4vw, 42px); font-weight: 800;
+  letter-spacing: -1px; margin-bottom: 16px;
+}
+
+.section-header p {
+  font-size: 16px; color: var(--text-secondary); line-height: 1.7;
+}
+
+/* ═══ DUAL PANELS ═══ */
+.dual-container {
+  max-width: 1200px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+}
+
+.platform-panel {
+  border: 1px solid var(--border); border-radius: 16px;
+  overflow: hidden; transition: all 0.3s ease;
+  background: var(--bg-card);
+}
+
+.platform-panel:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+.panel-header {
+  padding: 32px 32px 0;
+}
+
+.panel-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; margin-bottom: 20px;
+}
+
+.panel-icon.blue { background: rgba(59,130,246,0.1); }
+.panel-icon.green { background: rgba(52,211,153,0.1); }
+
+.panel-header h3 {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+
+.panel-header .panel-sub {
+  font-size: 13px; color: var(--text-muted); font-weight: 500;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
+}
+
+.panel-header p {
+  font-size: 14px; color: var(--text-secondary); line-height: 1.7;
+  margin-bottom: 24px;
+}
+
+.panel-features {
+  padding: 0 32px 24px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+
+.feature-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 13px; color: var(--text-secondary);
+}
+
+.feature-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  margin-top: 6px; flex-shrink: 0;
+}
+
+.feature-dot.blue { background: var(--brand-blue); }
+.feature-dot.green { background: var(--brand-emerald); }
+
+/* Panel screenshots (simulated) */
+.panel-preview {
+  margin: 0 20px 20px; border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--border); background: var(--bg-surface);
+  height: 220px; position: relative;
+}
+
+.preview-topbar {
+  height: 32px; background: rgba(0,0,0,0.3);
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 12px; border-bottom: 1px solid var(--border);
+}
+
+.preview-dot { width: 8px; height: 8px; border-radius: 50%; }
+.preview-dot.r { background: #ef4444; }
+.preview-dot.y { background: #f59e0b; }
+.preview-dot.g { background: #22c55e; }
+
+.preview-url {
+  margin-left: 12px; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+}
+
+.preview-body {
+  padding: 12px; display: flex; gap: 8px; height: calc(100% - 32px);
+}
+
+.preview-sidebar {
+  width: 50px; background: rgba(255,255,255,0.02);
+  border-radius: 4px; flex-shrink: 0;
+}
+
+.preview-sidebar .psb-item {
+  height: 4px; margin: 8px 6px; border-radius: 2px;
+  background: rgba(255,255,255,0.05);
+}
+
+.preview-sidebar .psb-item.active-b { background: rgba(59,130,246,0.3); }
+.preview-sidebar .psb-item.active-g { background: rgba(52,211,153,0.3); }
+
+.preview-content { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+
+.preview-kpi-row { display: flex; gap: 6px; }
+
+.preview-kpi {
+  flex: 1; height: 36px; border-radius: 4px;
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+}
+
+.preview-chart {
+  flex: 1; border-radius: 4px;
+  background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03);
+  position: relative; overflow: hidden;
+}
+
+.preview-chart .bar {
+  position: absolute; bottom: 0; width: 8%; border-radius: 2px 2px 0 0;
+}
+
+.panel-cta {
+  display: block; text-align: center; padding: 16px;
+  font-size: 14px; font-weight: 600; text-decoration: none;
+  border-top: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.panel-cta.blue { color: var(--brand-blue); }
+.panel-cta.blue:hover { background: rgba(59,130,246,0.05); }
+.panel-cta.green { color: var(--brand-emerald); }
+.panel-cta.green:hover { background: rgba(52,211,153,0.05); }
+
+/* ═══ FEATURES GRID ═══ */
+.features-grid {
+  max-width: 1200px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+}
+
+.feature-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 28px;
+  transition: all 0.2s ease;
+}
+
+.feature-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+}
+
+.feature-card-icon {
+  font-size: 20px; margin-bottom: 16px;
+}
+
+.feature-card h4 {
+  font-size: 15px; font-weight: 700; margin-bottom: 8px;
+}
+
+.feature-card p {
+  font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+}
+
+/* ═══ INTEGRATIONS ═══ */
+.integrations-row {
+  max-width: 800px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 16px;
+}
+
+.int-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border-radius: 100px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+}
+
+.int-chip .int-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--brand-emerald);
+}
+
+/* ═══ CTA ═══ */
+.cta-section {
+  padding: 120px 32px; text-align: center;
+}
+
+.cta-section h2 {
+  font-size: clamp(28px, 4vw, 42px); font-weight: 800;
+  letter-spacing: -1px; margin-bottom: 16px;
+}
+
+.cta-section p {
+  font-size: 16px; color: var(--text-secondary); margin-bottom: 40px;
+  max-width: 480px; margin-left: auto; margin-right: auto;
+}
+
+.cta-buttons { display: flex; gap: 16px; justify-content: center; }
+
+/* ═══ FOOTER ═══ */
+.footer {
+  border-top: 1px solid var(--border); padding: 40px 32px;
+  text-align: center;
+}
+
+.footer-brand {
+  font-size: 16px; font-weight: 800;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 8px;
+}
+
+.footer p {
+  font-size: 12px; color: var(--text-muted);
+}
+
+.footer-links {
+  margin-top: 16px; display: flex; justify-content: center; gap: 24px;
+}
+
+.footer-links a {
+  font-size: 12px; color: var(--text-muted); text-decoration: none;
+}
+
+.footer-links a:hover { color: var(--text-secondary); }
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 900px) {
+  .dual-container { grid-template-columns: 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .metrics-inner { grid-template-columns: repeat(2, 1fr); }
+  .nav-links { display: none; }
+}
+
+@media (max-width: 600px) {
+  .metrics-inner { grid-template-columns: 1fr; }
+  .panel-features { grid-template-columns: 1fr; }
+  .hero-buttons { flex-direction: column; align-items: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">
+      SOURCINGNAV
+      <small>Talent Engineering</small>
+    </a>
+    <div class="nav-links">
+      <a href="#platforms">Platform</a>
+      <a href="#features">Features</a>
+      <a href="#integrations">Integrations</a>
+      <a href="https://github.com/shotwellj/placement-ops" target="_blank">GitHub</a>
+      <a href="ui/dashboard.html" class="nav-cta">Launch App</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-badge">
+    <span>◈</span> Open Source · MIT Licensed
+  </div>
+  <h1>
+    Talent Engineering.<br>
+    <span class="gradient">Not Talent Guessing.</span>
+  </h1>
+  <p>
+    Pipeline intelligence, workforce analytics, competitive benchmarking, and retention forecasting — built for recruiters and companies who run on data.
+  </p>
+  <div class="hero-buttons">
+    <a href="ui/dashboard.html" class="btn btn-primary">
+      <span class="btn-icon">◎</span> Agency Dashboard
+    </a>
+    <a href="ui/people-ops.html" class="btn btn-green">
+      <span class="btn-icon">◉</span> Company Dashboard
+    </a>
+    <a href="https://github.com/shotwellj/placement-ops" target="_blank" class="btn btn-ghost">
+      <span class="btn-icon">⧉</span> View on GitHub
+    </a>
+  </div>
+</section>
+
+<!-- ═══ METRICS STRIP ═══ -->
+<section class="metrics">
+  <div class="metrics-inner">
+    <div class="metric-card">
+      <div class="metric-value blue">16</div>
+      <div class="metric-label">Operational Modes</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value cyan">8D</div>
+      <div class="metric-label">Scoring Dimensions</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value emerald">50+</div>
+      <div class="metric-label">ATS Integrations</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value violet">14</div>
+      <div class="metric-label">Competency Models</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DUAL PLATFORM ═══ -->
+<section class="section" id="platforms">
+  <div class="section-header">
+    <div class="section-tag blue">Two Sides. One Platform.</div>
+    <h2>Built for Agencies.<br>Built for Companies.</h2>
+    <p>Whether you're placing talent or developing it — SourcingNav gives you the engineering layer that turns gut calls into data-driven decisions.</p>
+  </div>
+
+  <div class="dual-container">
+    <!-- Agency Panel -->
+    <div class="platform-panel">
+      <div class="panel-header">
+        <div class="panel-icon blue">◎</div>
+        <div class="panel-sub">For Agencies</div>
+        <h3>Placement-Ops</h3>
+        <p>Pipeline velocity tracking, candidate scoring, market benchmarking, revenue forecasting, and client strategy — everything a recruiter needs to close faster with better data.</p>
+      </div>
+      <div class="panel-features">
+        <div class="feature-item"><span class="feature-dot blue"></span> 8D Candidate Scoring</div>
+        <div class="feature-item"><span class="feature-dot blue"></span> Pipeline Analytics</div>
+        <div class="feature-item"><span class="feature-dot blue"></span> Market Benchmarking</div>
+        <div class="feature-item"><span class="feature-dot blue"></span> Revenue Forecasting</div>
+        <div class="feature-item"><span class="feature-dot blue"></span> Batch Evaluation</div>
+        <div class="feature-item"><span class="feature-dot blue"></span> Client Strategy Reports</div>
+        <div class="feature-item"><span class="feature-dot blue"></span> Competitive Intel</div>
+        <div class="feature-item"><span class="feature-dot blue"></span> Retention Tracking</div>
+      </div>
+      <div class="panel-preview">
+        <div class="preview-topbar">
+          <span class="preview-dot r"></span>
+          <span class="preview-dot y"></span>
+          <span class="preview-dot g"></span>
+          <span class="preview-url">sourcingnav.com/agency</span>
+        </div>
+        <div class="preview-body">
+          <div class="preview-sidebar">
+            <div class="psb-item active-b"></div>
+            <div class="psb-item"></div>
+            <div class="psb-item"></div>
+            <div class="psb-item"></div>
+            <div class="psb-item"></div>
+          </div>
+          <div class="preview-content">
+            <div class="preview-kpi-row">
+              <div class="preview-kpi"></div>
+              <div class="preview-kpi"></div>
+              <div class="preview-kpi"></div>
+              <div class="preview-kpi"></div>
+            </div>
+            <div class="preview-chart">
+              <div class="bar" style="left:5%;height:40%;background:rgba(59,130,246,0.4)"></div>
+              <div class="bar" style="left:17%;height:65%;background:rgba(59,130,246,0.5)"></div>
+              <div class="bar" style="left:29%;height:50%;background:rgba(59,130,246,0.4)"></div>
+              <div class="bar" style="left:41%;height:80%;background:rgba(59,130,246,0.6)"></div>
+              <div class="bar" style="left:53%;height:55%;background:rgba(59,130,246,0.45)"></div>
+              <div class="bar" style="left:65%;height:90%;background:rgba(59,130,246,0.7)"></div>
+              <div class="bar" style="left:77%;height:70%;background:rgba(59,130,246,0.55)"></div>
+              <div class="bar" style="left:89%;height:85%;background:rgba(59,130,246,0.65)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <a href="ui/dashboard.html" class="panel-cta blue">Launch Agency Dashboard →</a>
+    </div>
+
+    <!-- Company Panel -->
+    <div class="platform-panel">
+      <div class="panel-header">
+        <div class="panel-icon green">◉</div>
+        <div class="panel-sub">For Companies</div>
+        <h3>People-Ops</h3>
+        <p>Employee lifecycle tracking, flight risk monitoring, competency mapping, workforce planning, and engagement analytics — the internal talent engine your HR team needs.</p>
+      </div>
+      <div class="panel-features">
+        <div class="feature-item"><span class="feature-dot green"></span> Team Health Monitoring</div>
+        <div class="feature-item"><span class="feature-dot green"></span> Flight Risk Alerts</div>
+        <div class="feature-item"><span class="feature-dot green"></span> Competency Heatmap</div>
+        <div class="feature-item"><span class="feature-dot green"></span> Workforce Planning</div>
+        <div class="feature-item"><span class="feature-dot green"></span> Onboarding Tracking</div>
+        <div class="feature-item"><span class="feature-dot green"></span> Engagement Analytics</div>
+        <div class="feature-item"><span class="feature-dot green"></span> Development Paths</div>
+        <div class="feature-item"><span class="feature-dot green"></span> Hiring Pipeline View</div>
+      </div>
+      <div class="panel-preview">
+        <div class="preview-topbar">
+          <span class="preview-dot r"></span>
+          <span class="preview-dot y"></span>
+          <span class="preview-dot g"></span>
+          <span class="preview-url">sourcingnav.com/company</span>
+        </div>
+        <div class="preview-body">
+          <div class="preview-sidebar">
+            <div class="psb-item active-g"></div>
+            <div class="psb-item"></div>
+            <div class="psb-item"></div>
+            <div class="psb-item"></div>
+            <div class="psb-item"></div>
+          </div>
+          <div class="preview-content">
+            <div class="preview-kpi-row">
+              <div class="preview-kpi"></div>
+              <div class="preview-kpi"></div>
+              <div class="preview-kpi"></div>
+              <div class="preview-kpi"></div>
+            </div>
+            <div class="preview-chart">
+              <div class="bar" style="left:5%;height:70%;background:rgba(52,211,153,0.5)"></div>
+              <div class="bar" style="left:17%;height:85%;background:rgba(52,211,153,0.6)"></div>
+              <div class="bar" style="left:29%;height:60%;background:rgba(52,211,153,0.45)"></div>
+              <div class="bar" style="left:41%;height:90%;background:rgba(52,211,153,0.7)"></div>
+              <div class="bar" style="left:53%;height:45%;background:rgba(52,211,153,0.4)"></div>
+              <div class="bar" style="left:65%;height:75%;background:rgba(52,211,153,0.55)"></div>
+              <div class="bar" style="left:77%;height:95%;background:rgba(52,211,153,0.75)"></div>
+              <div class="bar" style="left:89%;height:65%;background:rgba(52,211,153,0.5)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <a href="ui/people-ops.html" class="panel-cta green">Launch Company Dashboard →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section class="section" id="features">
+  <div class="section-header">
+    <div class="section-tag blue">Capabilities</div>
+    <h2>Everything You Need.<br>Nothing You Don't.</h2>
+    <p>16 operational modes. Taxonomy-driven skill matching. Competency frameworks. All running on real ATS data.</p>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-card-icon">◈</div>
+      <h4>8-Dimension Scoring</h4>
+      <p>Technical match, seniority fit, location, comp alignment, culture, gap analysis, presentation risk, and fill probability — all weighted and scored.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">◬</div>
+      <h4>Predictive Forecasting</h4>
+      <p>Hiring signal detection, expansion prediction, and fill probability modeling. Know who's hiring before they post the job.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">◧</div>
+      <h4>Market Benchmarking</h4>
+      <p>Comp hygiene analysis, posting quality audits, time-to-fill benchmarks, and talent flow mapping across industries.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">◐</div>
+      <h4>Competency Framework</h4>
+      <p>14 competencies across 4 categories. 5-level proficiency scales. Archetype-specific weighting for ICs vs managers.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">⧉</div>
+      <h4>Taxonomy Engine</h4>
+      <p>Skill adjacency relationships — exact, alias, adjacent, and parent matches. No more keyword-matching failures.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card-icon">◆</div>
+      <h4>Strategy Reports</h4>
+      <p>Client-facing talent strategy with org charts, hiring sequences, comp benchmarking, risk assessments, and fee projections.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ INTEGRATIONS ═══ -->
+<section class="section" id="integrations">
+  <div class="section-header">
+    <div class="section-tag green">Integrations</div>
+    <h2>Plugs Into Your Stack</h2>
+    <p>Direct API connections to major ATS/HRIS platforms, plus a universal adapter for 50+ systems via Merge.dev.</p>
+  </div>
+
+  <div class="integrations-row">
+    <div class="int-chip"><span class="int-dot"></span> Greenhouse</div>
+    <div class="int-chip"><span class="int-dot"></span> Lever</div>
+    <div class="int-chip"><span class="int-dot"></span> Ashby</div>
+    <div class="int-chip"><span class="int-dot"></span> Workday</div>
+    <div class="int-chip"><span class="int-dot"></span> iCIMS</div>
+    <div class="int-chip"><span class="int-dot"></span> BambooHR</div>
+    <div class="int-chip"><span class="int-dot"></span> Rippling</div>
+    <div class="int-chip"><span class="int-dot"></span> Merge.dev</div>
+    <div class="int-chip"><span class="int-dot"></span> Google Jobs</div>
+    <div class="int-chip"><span class="int-dot"></span> LinkedIn</div>
+    <div class="int-chip"><span class="int-dot"></span> Levels.fyi</div>
+    <div class="int-chip"><span class="int-dot"></span> Crunchbase</div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta-section">
+  <h2>Stop Guessing.<br>Start Engineering.</h2>
+  <p>Open source. Free forever. Built by recruiters who believe talent acquisition is a data problem.</p>
+  <div class="cta-buttons">
+    <a href="ui/dashboard.html" class="btn btn-primary">
+      <span class="btn-icon">◎</span> Agency Dashboard
+    </a>
+    <a href="ui/people-ops.html" class="btn btn-green">
+      <span class="btn-icon">◉</span> Company Dashboard
+    </a>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <div class="footer-brand">SOURCINGNAV</div>
+  <p>Talent Engineering Platform · Open Source · MIT License</p>
+  <div class="footer-links">
+    <a href="https://github.com/shotwellj/placement-ops" target="_blank">GitHub</a>
+    <a href="ui/dashboard.html">Agency</a>
+    <a href="ui/people-ops.html">Company</a>
+    <a href="https://github.com/shotwellj/placement-ops/blob/main/LICENSE" target="_blank">License</a>
+  </div>
+</footer>
+
+</body>
+</html>
