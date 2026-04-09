@@ -292,3 +292,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). The easiest ways to contribute:
 ## License
 
 MIT — see [LICENSE](LICENSE)
+
