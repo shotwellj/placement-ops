@@ -1,0 +1,1915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SourcingNav — The Recruiter's Knowledge Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Space+Mono:wght@400;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-hover: #1a1a26;
+  --border: #1e1e2e;
+  --border-hover: #2e2e44;
+  --text: #e4e4ef;
+  --text-dim: #8888a4;
+  --text-muted: #55556a;
+  --accent: #00e5a0;
+  --accent-dim: rgba(0,229,160,0.12);
+  --accent-glow: rgba(0,229,160,0.25);
+  --orange: #ff6b35;
+  --orange-dim: rgba(255,107,53,0.12);
+  --blue: #4d9fff;
+  --blue-dim: rgba(77,159,255,0.12);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --yellow: #fbbf24;
+  --yellow-dim: rgba(251,191,36,0.12);
+  --pink: #f472b6;
+  --pink-dim: rgba(244,114,182,0.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --mono: 'Space Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+  --display: 'Fraunces', serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Noise overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ---- NAV ---- */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-logo {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--accent);
+  text-decoration: none;
+  letter-spacing: -0.5px;
+}
+.nav-logo span { color: var(--text-dim); }
+.nav-links { display: flex; gap: 8px; }
+.nav-links a {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.nav-links a:hover { color: var(--text); background: var(--bg-card); }
+.nav-links a.active { color: var(--accent); background: var(--accent-dim); }
+
+/* Page nav (second bar) */
+.page-nav-link {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.page-nav-link:hover { color: var(--text); }
+.page-nav-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ---- HERO ---- */
+.hero {
+  padding: 180px 40px 80px;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,229,160,0.2);
+  padding: 6px 16px;
+  border-radius: 100px;
+  margin-bottom: 28px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.hero h1 {
+  font-family: var(--display);
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, var(--text) 0%, var(--text-dim) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero h1 em {
+  font-style: italic;
+  -webkit-text-fill-color: var(--accent);
+}
+.hero p {
+  font-size: 18px;
+  color: var(--text-dim);
+  max-width: 600px;
+  margin: 0 auto 36px;
+  line-height: 1.7;
+}
+.hero-search {
+  max-width: 520px;
+  margin: 0 auto;
+  position: relative;
+}
+.hero-search input {
+  width: 100%;
+  padding: 16px 24px 16px 48px;
+  font-family: var(--sans);
+  font-size: 15px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  color: var(--text);
+  outline: none;
+  transition: all 0.3s;
+}
+.hero-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.hero-search input::placeholder { color: var(--text-muted); }
+.hero-search svg {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+/* ---- SECTIONS ---- */
+.section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 80px 40px;
+}
+.section-header {
+  margin-bottom: 48px;
+}
+.section-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.section-header h2 {
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.section-header p {
+  color: var(--text-dim);
+  font-size: 16px;
+  max-width: 600px;
+}
+.section-divider {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 40px;
+}
+.section-divider hr {
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* ---- GRID ---- */
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  gap: 16px;
+}
+
+/* ---- CARDS ---- */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: all 0.25s;
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+.card:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);
+}
+.card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 18px;
+}
+.card h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.card p {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 16px;
+  color: var(--accent);
+  text-decoration: none;
+  transition: gap 0.2s;
+}
+.card-link:hover { gap: 10px; }
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.tag.orange { background: var(--orange-dim); color: var(--orange); }
+.tag.blue { background: var(--blue-dim); color: var(--blue); }
+.tag.purple { background: var(--purple-dim); color: var(--purple); }
+.tag.yellow { background: var(--yellow-dim); color: var(--yellow); }
+.tag.pink { background: var(--pink-dim); color: var(--pink); }
+
+/* ---- PROMPT CARDS ---- */
+.prompt-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: all 0.25s;
+}
+.prompt-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+}
+.prompt-header {
+  padding: 20px 24px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.prompt-header h3 { font-size: 15px; font-weight: 700; }
+.prompt-body {
+  padding: 0 24px 20px;
+}
+.prompt-code {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  position: relative;
+}
+.copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ---- RESOURCE TABLE ---- */
+.resource-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.resource-table th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.resource-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.resource-table tr:hover td { background: var(--bg-card); }
+.resource-table a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.resource-table a:hover { text-decoration: underline; }
+.resource-table .desc { color: var(--text-dim); font-size: 13px; }
+
+/* ---- TECH TREE ---- */
+.tech-domain {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.tech-domain-header {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.tech-domain-header:hover { background: var(--bg-card-hover); }
+.tech-domain-header h3 { font-size: 16px; font-weight: 700; flex: 1; }
+.tech-domain-header .chevron {
+  color: var(--text-muted);
+  transition: transform 0.3s;
+}
+.tech-domain.open .chevron { transform: rotate(180deg); }
+.tech-domain-body {
+  display: none;
+  padding: 0 24px 24px;
+}
+.tech-domain.open .tech-domain-body { display: block; }
+.tech-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(30,30,46,0.5);
+}
+.tech-item:last-child { border-bottom: none; }
+.tech-name {
+  font-weight: 700;
+  font-size: 14px;
+  min-width: 140px;
+}
+.tech-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+/* ---- CONTACT METHODS ---- */
+.method-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: all 0.25s;
+}
+.method-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+}
+.method-number {
+  font-family: var(--mono);
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--border);
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.method-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.method-card p { font-size: 14px; color: var(--text-dim); line-height: 1.6; }
+.method-card ul {
+  margin-top: 12px;
+  padding-left: 18px;
+}
+.method-card li {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.method-card li strong { color: var(--text); }
+
+/* ---- STATS BAR ---- */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 60px;
+}
+.stat-item {
+  text-align: center;
+  padding: 28px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.stat-number {
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.stat-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* ---- FOOTER ---- */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 48px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+footer .foot-left {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+footer .foot-right {
+  display: flex;
+  gap: 24px;
+}
+footer .foot-right a {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+footer .foot-right a:hover { color: var(--accent); }
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 768px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+  .page-nav { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .hero { padding: 160px 20px 60px; }
+  .section { padding: 60px 20px; }
+  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  footer { flex-direction: column; gap: 16px; text-align: center; }
+  .section-divider { padding: 0 20px; }
+}
+
+/* ---- TABS ---- */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+  overflow-x: auto;
+}
+.tab-btn {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  padding: 12px 20px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- SITE NAV (matches sourcingnav.com) -->
+<nav>
+  <a href="https://sourcingnav.com/" class="nav-logo">SOURCINGNAV<span style="color: var(--text-muted); font-weight: 400; margin-left: 8px; font-size: 12px;">Knowledge Hub</span></a>
+  <div class="nav-links">
+    <a href="https://sourcingnav.com/">Home</a>
+    <a href="https://sourcingnav.com/ui/dashboard.html">&#9678; Agency</a>
+    <a href="https://sourcingnav.com/ui/people-ops.html">&#9673; Company</a>
+    <a href="https://github.com/shotwellj/placement-ops" target="_blank">&#10697; GitHub</a>
+  </div>
+</nav>
+
+<!-- PAGE NAV (section jump links) -->
+<div style="position: fixed; top: 64px; left: 0; right: 0; z-index: 99; background: rgba(10,10,15,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 0 40px; overflow-x: auto;">
+  <div style="max-width: 1200px; margin: 0 auto; display: flex; gap: 4px;" class="page-nav">
+    <a href="#prompts" class="page-nav-link active">Prompts</a>
+    <a href="#boolean-gen" class="page-nav-link">Boolean Gen</a>
+    <a href="#tools" class="page-nav-link">Tools</a>
+    <a href="#resources" class="page-nav-link">Resources</a>
+    <a href="#contact-intel" class="page-nav-link">Contact Intel</a>
+    <a href="#automations" class="page-nav-link">Automations</a>
+    <a href="#build-ats" class="page-nav-link">Build Your ATS</a>
+    <a href="#tech" class="page-nav-link">Tech Guide</a>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">&#9889; Free forever &mdash; no login required</div>
+  <h1>The recruiter's<br><em>knowledge hub</em></h1>
+  <p>Prompts, tools, resources, and tech explainers built by a recruiter with 13+ years in the trenches. Everything you wish someone gave you on day one.</p>
+  <div class="hero-search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="searchInput" placeholder="Search prompts, tools, resources..." oninput="filterAll(this.value)">
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="section" style="padding-top: 0; padding-bottom: 40px;">
+  <div class="stats-bar">
+    <div class="stat-item"><div class="stat-number">50+</div><div class="stat-label">Recruiting Prompts</div></div>
+    <div class="stat-item"><div class="stat-number">40+</div><div class="stat-label">Free Tools & Resources</div></div>
+    <div class="stat-item"><div class="stat-number">6</div><div class="stat-label">Automation Blueprints</div></div>
+    <div class="stat-item"><div class="stat-number">12</div><div class="stat-label">Tech Domains Explained</div></div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SECTION 1: PROMPTS & TEMPLATES -->
+<!-- ============================================ -->
+<div class="section-divider"><hr></div>
+<div class="section" id="prompts">
+  <div class="section-header">
+    <div class="section-tag" style="color: var(--accent);">01 &mdash; Prompts &amp; Templates</div>
+    <h2>Copy. Paste. Source.</h2>
+    <p>Battle-tested prompts for AI-assisted sourcing, outreach, JD parsing, and Boolean building. Works with ChatGPT, Claude, Gemini, and Perplexity.</p>
+  </div>
+
+  <div class="tab-bar" id="promptTabs">
+    <button class="tab-btn active" onclick="switchTab('prompts', 'sourcing')">Sourcing</button>
+    <button class="tab-btn" onclick="switchTab('prompts', 'outreach')">Outreach</button>
+    <button class="tab-btn" onclick="switchTab('prompts', 'jd')">JD Parsing</button>
+    <button class="tab-btn" onclick="switchTab('prompts', 'boolean')">Boolean</button>
+    <button class="tab-btn" onclick="switchTab('prompts', 'screening')">Screening</button>
+    <button class="tab-btn" onclick="switchTab('prompts', 'market')">Market Intel</button>
+  </div>
+
+  <!-- Sourcing Prompts -->
+  <div class="tab-panel active" id="tab-sourcing">
+    <div class="grid-2 searchable">
+
+      <div class="prompt-card" data-search="sourcing talent mapping companies hiring engineers">
+        <div class="prompt-header">
+          <h3>Talent Mapping Prompt</h3>
+          <div class="card-tags"><span class="tag">sourcing</span><span class="tag blue">strategy</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">I'm sourcing for a [ROLE TITLE] at [COMPANY]. The ideal candidate has experience with [KEY SKILLS].
+
+List 15 companies where this talent typically works, organized by tier:
+- Tier 1: Direct competitors (same product/market)
+- Tier 2: Adjacent companies (similar tech stack)  
+- Tier 3: Surprising sources (non-obvious companies using this stack)
+
+For each company, name the team or org where this talent sits.<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="sourcing linkedin xray search github alternative channels">
+        <div class="prompt-header">
+          <h3>Multi-Channel Search Strategy</h3>
+          <div class="card-tags"><span class="tag">sourcing</span><span class="tag orange">advanced</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">I need to find [ROLE TITLE] candidates who have [KEY SKILLS]. LinkedIn Recruiter is saturated.
+
+Generate search strategies for these alternative channels:
+1. GitHub (repos, contributions, stars)
+2. Google X-ray for personal sites and portfolios
+3. Conference speaker lists and meetup organizers
+4. Stack Overflow and technical forums
+5. Academic papers (Google Scholar, Semantic Scholar)
+6. Patent databases
+
+For each channel, give me the exact search string or query I should use.<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="sourcing passive candidate persona ideal profile">
+        <div class="prompt-header">
+          <h3>Ideal Candidate Persona Builder</h3>
+          <div class="card-tags"><span class="tag">sourcing</span><span class="tag purple">persona</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Here is a job description:
+
+[PASTE JD]
+
+Build an ideal candidate persona:
+- Years of experience range
+- Most likely current titles (3-5 variations)
+- Companies they probably work at now
+- Technologies on their resume
+- Career path that led them here
+- What motivates them to move (pull factors)
+- What keeps them in their current role (retention risks)
+- LinkedIn headline patterns to search for
+- Keywords that appear on their GitHub/portfolio<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="sourcing diversity inclusive hidden talent pools underrepresented">
+        <div class="prompt-header">
+          <h3>Hidden Talent Pool Finder</h3>
+          <div class="card-tags"><span class="tag">sourcing</span><span class="tag yellow">diversity</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">I'm sourcing for [ROLE TITLE] and want to expand beyond the usual channels.
+
+Identify non-obvious talent pools:
+1. Professional communities & Slack groups for this skill set
+2. Bootcamps and reskilling programs producing this talent
+3. Open-source projects where contributors have this expertise
+4. Industry conferences where this talent speaks or attends
+5. Adjacent roles where people have transferable skills
+6. Geographic markets with untapped supply
+7. Nonprofit/academic orgs where this talent is underpaid
+
+For each, tell me specifically how to find and reach these people.<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Outreach Prompts -->
+  <div class="tab-panel" id="tab-outreach">
+    <div class="grid-2 searchable">
+
+      <div class="prompt-card" data-search="outreach cold email inmail personalized message recruiting">
+        <div class="prompt-header">
+          <h3>Personalized InMail Generator</h3>
+          <div class="card-tags"><span class="tag orange">outreach</span><span class="tag">email</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Write a cold outreach message for this candidate:
+
+Name: [NAME]
+Current role: [TITLE at COMPANY]
+Notable: [SOMETHING SPECIFIC - project, patent, talk, open source contribution]
+Role I'm pitching: [TITLE at CLIENT]
+Key selling points: [2-3 reasons this role is compelling]
+
+Rules:
+- Under 100 words
+- Lead with what impressed me about THEM (not the job)
+- No "exciting opportunity" or "I came across your profile"
+- End with a low-friction ask (15-min call, not a full interview)
+- Sound like a human, not a template<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="outreach follow up sequence cadence drip nurture">
+        <div class="prompt-header">
+          <h3>Follow-Up Sequence (5-touch)</h3>
+          <div class="card-tags"><span class="tag orange">outreach</span><span class="tag blue">sequence</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Create a 5-touch follow-up sequence for a candidate who hasn't responded to my initial outreach.
+
+Context:
+- Role: [TITLE at COMPANY]
+- Initial message sent: [DATE]
+- Candidate background: [BRIEF SUMMARY]
+
+Rules for each touch:
+1. Touch 2 (Day 3): Different angle, add new info
+2. Touch 3 (Day 7): Value-add (market insight, comp data)
+3. Touch 4 (Day 14): Social proof (similar placement story)
+4. Touch 5 (Day 21): Breakup email with door left open
+
+Each message under 75 words. Never repeat the same pitch. Never sound desperate.<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="outreach subject lines email open rate ab test">
+        <div class="prompt-header">
+          <h3>Subject Line Generator</h3>
+          <div class="card-tags"><span class="tag orange">outreach</span><span class="tag pink">conversion</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Generate 10 subject lines for a recruiting email to a [ROLE TITLE] at [CURRENT COMPANY].
+
+I'm pitching: [ROLE at CLIENT COMPANY]
+
+Rules:
+- Under 6 words each
+- No spam trigger words (opportunity, exciting, amazing)
+- Mix of approaches: curiosity, specificity, mutual connection, value-add
+- Include 2 that reference something specific about them
+- Include 2 that are intentionally casual/conversational
+- Rank them by expected open rate and explain why<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JD Parsing Prompts -->
+  <div class="tab-panel" id="tab-jd">
+    <div class="grid-2 searchable">
+
+      <div class="prompt-card" data-search="jd parsing job description requirements skills extract">
+        <div class="prompt-header">
+          <h3>JD Deconstructor</h3>
+          <div class="card-tags"><span class="tag purple">jd parsing</span><span class="tag">analysis</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Parse this job description and give me a structured breakdown:
+
+[PASTE FULL JD]
+
+Output:
+1. MUST-HAVE skills (true dealbreakers vs. wish list padding)
+2. NICE-TO-HAVE skills (won't reject without these)
+3. Hidden requirements (things implied but not stated)
+4. Red flags (unrealistic combos, title/comp mismatch)
+5. Seniority signals (IC vs. lead vs. manager)
+6. Comp estimate based on requirements + market
+7. Similar titles this person might use on LinkedIn
+8. Top 5 companies where this exact person works today<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="jd intake call hiring manager questions kickoff">
+        <div class="prompt-header">
+          <h3>Intake Call Question Generator</h3>
+          <div class="card-tags"><span class="tag purple">jd parsing</span><span class="tag yellow">intake</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">I have an intake call with a hiring manager for this role:
+
+[PASTE JD]
+
+Generate 15 intake questions organized by:
+- MUST-ASK (clarify ambiguity, validate true requirements)
+- DIFFERENTIATORS (what separates good from great)
+- PROCESS (timeline, interview stages, decision-makers)
+- COMP & SELL (budget flexibility, unique selling points)
+- RED FLAG DETECTORS (has this been open before? why did the last person leave?)
+
+For each question, tell me WHY I'm asking it and what answer to watch for.<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Boolean Prompts -->
+  <div class="tab-panel" id="tab-boolean">
+    <div class="grid-2 searchable">
+
+      <div class="prompt-card" data-search="boolean string linkedin recruiter search query and or not">
+        <div class="prompt-header">
+          <h3>Boolean String Builder</h3>
+          <div class="card-tags"><span class="tag blue">boolean</span><span class="tag">linkedin</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Build LinkedIn Boolean search strings for this role:
+
+Title: [ROLE TITLE]
+Key skills: [LIST SKILLS]
+Location: [CITY/REGION or REMOTE]
+Experience: [YEARS]
+
+Generate:
+1. A broad string (cast a wide net, 200+ results)
+2. A targeted string (narrow to best-fit, 30-50 results)
+3. A Google X-ray string (site:linkedin.com/in/)
+4. A GitHub X-ray string (site:github.com)
+5. Title variations I should also search
+
+For each string, explain the logic so I can modify it.<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="boolean xray google search alternative platform sourcing">
+        <div class="prompt-header">
+          <h3>X-Ray Search Generator</h3>
+          <div class="card-tags"><span class="tag blue">boolean</span><span class="tag orange">xray</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Generate Google X-ray searches for [ROLE TITLE] with [KEY SKILLS]:
+
+1. LinkedIn profiles: site:linkedin.com/in/
+2. GitHub profiles: site:github.com
+3. Personal websites/portfolios: -site:linkedin.com -site:github.com
+4. Conference talks: site:youtube.com OR site:slideshare.net
+5. Research papers: site:arxiv.org OR site:scholar.google.com
+6. Stack Overflow: site:stackoverflow.com/users/
+7. Twitter/X bios: site:twitter.com
+
+Include filetype searches for resumes:
+8. filetype:pdf [skills] resume
+9. filetype:docx [skills] resume<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Screening Prompts -->
+  <div class="tab-panel" id="tab-screening">
+    <div class="grid-2 searchable">
+
+      <div class="prompt-card" data-search="screening interview questions technical behavioral phone screen">
+        <div class="prompt-header">
+          <h3>Phone Screen Question Bank</h3>
+          <div class="card-tags"><span class="tag pink">screening</span><span class="tag">interview</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">I'm screening candidates for: [ROLE TITLE at COMPANY]
+
+Key requirements: [TOP 3-5 SKILLS]
+
+Generate a 20-minute phone screen:
+- 2 questions to verify technical depth (not trivia)
+- 2 questions to assess seniority/scope
+- 2 questions to gauge motivation and fit
+- 1 question to surface red flags
+- 1 question to assess comp expectations
+
+For each question:
+- Give me the question
+- What a STRONG answer sounds like
+- What a WEAK answer sounds like
+- Follow-up probes if I need to dig deeper<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="screening resume review evaluate candidate assessment">
+        <div class="prompt-header">
+          <h3>Resume Evaluator</h3>
+          <div class="card-tags"><span class="tag pink">screening</span><span class="tag purple">evaluation</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Evaluate this resume against this job description:
+
+[PASTE RESUME]
+
+[PASTE JD]
+
+Score on these dimensions (1-5 each):
+1. Technical skill match
+2. Seniority/scope alignment  
+3. Industry relevance
+4. Career trajectory (trending up?)
+5. Red flags (gaps, hopping, title inflation)
+
+Then give me:
+- Overall fit score (Submit / Maybe / Pass)
+- Top 3 strengths to highlight to the client
+- Top 3 risks or gaps to probe in screening
+- Suggested talking points for the candidate call<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Market Intel Prompts -->
+  <div class="tab-panel" id="tab-market">
+    <div class="grid-2 searchable">
+
+      <div class="prompt-card" data-search="market intel salary compensation benchmark range levels">
+        <div class="prompt-header">
+          <h3>Comp Benchmarking</h3>
+          <div class="card-tags"><span class="tag yellow">market intel</span><span class="tag">compensation</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Benchmark compensation for this role:
+
+Title: [ROLE TITLE]
+Level: [Junior/Mid/Senior/Staff/Principal]
+Location: [CITY or REMOTE]
+Industry: [INDUSTRY]
+Key skills: [TOP SKILLS]
+
+Provide:
+1. Base salary range (25th, 50th, 75th, 90th percentile)
+2. Total comp range (base + bonus + equity)
+3. How comp varies by company stage (startup vs. BigTech vs. mid-market)
+4. Skills that command a premium in this market
+5. Comp trends (up, flat, down) over the last 12 months
+6. Sources for this data (levels.fyi, Glassdoor, Blind, etc.)<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="prompt-card" data-search="market intel talent supply demand scarcity analysis market map">
+        <div class="prompt-header">
+          <h3>Talent Scarcity Analysis</h3>
+          <div class="card-tags"><span class="tag yellow">market intel</span><span class="tag orange">strategy</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code">Analyze talent supply/demand for: [ROLE TITLE with KEY SKILLS]
+
+Tell me:
+1. Estimated total addressable talent pool (US or global)
+2. How many are actively looking vs. passive
+3. Top 10 companies hoarding this talent
+4. Recent layoffs that freed up this talent
+5. Bootcamps/programs producing new supply
+6. Adjacent skill profiles that could fill this role
+7. Geographic hotspots for this talent
+8. Average time-to-fill for this role
+9. Is this market getting easier or harder to hire in?<button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ============================================ -->
+<!-- SECTION 1B: BOOLEAN GENERATOR -->
+<!-- ============================================ -->
+<div class="section-divider"><hr></div>
+<div class="section" id="boolean-gen">
+  <div class="section-header">
+    <div class="section-tag" style="color: var(--blue);">01B &mdash; Boolean Generator</div>
+    <h2>Build your Boolean strings</h2>
+    <p>Enter a role and skills, get ready-to-paste Boolean strings for LinkedIn, Google X-ray, and GitHub. Free basic version below.</p>
+  </div>
+
+  <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin-bottom: 24px;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+      <div>
+        <label style="font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 8px;">Role Title</label>
+        <input type="text" id="boolRole" placeholder="e.g. Senior Data Engineer" style="width: 100%; padding: 12px 16px; font-family: var(--sans); font-size: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); outline: none;">
+      </div>
+      <div>
+        <label style="font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 8px;">Location (optional)</label>
+        <input type="text" id="boolLocation" placeholder="e.g. San Francisco, Remote" style="width: 100%; padding: 12px 16px; font-family: var(--sans); font-size: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); outline: none;">
+      </div>
+    </div>
+    <div style="margin-bottom: 20px;">
+      <label style="font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 8px;">Required Skills (comma separated)</label>
+      <input type="text" id="boolSkills" placeholder="e.g. Python, Spark, Snowflake, Airflow" style="width: 100%; padding: 12px 16px; font-family: var(--sans); font-size: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); outline: none;">
+    </div>
+    <div style="margin-bottom: 20px;">
+      <label style="font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 8px;">Nice-to-Have Skills (comma separated, optional)</label>
+      <input type="text" id="boolNice" placeholder="e.g. Kafka, dbt, Terraform" style="width: 100%; padding: 12px 16px; font-family: var(--sans); font-size: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); outline: none;">
+    </div>
+    <button onclick="generateBoolean()" style="padding: 14px 32px; font-family: var(--sans); font-size: 15px; font-weight: 700; background: var(--accent); color: var(--bg); border: none; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.2s;">Generate Boolean Strings</button>
+    <span id="boolFreeLabel" style="margin-left: 16px; font-family: var(--mono); font-size: 11px; color: var(--text-muted);">FREE BASIC VERSION</span>
+  </div>
+
+  <!-- Output area -->
+  <div id="boolOutput" style="display: none;">
+    <div class="grid-2" style="margin-bottom: 24px;">
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <h3>LinkedIn Recruiter Boolean</h3>
+          <div class="card-tags"><span class="tag blue">linkedin</span><span class="tag">free</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code" id="boolLinkedIn" style="min-height: 60px;"><button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <h3>Google X-Ray (LinkedIn)</h3>
+          <div class="card-tags"><span class="tag orange">google</span><span class="tag">free</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code" id="boolXray" style="min-height: 60px;"><button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <h3>GitHub X-Ray</h3>
+          <div class="card-tags"><span class="tag purple">github</span><span class="tag">free</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code" id="boolGitHub" style="min-height: 60px;"><button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+      <div class="prompt-card">
+        <div class="prompt-header">
+          <h3>Title Variations</h3>
+          <div class="card-tags"><span class="tag yellow">titles</span><span class="tag">free</span></div>
+        </div>
+        <div class="prompt-body">
+          <div class="prompt-code" id="boolTitles" style="min-height: 60px;"><button class="copy-btn" onclick="copyPrompt(this)">Copy</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pro upsell -->
+  <div style="background: linear-gradient(135deg, rgba(0,229,160,0.06) 0%, rgba(77,159,255,0.06) 100%); border: 1px solid rgba(0,229,160,0.2); border-radius: var(--radius); padding: 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+    <div>
+      <h3 style="font-size: 18px; margin-bottom: 8px;">&#9889; SourcingNav Pro Boolean Generator</h3>
+      <p style="color: var(--text-dim); font-size: 14px; max-width: 500px;">Advanced mode: AI-powered skill adjacency mapping, exclusion strings, diversity sourcing filters, cross-platform strings for SeekOut/hireEZ, and saved search templates.</p>
+    </div>
+    <a href="#" style="padding: 12px 28px; font-family: var(--sans); font-size: 14px; font-weight: 700; background: var(--accent); color: var(--bg); border-radius: var(--radius-sm); text-decoration: none; white-space: nowrap;">Coming Soon</a>
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- SECTION 2: TOOLS & PLATFORMS -->
+<!-- ============================================ -->
+<div class="section-divider"><hr></div>
+<div class="section" id="tools">
+  <div class="section-header">
+    <div class="section-tag" style="color: var(--orange);">02 &mdash; Tools &amp; Platforms</div>
+    <h2>The recruiter's toolkit</h2>
+    <p>Every tool worth knowing about, organized by what it actually does for you. Free tools marked clearly.</p>
+  </div>
+
+  <div class="tab-bar" id="toolTabs">
+    <button class="tab-btn active" onclick="switchTab('tools', 'comp')">Comp & Levels</button>
+    <button class="tab-btn" onclick="switchTab('tools', 'sourcing-tools')">Sourcing</button>
+    <button class="tab-btn" onclick="switchTab('tools', 'market-tools')">Market Data</button>
+    <button class="tab-btn" onclick="switchTab('tools', 'productivity')">Productivity</button>
+    <button class="tab-btn" onclick="switchTab('tools', 'ai-tools')">AI Tools</button>
+  </div>
+
+  <!-- Comp & Levels -->
+  <div class="tab-panel active" id="tab-comp">
+    <table class="resource-table searchable">
+      <thead><tr><th>Tool</th><th>What It Does</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr data-search="levels.fyi compensation salary data big tech faang"><td><a href="https://levels.fyi" target="_blank">levels.fyi</a></td><td class="desc">Verified compensation data across Big Tech and startups. The gold standard for TC benchmarking. Has leveling comparisons across companies.</td><td><span class="tag">Free</span></td></tr>
+        <tr data-search="glassdoor salary reviews company ratings interview"><td><a href="https://glassdoor.com" target="_blank">Glassdoor</a></td><td class="desc">Salary data, company reviews, and interview question databases. Useful for candidate prep and comp validation.</td><td><span class="tag">Free</span></td></tr>
+        <tr data-search="blind anonymous tech workers compensation gossip verified"><td><a href="https://teamblind.com" target="_blank">Blind</a></td><td class="desc">Anonymous forum for tech workers. Raw, unfiltered comp data and company intel. Verified by work email. Goldmine for real comp numbers.</td><td><span class="tag">Free</span></td></tr>
+        <tr data-search="payscale compensation data salary survey hr"><td><a href="https://payscale.com" target="_blank">PayScale</a></td><td class="desc">Salary survey data with filters for role, location, experience, and industry. More traditional/enterprise-focused than levels.fyi.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="salary.com compensation ranges job descriptions hr"><td><a href="https://salary.com" target="_blank">Salary.com</a></td><td class="desc">Compensation data with detailed breakdowns. Popular with HR teams for building comp bands and salary ranges.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="opencomp compensation benchmarking startup equity"><td><a href="https://opencomp.com" target="_blank">OpenComp</a></td><td class="desc">Compensation benchmarking for startups and growth-stage companies. Useful when levels.fyi doesn't cover the company.</td><td><span class="tag purple">Paid</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Sourcing Tools -->
+  <div class="tab-panel" id="tab-sourcing-tools">
+    <table class="resource-table searchable">
+      <thead><tr><th>Tool</th><th>What It Does</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr data-search="linkedin recruiter sourcing search inmail talent"><td><a href="https://linkedin.com/talent" target="_blank">LinkedIn Recruiter</a></td><td class="desc">The default sourcing platform. Boolean search, InMail, pipeline management. Expensive but unavoidable for most desks.</td><td><span class="tag purple">Paid</span></td></tr>
+        <tr data-search="github sourcing developers engineers code contributions open source"><td><a href="https://github.com" target="_blank">GitHub</a></td><td class="desc">Find engineers by their actual code. Search repos, contributions, stars, and profile bios. Best signal for technical depth.</td><td><span class="tag">Free</span></td></tr>
+        <tr data-search="seekout sourcing diversity ai talent intelligence"><td><a href="https://seekout.com" target="_blank">SeekOut</a></td><td class="desc">AI-powered talent search with diversity filters, GitHub/patent integration, and deep profile enrichment. Strong for technical sourcing.</td><td><span class="tag purple">Paid</span></td></tr>
+        <tr data-search="hireez sourcing aggregator ai search chrome extension"><td><a href="https://hireez.com" target="_blank">hireEZ</a></td><td class="desc">Aggregates profiles from 45+ platforms. AI-powered search, contact info finder, and outreach sequencing. Good LinkedIn alternative.</td><td><span class="tag purple">Paid</span></td></tr>
+        <tr data-search="entelo sourcing predictive analytics talent"><td><a href="https://entelo.com" target="_blank">Entelo</a></td><td class="desc">Predictive sourcing with "likely to move" scores. Good for identifying passive candidates who might be open to new roles.</td><td><span class="tag purple">Paid</span></td></tr>
+        <tr data-search="stackoverflow developers sourcing jobs talent community"><td><a href="https://stackoverflow.com" target="_blank">Stack Overflow</a></td><td class="desc">Find developers by expertise area, reputation score, and contribution history. Developer Profiles show skills and work history.</td><td><span class="tag">Free</span></td></tr>
+        <tr data-search="kaggle data science machine learning sourcing competitions"><td><a href="https://kaggle.com" target="_blank">Kaggle</a></td><td class="desc">Source data scientists and ML engineers by competition rankings, notebook contributions, and dataset work. Shows real skill, not just titles.</td><td><span class="tag">Free</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Market Data -->
+  <div class="tab-panel" id="tab-market-tools">
+    <table class="resource-table searchable">
+      <thead><tr><th>Tool</th><th>What It Does</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr data-search="layoffs.fyi tracker tech companies layoff data"><td><a href="https://layoffs.fyi" target="_blank">layoffs.fyi</a></td><td class="desc">Real-time tech layoff tracker. See who's cutting, how many, and which teams. Goldmine for sourcing freshly-available talent.</td><td><span class="tag">Free</span></td></tr>
+        <tr data-search="crunchbase funding startups venture capital series"><td><a href="https://crunchbase.com" target="_blank">Crunchbase</a></td><td class="desc">Funding data, company profiles, leadership changes. Use to identify companies about to scale (post-funding = hiring surge).</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="pitchbook vc funding deals private market data"><td><a href="https://pitchbook.com" target="_blank">PitchBook</a></td><td class="desc">Deep VC and PE deal data. Know which companies just raised and how much. Enterprise-grade Crunchbase alternative.</td><td><span class="tag purple">Paid</span></td></tr>
+        <tr data-search="builtwith technology stack lookup company tools"><td><a href="https://builtwith.com" target="_blank">BuiltWith</a></td><td class="desc">See what technologies a company's website uses. Useful for identifying tech stack alignment when sourcing or qualifying leads.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="linkedin talent insights market analytics demand supply"><td><a href="https://business.linkedin.com/talent-solutions/talent-insights" target="_blank">LinkedIn Talent Insights</a></td><td class="desc">Workforce analytics: talent supply/demand by geography, competitor hiring trends, and skill migration patterns.</td><td><span class="tag purple">Paid</span></td></tr>
+        <tr data-search="indeed hiring lab market trends job posting data"><td><a href="https://hiringlab.org" target="_blank">Indeed Hiring Lab</a></td><td class="desc">Free labor market research from Indeed's economists. Job posting trends, wage data, and sector analysis. Great for market reports.</td><td><span class="tag">Free</span></td></tr>
+        <tr data-search="hacker news who is hiring monthly thread startups"><td><a href="https://hn.algolia.com/?dateRange=pastMonth&page=0&prefix=true&query=who%20is%20hiring&sort=byDate&type=story" target="_blank">HN: Who is Hiring</a></td><td class="desc">Monthly Hacker News thread where companies post open roles. Unfiltered look at who's hiring in the startup/tech ecosystem.</td><td><span class="tag">Free</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Productivity -->
+  <div class="tab-panel" id="tab-productivity">
+    <table class="resource-table searchable">
+      <thead><tr><th>Tool</th><th>What It Does</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr data-search="loxo crm recruiting ats outreach automation"><td><a href="https://loxo.co" target="_blank">Loxo</a></td><td class="desc">All-in-one recruiting CRM + ATS + sourcing + outreach. Built for agency recruiters. Includes AI sourcing and automated sequences.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="gem crm recruiting outreach sequences analytics"><td><a href="https://gem.com" target="_blank">Gem</a></td><td class="desc">Recruiting CRM with email sequencing, pipeline analytics, and LinkedIn integration. Popular with in-house TA teams.</td><td><span class="tag purple">Paid</span></td></tr>
+        <tr data-search="calendly scheduling interview booking time"><td><a href="https://calendly.com" target="_blank">Calendly</a></td><td class="desc">Scheduling automation. Eliminate the back-and-forth on interview scheduling. Integrates with ATS platforms.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="notion workspace templates recruiting pipeline tracker"><td><a href="https://notion.so" target="_blank">Notion</a></td><td class="desc">Flexible workspace for pipeline tracking, candidate databases, client SOWs, and knowledge management. Highly customizable.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="loom video recording screen share candidate introduction"><td><a href="https://loom.com" target="_blank">Loom</a></td><td class="desc">Quick video recordings for candidate presentations, client updates, and interview debriefs. Async communication tool.</td><td><span class="tag orange">Freemium</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- AI Tools -->
+  <div class="tab-panel" id="tab-ai-tools">
+    <table class="resource-table searchable">
+      <thead><tr><th>Tool</th><th>What It Does</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr data-search="claude ai assistant anthropic recruiting writing analysis"><td><a href="https://claude.ai" target="_blank">Claude (Anthropic)</a></td><td class="desc">Best for long-form analysis, JD parsing, resume evaluation, and nuanced writing. Handles complex recruiting prompts with depth.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="chatgpt openai assistant writing coding analysis"><td><a href="https://chat.openai.com" target="_blank">ChatGPT (OpenAI)</a></td><td class="desc">Versatile AI assistant for outreach drafting, Boolean generation, market research, and general recruiting tasks.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="perplexity ai search engine research company intel"><td><a href="https://perplexity.ai" target="_blank">Perplexity</a></td><td class="desc">AI-powered search engine with citations. Excellent for real-time company research, market trends, and fact-checking.</td><td><span class="tag orange">Freemium</span></td></tr>
+        <tr data-search="claude code terminal development automation coding mcp"><td><a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank">Claude Code</a></td><td class="desc">Command-line AI for building recruiting tools, automating workflows, and running structured skill systems like Placement-Ops.</td><td><span class="tag orange">Freemium</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+
+<!-- ============================================ -->
+<!-- SECTION 3: RESOURCE DATA -->
+<!-- ============================================ -->
+<div class="section-divider"><hr></div>
+<div class="section" id="resources">
+  <div class="section-header">
+    <div class="section-tag" style="color: var(--blue);">03 &mdash; Essential Resources</div>
+    <h2>Bookmark these today</h2>
+    <p>The sites, databases, and references that every recruiter should have in their back pocket. No fluff.</p>
+  </div>
+
+  <div class="grid-3 searchable">
+
+    <div class="card" data-search="levels.fyi compensation salary leveling career ladder faang big tech">
+      <div class="card-icon" style="background: var(--accent-dim); color: var(--accent);">&#128176;</div>
+      <h3>levels.fyi</h3>
+      <p>Verified comp data with leveling comparisons across Big Tech. Use to validate offers, benchmark roles, and educate candidates on total comp.</p>
+      <a href="https://levels.fyi" target="_blank" class="card-link">Visit site &rarr;</a>
+    </div>
+
+    <div class="card" data-search="layoffs.fyi tech layoff tracker company workforce reduction">
+      <div class="card-icon" style="background: var(--orange-dim); color: var(--orange);">&#128200;</div>
+      <h3>layoffs.fyi</h3>
+      <p>Real-time tech layoff tracker. Source recently-displaced talent, identify companies in flux, and time your outreach to hiring managers post-reorg.</p>
+      <a href="https://layoffs.fyi" target="_blank" class="card-link">Visit site &rarr;</a>
+    </div>
+
+    <div class="card" data-search="h1b salary visa sponsor database employer data">
+      <div class="card-icon" style="background: var(--blue-dim); color: var(--blue);">&#127757;</div>
+      <h3>H1B Salary Database</h3>
+      <p>Search H-1B visa applications by company, job title, and location. Reveals exact salaries companies have paid for specific roles. Public record data.</p>
+      <a href="https://h1bdata.info" target="_blank" class="card-link">Visit site &rarr;</a>
+    </div>
+
+    <div class="card" data-search="sec edgar executive compensation proxy statement filing">
+      <div class="card-icon" style="background: var(--purple-dim); color: var(--purple);">&#128220;</div>
+      <h3>SEC EDGAR</h3>
+      <p>Public company filings including executive comp in proxy statements (DEF 14A). See exact VP/C-level packages for benchmarking senior searches.</p>
+      <a href="https://efts.sec.gov/LATEST/search-index?q=%22DEF+14A%22&dateRange=custom&startdt=2024-01-01&enddt=2026-12-31" target="_blank" class="card-link">Visit EDGAR &rarr;</a>
+    </div>
+
+    <div class="card" data-search="bls bureau labor statistics employment occupation wage data">
+      <div class="card-icon" style="background: var(--yellow-dim); color: var(--yellow);">&#128202;</div>
+      <h3>Bureau of Labor Statistics</h3>
+      <p>Federal employment and wage data by occupation and metro area. Use for market reports, talent scarcity analysis, and workforce planning deliverables.</p>
+      <a href="https://bls.gov/oes/" target="_blank" class="card-link">Visit site &rarr;</a>
+    </div>
+
+    <div class="card" data-search="greenhouse lever ashby ats applicant tracking job board api">
+      <div class="card-icon" style="background: var(--pink-dim); color: var(--pink);">&#128196;</div>
+      <h3>ATS Job Board Feeds</h3>
+      <p>Most ATS platforms expose public job feeds. Use Greenhouse (boards.greenhouse.io), Lever (jobs.lever.co), and Ashby (jobs.ashbyhq.com) to track open roles before they hit LinkedIn.</p>
+      <div class="card-tags"><span class="tag">greenhouse</span><span class="tag orange">lever</span><span class="tag blue">ashby</span></div>
+    </div>
+
+    <div class="card" data-search="arxiv research papers ai machine learning deep learning academic">
+      <div class="card-icon" style="background: var(--accent-dim); color: var(--accent);">&#128218;</div>
+      <h3>arXiv</h3>
+      <p>Preprint research papers. Source ML/AI researchers by their published work. Author profiles link to institutional affiliations. Use with Semantic Scholar for citation networks.</p>
+      <a href="https://arxiv.org" target="_blank" class="card-link">Visit site &rarr;</a>
+    </div>
+
+    <div class="card" data-search="wellfound angellist startup jobs equity compensation venture">
+      <div class="card-icon" style="background: var(--orange-dim); color: var(--orange);">&#127793;</div>
+      <h3>Wellfound (AngelList)</h3>
+      <p>Startup job board with transparent salary and equity ranges. See funding stage, team size, and investor backing. Good for startup comp benchmarking.</p>
+      <a href="https://wellfound.com" target="_blank" class="card-link">Visit site &rarr;</a>
+    </div>
+
+    <div class="card" data-search="github trending repositories stars developers open source projects">
+      <div class="card-icon" style="background: var(--blue-dim); color: var(--blue);">&#128187;</div>
+      <h3>GitHub Trending</h3>
+      <p>See what repos and developers are trending daily/weekly. Find engineers building hot tools before they become household names. Great for AI/ML sourcing.</p>
+      <a href="https://github.com/trending" target="_blank" class="card-link">Visit site &rarr;</a>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- SECTION 4: CONTACT FINDING -->
+<!-- ============================================ -->
+<div class="section-divider"><hr></div>
+<div class="section" id="contact-intel">
+  <div class="section-header">
+    <div class="section-tag" style="color: var(--pink);">04 &mdash; Contact Intelligence</div>
+    <h2>Find anyone's email</h2>
+    <p>Eight proven methods to find contact information for candidates and hiring managers. Ordered from easiest to most advanced.</p>
+  </div>
+
+  <div class="grid-2 searchable">
+
+    <div class="method-card" data-search="email pattern format guess company domain">
+      <div class="method-number">01</div>
+      <h3>Email Pattern Guessing</h3>
+      <p>Most companies use predictable email formats. Try these patterns against the company domain:</p>
+      <ul>
+        <li><strong>first.last</strong>@company.com (most common)</li>
+        <li><strong>firstlast</strong>@company.com</li>
+        <li><strong>flast</strong>@company.com</li>
+        <li><strong>first</strong>@company.com (startups)</li>
+        <li><strong>first_last</strong>@company.com</li>
+      </ul>
+      <p style="margin-top: 12px;">Verify with email validation tools before sending.</p>
+    </div>
+
+    <div class="method-card" data-search="hunter.io email finder domain search contact">
+      <div class="method-number">02</div>
+      <h3>Email Lookup Tools</h3>
+      <p>Dedicated tools that find and verify professional email addresses:</p>
+      <ul>
+        <li><strong>Hunter.io</strong> &mdash; Domain search + email verification (50 free/mo)</li>
+        <li><strong>RocketReach</strong> &mdash; Email + phone + social profiles</li>
+        <li><strong>Lusha</strong> &mdash; Chrome extension, good for LinkedIn enrichment</li>
+        <li><strong>Apollo.io</strong> &mdash; Free tier with email + phone + sequences</li>
+        <li><strong>ContactOut</strong> &mdash; Built specifically for recruiters on LinkedIn</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="google xray search email site company find">
+      <div class="method-number">03</div>
+      <h3>Google Search Tricks</h3>
+      <p>Use Google operators to find emails hiding in plain sight:</p>
+      <ul>
+        <li><strong>"first last" "@company.com"</strong> &mdash; Direct email search</li>
+        <li><strong>"first last" email contact</strong> &mdash; Personal sites</li>
+        <li><strong>site:github.com "first last" @</strong> &mdash; GitHub commit emails</li>
+        <li><strong>"first last" filetype:pdf resume</strong> &mdash; Resume with email</li>
+        <li><strong>site:twitter.com "first last" DM</strong> &mdash; Social contact</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="github commit email git log author developer">
+      <div class="method-number">04</div>
+      <h3>GitHub Commit Mining</h3>
+      <p>Every git commit contains an email address. If someone has public repos:</p>
+      <ul>
+        <li>Go to their repo &rarr; click any commit</li>
+        <li>Add <strong>.patch</strong> to the commit URL</li>
+        <li>The email appears in the "From:" header</li>
+        <li>Or use: <strong>github.com/[user].keys</strong> for SSH keys</li>
+        <li>Works even if they hide their email in profile settings</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="conference speaker talk presenter email bio event">
+      <div class="method-number">05</div>
+      <h3>Conference & Event Bios</h3>
+      <p>Speakers at tech conferences often list contact info in their bios:</p>
+      <ul>
+        <li>Search conference speaker pages for the person's name</li>
+        <li>Check YouTube video descriptions for talk recordings</li>
+        <li>SlideShare/SpeakerDeck profiles often have emails</li>
+        <li>Meetup.com organizer profiles are public</li>
+        <li>Academic conference proceedings list author emails</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="personal website blog portfolio domain whois">
+      <div class="method-number">06</div>
+      <h3>Personal Sites & Blogs</h3>
+      <p>Many engineers have personal websites with contact info:</p>
+      <ul>
+        <li>Check their LinkedIn for website links</li>
+        <li>Search <strong>"first last" site:dev.to OR site:medium.com</strong></li>
+        <li>Look for "about" or "contact" pages on personal domains</li>
+        <li>WHOIS lookup on personal domains (sometimes has email)</li>
+        <li>Substack newsletters list subscriber-reachable emails</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="patent database inventor email corporate address">
+      <div class="method-number">07</div>
+      <h3>Patent & Paper Databases</h3>
+      <p>For senior researchers and inventors:</p>
+      <ul>
+        <li><strong>Google Patents</strong> &mdash; Inventor names link to corporate affiliations</li>
+        <li><strong>Google Scholar</strong> &mdash; Author profiles often have institutional email</li>
+        <li><strong>Semantic Scholar</strong> &mdash; AI research papers with author contacts</li>
+        <li><strong>DBLP</strong> &mdash; Computer science bibliography with author pages</li>
+        <li>Research lab pages at universities list faculty emails publicly</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="social media dm twitter linkedin direct message warm">
+      <div class="method-number">08</div>
+      <h3>Warm Channels & Social DMs</h3>
+      <p>When email fails, go where they actually respond:</p>
+      <ul>
+        <li><strong>Twitter/X DMs</strong> &mdash; Many engineers have open DMs</li>
+        <li><strong>Discord servers</strong> &mdash; Tech communities have DM access</li>
+        <li><strong>Slack communities</strong> &mdash; Industry-specific groups</li>
+        <li><strong>Reddit</strong> &mdash; Chat feature on relevant subreddits</li>
+        <li><strong>Mutual connections</strong> &mdash; Ask for a warm intro (highest response rate)</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+
+
+<!-- ============================================ -->
+<!-- SECTION 5: WORKFLOW AUTOMATIONS -->
+<!-- ============================================ -->
+<div class="section-divider"><hr></div>
+<div class="section" id="automations">
+  <div class="section-header">
+    <div class="section-tag" style="color: var(--yellow);">05 &mdash; Workflow Automations</div>
+    <h2>Automate your desk</h2>
+    <p>Use no-code automation platforms to eliminate repetitive recruiting tasks. These three tools connect your ATS, email, LinkedIn, and CRM without writing a single line of code.</p>
+  </div>
+
+  <div class="grid-3 searchable" style="margin-bottom: 40px;">
+    <div class="card" data-search="n8n automation workflow self-hosted open source integration">
+      <div class="card-icon" style="background: var(--orange-dim); color: var(--orange);">&#9881;&#65039;</div>
+      <h3>n8n</h3>
+      <p>Open-source, self-hosted workflow automation. Full control over your data. 400+ integrations. The power user's choice. Can run on your own server so candidate data never leaves your infrastructure.</p>
+      <div class="card-tags"><span class="tag">self-hosted</span><span class="tag orange">open source</span><span class="tag blue">400+ nodes</span></div>
+      <a href="https://n8n.io" target="_blank" class="card-link">Visit n8n &rarr;</a>
+    </div>
+    <div class="card" data-search="make integromat automation workflow visual builder scenarios">
+      <div class="card-icon" style="background: var(--purple-dim); color: var(--purple);">&#128302;</div>
+      <h3>Make (Integromat)</h3>
+      <p>Visual workflow builder with the best UI of the three. Powerful data transformation. Great for complex multi-step automations that need conditional logic and data mapping.</p>
+      <div class="card-tags"><span class="tag purple">visual builder</span><span class="tag">cloud</span><span class="tag yellow">complex logic</span></div>
+      <a href="https://make.com" target="_blank" class="card-link">Visit Make &rarr;</a>
+    </div>
+    <div class="card" data-search="zapier automation workflow simple integration zap trigger action">
+      <div class="card-icon" style="background: var(--accent-dim); color: var(--accent);">&#9889;</div>
+      <h3>Zapier</h3>
+      <p>The simplest option. Best app marketplace (6,000+ integrations). If/then logic is straightforward. Best for recruiters who want quick wins without a learning curve.</p>
+      <div class="card-tags"><span class="tag">easiest</span><span class="tag orange">6000+ apps</span><span class="tag pink">no learning curve</span></div>
+      <a href="https://zapier.com" target="_blank" class="card-link">Visit Zapier &rarr;</a>
+    </div>
+  </div>
+
+  <h3 style="font-size: 20px; font-family: var(--display); margin-bottom: 24px;">Recruiting Automations You Can Build Today</h3>
+
+  <div class="grid-2 searchable">
+
+    <div class="method-card" data-search="automation new job alert notification career page scrape monitor">
+      <div class="method-number" style="color: var(--accent);">01</div>
+      <h3>New Job Alert Pipeline</h3>
+      <p>Automatically monitor company career pages and get notified when new roles matching your niche appear.</p>
+      <ul>
+        <li><strong>Trigger:</strong> RSS feed or scheduled web scrape of career pages</li>
+        <li><strong>Filter:</strong> Match keywords (Python, ML, Data Engineer)</li>
+        <li><strong>Action:</strong> Send Slack/email alert with role details</li>
+        <li><strong>Bonus:</strong> Auto-add to your pipeline tracker spreadsheet</li>
+      </ul>
+      <div class="card-tags" style="margin-top: 14px;"><span class="tag">n8n</span><span class="tag orange">make</span><span class="tag blue">zapier</span></div>
+    </div>
+
+    <div class="method-card" data-search="automation candidate intake form airtable google sheets crm pipeline">
+      <div class="method-number" style="color: var(--orange);">02</div>
+      <h3>Candidate Intake Automation</h3>
+      <p>When a candidate fills out your intake form, automatically create records and trigger follow-ups.</p>
+      <ul>
+        <li><strong>Trigger:</strong> Typeform/Google Form submission</li>
+        <li><strong>Actions:</strong> Create Airtable record, send welcome email, add to drip sequence</li>
+        <li><strong>Enrich:</strong> Auto-lookup LinkedIn profile via API</li>
+        <li><strong>Notify:</strong> Slack alert to you with candidate summary</li>
+      </ul>
+      <div class="card-tags" style="margin-top: 14px;"><span class="tag">n8n</span><span class="tag orange">make</span><span class="tag blue">zapier</span></div>
+    </div>
+
+    <div class="method-card" data-search="automation follow up sequence email reminder cadence outreach drip">
+      <div class="method-number" style="color: var(--blue);">03</div>
+      <h3>Follow-Up Cadence Engine</h3>
+      <p>Never miss a follow-up. Automated reminders and sequences based on candidate status changes.</p>
+      <ul>
+        <li><strong>Trigger:</strong> Status change in your pipeline tracker</li>
+        <li><strong>Day 3:</strong> Auto-send follow-up email if no response</li>
+        <li><strong>Day 7:</strong> Slack reminder to try a different channel</li>
+        <li><strong>Day 14:</strong> Auto-send breakup email, mark as cold</li>
+      </ul>
+      <div class="card-tags" style="margin-top: 14px;"><span class="tag">n8n</span><span class="tag orange">make</span><span class="tag blue">zapier</span></div>
+    </div>
+
+    <div class="method-card" data-search="automation interview scheduling calendar booking confirmation">
+      <div class="method-number" style="color: var(--purple);">04</div>
+      <h3>Interview Scheduling Flow</h3>
+      <p>Candidate confirms interest, automatically send Calendly link, then sync the booking to your pipeline.</p>
+      <ul>
+        <li><strong>Trigger:</strong> Candidate replies "interested" (email parsing)</li>
+        <li><strong>Action:</strong> Send Calendly link via email</li>
+        <li><strong>On booking:</strong> Update pipeline status, send prep materials</li>
+        <li><strong>Post-interview:</strong> Auto-send feedback form to interviewer</li>
+      </ul>
+      <div class="card-tags" style="margin-top: 14px;"><span class="tag">n8n</span><span class="tag orange">make</span><span class="tag blue">zapier</span></div>
+    </div>
+
+    <div class="method-card" data-search="automation reporting weekly metrics dashboard kpi placement">
+      <div class="method-number" style="color: var(--yellow);">05</div>
+      <h3>Weekly Metrics Report</h3>
+      <p>Automatically compile your recruiting metrics every Friday and send a formatted summary.</p>
+      <ul>
+        <li><strong>Trigger:</strong> Scheduled (every Friday at 5pm)</li>
+        <li><strong>Pull:</strong> Pipeline data from Airtable/Sheets</li>
+        <li><strong>Calculate:</strong> Submissions, interviews, offers, placements this week</li>
+        <li><strong>Deliver:</strong> Formatted email or Slack message with trends</li>
+      </ul>
+      <div class="card-tags" style="margin-top: 14px;"><span class="tag">n8n</span><span class="tag orange">make</span><span class="tag blue">zapier</span></div>
+    </div>
+
+    <div class="method-card" data-search="automation layoff monitoring alert hiring signal talent pool">
+      <div class="method-number" style="color: var(--pink);">06</div>
+      <h3>Layoff Signal Monitor</h3>
+      <p>Get alerted when companies in your niche announce layoffs. Fresh talent pool + potential client opportunities.</p>
+      <ul>
+        <li><strong>Trigger:</strong> RSS feed from layoffs.fyi or news alerts</li>
+        <li><strong>Filter:</strong> Match your target companies or industries</li>
+        <li><strong>Action 1:</strong> Alert you to source displaced talent</li>
+        <li><strong>Action 2:</strong> Add the company to your BD outreach list</li>
+      </ul>
+      <div class="card-tags" style="margin-top: 14px;"><span class="tag">n8n</span><span class="tag orange">make</span></div>
+    </div>
+
+  </div>
+
+  <!-- Platform comparison table -->
+  <h3 style="font-size: 20px; font-family: var(--display); margin: 48px 0 24px;">Which platform should you pick?</h3>
+  <table class="resource-table">
+    <thead><tr><th>Factor</th><th>n8n</th><th>Make</th><th>Zapier</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Ease of use</strong></td><td class="desc">Moderate</td><td class="desc">Easy</td><td class="desc">Easiest</td></tr>
+      <tr><td><strong>Data privacy</strong></td><td class="desc" style="color: var(--accent);">Best (self-host)</td><td class="desc">Cloud only</td><td class="desc">Cloud only</td></tr>
+      <tr><td><strong>Cost (starter)</strong></td><td class="desc">Free (self-hosted)</td><td class="desc">Free tier</td><td class="desc">Free tier</td></tr>
+      <tr><td><strong>Complex logic</strong></td><td class="desc">Excellent</td><td class="desc">Excellent</td><td class="desc">Basic</td></tr>
+      <tr><td><strong>Integrations</strong></td><td class="desc">400+</td><td class="desc">1,500+</td><td class="desc">6,000+</td></tr>
+      <tr><td><strong>Best for</strong></td><td class="desc">Privacy-first teams, technical users</td><td class="desc">Power users wanting visual building</td><td class="desc">Quick wins, non-technical users</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ============================================ -->
+<!-- SECTION 6: BUILD YOUR OWN ATS -->
+<!-- ============================================ -->
+<div class="section-divider"><hr></div>
+<div class="section" id="build-ats">
+  <div class="section-header">
+    <div class="section-tag" style="color: var(--accent);">06 &mdash; Build Your Own ATS</div>
+    <h2>Your desk, your system</h2>
+    <p>Use Claude + workflow automation + AIR Blackbox to build a recruiting system that you own, with zero data leakage. No $500/month ATS subscription required.</p>
+  </div>
+
+  <!-- Architecture diagram -->
+  <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 40px; margin-bottom: 40px; text-align: center;">
+    <h3 style="font-family: var(--mono); font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 24px;">Architecture: Recruiter-Owned ATS Stack</h3>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; font-family: var(--mono); font-size: 13px;">
+      <div style="background: var(--accent-dim); border: 1px solid rgba(0,229,160,0.3); padding: 14px 20px; border-radius: var(--radius-sm); color: var(--accent);">Claude AI<br><span style="font-size: 11px; color: var(--text-muted);">JD parsing, scoring,<br>outreach drafting</span></div>
+      <div style="color: var(--text-muted);">&#8594;</div>
+      <div style="background: var(--orange-dim); border: 1px solid rgba(255,107,53,0.3); padding: 14px 20px; border-radius: var(--radius-sm); color: var(--orange);">n8n / Make / Zapier<br><span style="font-size: 11px; color: var(--text-muted);">Workflow automation<br>& integrations</span></div>
+      <div style="color: var(--text-muted);">&#8594;</div>
+      <div style="background: var(--blue-dim); border: 1px solid rgba(77,159,255,0.3); padding: 14px 20px; border-radius: var(--radius-sm); color: var(--blue);">Airtable / Sheets<br><span style="font-size: 11px; color: var(--text-muted);">Pipeline tracker<br>& candidate DB</span></div>
+      <div style="color: var(--text-muted);">&#8594;</div>
+      <div style="background: var(--purple-dim); border: 1px solid rgba(167,139,250,0.3); padding: 14px 20px; border-radius: var(--radius-sm); color: var(--purple);">Email / Slack<br><span style="font-size: 11px; color: var(--text-muted);">Outreach &<br>notifications</span></div>
+    </div>
+    <div style="margin-top: 16px; display: flex; justify-content: center;">
+      <div style="color: var(--text-muted); font-family: var(--mono); font-size: 12px;">&#8595;</div>
+    </div>
+    <div style="display: inline-flex; margin-top: 8px; background: linear-gradient(135deg, rgba(255,107,53,0.1), rgba(0,229,160,0.1)); border: 1px solid rgba(255,107,53,0.3); padding: 14px 28px; border-radius: var(--radius-sm);">
+      <span style="color: var(--orange); font-family: var(--mono); font-size: 13px; font-weight: 700;">&#128737; AIR Blackbox</span>
+      <span style="color: var(--text-dim); font-family: var(--mono); font-size: 12px; margin-left: 12px;">Data leakage prevention &bull; Compliance scanning &bull; Audit trail</span>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="grid-2 searchable">
+
+    <div class="method-card" data-search="build ats step 1 pipeline tracker airtable google sheets database">
+      <div class="method-number" style="color: var(--accent);">01</div>
+      <h3>Set Up Your Pipeline Database</h3>
+      <p>Your ATS starts with a structured database. Use Airtable (free) or Google Sheets as your candidate and requisition tracker.</p>
+      <ul>
+        <li><strong>Candidates table:</strong> Name, skills, status, source, notes, comp</li>
+        <li><strong>Requisitions table:</strong> Company, role, JD, priority, submissions</li>
+        <li><strong>Submissions table:</strong> Links candidates to reqs with status</li>
+        <li><strong>Activity log:</strong> Every touchpoint, timestamped</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="build ats step 2 claude ai jd parsing resume scoring evaluation">
+      <div class="method-number" style="color: var(--blue);">02</div>
+      <h3>Add AI-Powered Scoring with Claude</h3>
+      <p>Use Claude to parse JDs, score candidates, and generate outreach. Feed JDs and resumes in, get structured evaluations out.</p>
+      <ul>
+        <li><strong>JD Parser:</strong> Extract must-haves, nice-to-haves, hidden requirements</li>
+        <li><strong>Resume Scorer:</strong> Match candidate skills against parsed JD</li>
+        <li><strong>Outreach Writer:</strong> Generate personalized messages per candidate</li>
+        <li><strong>Interview Prep:</strong> Create prep docs for submitted candidates</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="build ats step 3 workflow automation connect integrate n8n make zapier">
+      <div class="method-number" style="color: var(--orange);">03</div>
+      <h3>Wire Up Automation</h3>
+      <p>Connect everything with n8n, Make, or Zapier so data flows automatically between your tools.</p>
+      <ul>
+        <li><strong>New req added:</strong> Auto-generate sourcing strategy via Claude API</li>
+        <li><strong>Candidate submitted:</strong> Auto-update pipeline, notify client</li>
+        <li><strong>No response in 3 days:</strong> Auto-trigger follow-up sequence</li>
+        <li><strong>Placement made:</strong> Auto-create invoice, start retention tracker</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="build ats step 4 air blackbox data leakage compliance privacy security audit">
+      <div class="method-number" style="color: var(--orange); background: linear-gradient(135deg, rgba(255,107,53,0.05), rgba(0,229,160,0.05));">04</div>
+      <h3>Lock Down Data with AIR Blackbox</h3>
+      <p>Candidate data is sensitive. AIR Blackbox ensures your AI workflows don't leak PII, violate compliance, or create audit gaps.</p>
+      <ul>
+        <li><strong>Data leakage scanning:</strong> Detect if candidate PII is being sent to unauthorized endpoints</li>
+        <li><strong>Compliance checks:</strong> Ensure your AI scoring doesn't create bias or discrimination risk</li>
+        <li><strong>Audit trail:</strong> Tamper-evident logs of every AI decision for EEOC/OFCCP defensibility</li>
+        <li><strong>Self-hosted option:</strong> Run n8n + AIR Blackbox locally so data never leaves your machine</li>
+      </ul>
+      <a href="https://github.com/air-blackbox" target="_blank" class="card-link" style="margin-top: 12px;">Learn about AIR Blackbox &rarr;</a>
+    </div>
+
+    <div class="method-card" data-search="build ats step 5 reporting analytics metrics conversion funnel">
+      <div class="method-number" style="color: var(--purple);">05</div>
+      <h3>Build Your Dashboard</h3>
+      <p>Pull metrics from your pipeline database into a live dashboard. Know your numbers without manual counting.</p>
+      <ul>
+        <li><strong>Funnel metrics:</strong> Sourced &rarr; Submitted &rarr; Interview &rarr; Offer &rarr; Placed</li>
+        <li><strong>Time tracking:</strong> Average time-to-fill by client and role type</li>
+        <li><strong>Revenue:</strong> Fees earned, pipeline value, close rate</li>
+        <li><strong>Source quality:</strong> Which channels produce the most placements</li>
+      </ul>
+    </div>
+
+    <div class="method-card" data-search="build ats step 6 total cost comparison pricing save money diy vs bought">
+      <div class="method-number" style="color: var(--yellow);">06</div>
+      <h3>Cost Comparison</h3>
+      <p>Why build your own? Because traditional ATS platforms charge $200-$500/month for features you can replicate for nearly free.</p>
+      <ul>
+        <li><strong>Bullhorn/JobAdder:</strong> $200-$500/month</li>
+        <li><strong>Your stack:</strong> Airtable (free) + n8n (free, self-hosted) + Claude API (~$20/mo) = <strong style="color: var(--accent);">under $25/month</strong></li>
+        <li><strong>Bonus:</strong> You own your data. You control the workflow. No vendor lock-in.</li>
+        <li><strong>With AIR Blackbox:</strong> Add compliance and data protection at no extra cost (open source)</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- CTA -->
+  <div style="background: linear-gradient(135deg, rgba(0,229,160,0.08) 0%, rgba(167,139,250,0.08) 100%); border: 1px solid rgba(0,229,160,0.2); border-radius: var(--radius); padding: 36px; margin-top: 40px; text-align: center;">
+    <h3 style="font-size: 22px; font-family: var(--display); margin-bottom: 12px;">Want the full blueprint?</h3>
+    <p style="color: var(--text-dim); font-size: 15px; max-width: 500px; margin: 0 auto 24px;">Step-by-step video walkthrough of building your own ATS with Claude + n8n + AIR Blackbox. From zero to a working system in one afternoon.</p>
+    <a href="#" style="display: inline-block; padding: 14px 32px; font-family: var(--sans); font-size: 15px; font-weight: 700; background: var(--accent); color: var(--bg); border-radius: var(--radius-sm); text-decoration: none;">Coming Soon</a>
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- SECTION 7: TECH GUIDE -->
+<!-- ============================================ -->
+<div class="section-divider"><hr></div>
+<div class="section" id="tech">
+  <div class="section-header">
+    <div class="section-tag" style="color: var(--purple);">07 &mdash; Technology Guide</div>
+    <h2>Speak the language</h2>
+    <p>You don't need to code. You do need to know what these technologies are, why they matter, and how they relate to each other. This is your cheat sheet.</p>
+  </div>
+
+  <div class="searchable">
+
+    <div class="tech-domain open" data-search="python programming language data science machine learning backend scripting">
+      <div class="tech-domain-header" onclick="this.parentElement.classList.toggle('open')">
+        <span style="font-size: 24px;">&#128013;</span>
+        <h3>Programming Languages</h3>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="tech-domain-body">
+        <div class="tech-item"><div class="tech-name">Python</div><div class="tech-desc">The dominant language for data science, ML, AI, and automation. If you're filling any data/ML role, Python is almost always required. Think of it as the English of programming for data work.</div></div>
+        <div class="tech-item"><div class="tech-name">SQL</div><div class="tech-desc">The language for querying databases. Every data role uses SQL. It's not a programming language in the traditional sense. It's how you ask databases questions and get answers back.</div></div>
+        <div class="tech-item"><div class="tech-name">R</div><div class="tech-desc">Statistical programming language popular in academia, biotech, and traditional analytics. Being replaced by Python in most tech companies, but still dominant in pharma and academic research.</div></div>
+        <div class="tech-item"><div class="tech-name">Java</div><div class="tech-desc">Enterprise workhorse. Big banks, large companies, Android apps. Verbose but reliable. If a candidate has Java, they can likely pick up other languages. Strong signal for backend engineering roles.</div></div>
+        <div class="tech-item"><div class="tech-name">Scala</div><div class="tech-desc">Runs on the Java platform but more concise. Popular in data engineering because Apache Spark (the big data processing engine) was written in Scala. Scala + Spark is a classic data engineering combo.</div></div>
+        <div class="tech-item"><div class="tech-name">Go (Golang)</div><div class="tech-desc">Built by Google. Fast, simple, great for infrastructure and backend services. Popular at companies building cloud tools, DevOps platforms, and high-performance systems.</div></div>
+        <div class="tech-item"><div class="tech-name">Rust</div><div class="tech-desc">The "hot" systems language. Memory-safe without garbage collection. Growing fast in infrastructure, WebAssembly, and performance-critical applications. Rust engineers are scarce and expensive.</div></div>
+        <div class="tech-item"><div class="tech-name">TypeScript</div><div class="tech-desc">JavaScript with type safety. Standard for modern frontend and full-stack development. If a JD says "React + TypeScript," they want a frontend or full-stack engineer.</div></div>
+      </div>
+    </div>
+
+    <div class="tech-domain" data-search="pytorch tensorflow machine learning deep learning ai framework model training">
+      <div class="tech-domain-header" onclick="this.parentElement.classList.toggle('open')">
+        <span style="font-size: 24px;">&#129302;</span>
+        <h3>ML & AI Frameworks</h3>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="tech-domain-body">
+        <div class="tech-item"><div class="tech-name">PyTorch</div><div class="tech-desc">The leading ML framework. Built by Meta's AI Research lab. Dominates in research and increasingly in production. If a candidate knows PyTorch, they do real ML work, not just calling APIs.</div></div>
+        <div class="tech-item"><div class="tech-name">TensorFlow</div><div class="tech-desc">Google's ML framework. Was #1, now #2 behind PyTorch. Still huge in production deployments, especially at Google-ecosystem companies. TensorFlow experience is adjacent to PyTorch.</div></div>
+        <div class="tech-item"><div class="tech-name">JAX</div><div class="tech-desc">Google's newer ML framework. Faster and more flexible than TensorFlow. Used by cutting-edge research teams (Google DeepMind, Anthropic). JAX on a resume signals advanced ML work.</div></div>
+        <div class="tech-item"><div class="tech-name">scikit-learn</div><div class="tech-desc">The standard library for "classical" ML (not deep learning). Random forests, SVMs, clustering. Often the first ML tool people learn. Good for data scientists doing tabular data work.</div></div>
+        <div class="tech-item"><div class="tech-name">Hugging Face</div><div class="tech-desc">The GitHub of ML models. Hosts pre-trained models and the Transformers library. If someone uses Hugging Face, they work with large language models, NLP, or computer vision.</div></div>
+        <div class="tech-item"><div class="tech-name">XGBoost / LightGBM</div><div class="tech-desc">Gradient boosting libraries. The go-to for structured/tabular data problems (fraud detection, recommendations, pricing). Wins most Kaggle competitions on tabular data.</div></div>
+      </div>
+    </div>
+
+    <div class="tech-domain" data-search="llm genai langchain rag fine-tuning agents vector database embeddings openai anthropic">
+      <div class="tech-domain-header" onclick="this.parentElement.classList.toggle('open')">
+        <span style="font-size: 24px;">&#129504;</span>
+        <h3>LLM & GenAI Stack</h3>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="tech-domain-body">
+        <div class="tech-item"><div class="tech-name">LangChain</div><div class="tech-desc">The most popular framework for building applications with LLMs. Handles chains, agents, memory, and tool use. LangChain on a resume means they build AI applications, not just use ChatGPT.</div></div>
+        <div class="tech-item"><div class="tech-name">RAG</div><div class="tech-desc">Retrieval-Augmented Generation. The technique of feeding an LLM your own documents so it can answer questions about them. The hottest pattern in enterprise AI right now.</div></div>
+        <div class="tech-item"><div class="tech-name">Fine-tuning</div><div class="tech-desc">Customizing a pre-trained model on your specific data. More advanced than RAG. Requires ML engineering skills, GPU infrastructure, and training data pipelines.</div></div>
+        <div class="tech-item"><div class="tech-name">Vector Databases</div><div class="tech-desc">Databases that store embeddings (numerical representations of text). Pinecone, Weaviate, ChromaDB, Milvus. Essential infrastructure for RAG and semantic search.</div></div>
+        <div class="tech-item"><div class="tech-name">Prompt Engineering</div><div class="tech-desc">The art of writing effective instructions for LLMs. Not a traditional engineering skill. Some companies hire dedicated prompt engineers; others expect all engineers to have this skill.</div></div>
+        <div class="tech-item"><div class="tech-name">AI Agents</div><div class="tech-desc">LLMs that can use tools, browse the web, write code, and take actions autonomously. The frontier of GenAI. Companies building agents: Anthropic, OpenAI, Google, plus hundreds of startups.</div></div>
+      </div>
+    </div>
+
+    <div class="tech-domain" data-search="spark snowflake data engineering pipeline etl airflow kafka dbt delta lake databricks">
+      <div class="tech-domain-header" onclick="this.parentElement.classList.toggle('open')">
+        <span style="font-size: 24px;">&#127984;</span>
+        <h3>Data Engineering</h3>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="tech-domain-body">
+        <div class="tech-item"><div class="tech-name">Apache Spark</div><div class="tech-desc">The dominant big data processing engine. Handles datasets too large for a single machine. PySpark (Spark in Python) is the most common flavor. Core skill for data engineers.</div></div>
+        <div class="tech-item"><div class="tech-name">Snowflake</div><div class="tech-desc">Cloud data warehouse. Stores and queries massive datasets. Competing with Databricks and BigQuery. "Snowflake" on a JD means the company uses a modern data stack.</div></div>
+        <div class="tech-item"><div class="tech-name">Databricks</div><div class="tech-desc">Unified analytics platform built on Spark. Data engineering + data science + ML in one platform. Founded by the creators of Spark. Big competitor to Snowflake.</div></div>
+        <div class="tech-item"><div class="tech-name">dbt</div><div class="tech-desc">Data Build Tool. Transforms data inside the warehouse using SQL. The hottest tool in analytics engineering. "dbt" on a resume signals modern data stack fluency.</div></div>
+        <div class="tech-item"><div class="tech-name">Airflow</div><div class="tech-desc">Workflow orchestrator. Schedules and monitors data pipelines. Built by Airbnb, now Apache project. The standard for "making sure data pipelines run on time."</div></div>
+        <div class="tech-item"><div class="tech-name">Kafka</div><div class="tech-desc">Real-time data streaming platform. Handles millions of events per second. If a company uses Kafka, they process data in real-time (fintech, ad-tech, ride-sharing).</div></div>
+      </div>
+    </div>
+
+    <div class="tech-domain" data-search="aws gcp azure cloud infrastructure docker kubernetes terraform devops">
+      <div class="tech-domain-header" onclick="this.parentElement.classList.toggle('open')">
+        <span style="font-size: 24px;">&#9729;&#65039;</span>
+        <h3>Cloud & Infrastructure</h3>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="tech-domain-body">
+        <div class="tech-item"><div class="tech-name">AWS</div><div class="tech-desc">Amazon Web Services. The #1 cloud platform (~32% market share). Services like S3 (storage), EC2 (compute), SageMaker (ML). AWS experience is the most in-demand cloud skill.</div></div>
+        <div class="tech-item"><div class="tech-name">GCP</div><div class="tech-desc">Google Cloud Platform. #3 cloud but dominant in data/ML (BigQuery, Vertex AI). Companies using Google's AI ecosystem often require GCP. Strong in analytics and ML workloads.</div></div>
+        <div class="tech-item"><div class="tech-name">Azure</div><div class="tech-desc">Microsoft's cloud. #2 overall, dominant in enterprise/government. Deep integration with Office 365 and Active Directory. If a company is "Microsoft shop," they're on Azure.</div></div>
+        <div class="tech-item"><div class="tech-name">Docker</div><div class="tech-desc">Containerization. Packages applications so they run the same everywhere. Nearly universal in modern engineering. If someone doesn't know Docker in 2026, that's a yellow flag.</div></div>
+        <div class="tech-item"><div class="tech-name">Kubernetes (K8s)</div><div class="tech-desc">Orchestrates Docker containers at scale. Complex but powerful. "K8s" experience means they've managed production systems. DevOps/Platform engineering staple.</div></div>
+        <div class="tech-item"><div class="tech-name">Terraform</div><div class="tech-desc">Infrastructure as Code. Defines cloud resources in config files instead of clicking through AWS console. Standard for DevOps and platform engineering roles.</div></div>
+      </div>
+    </div>
+
+    <div class="tech-domain" data-search="mlflow wandb mlops model deployment sagemaker vertex feature store experiment tracking">
+      <div class="tech-domain-header" onclick="this.parentElement.classList.toggle('open')">
+        <span style="font-size: 24px;">&#9881;&#65039;</span>
+        <h3>MLOps & Model Deployment</h3>
+        <span class="chevron">&#9660;</span>
+      </div>
+      <div class="tech-domain-body">
+        <div class="tech-item"><div class="tech-name">MLflow</div><div class="tech-desc">Open-source platform for ML lifecycle management: experiment tracking, model registry, deployment. The most widely adopted MLOps tool. Built by Databricks.</div></div>
+        <div class="tech-item"><div class="tech-name">Weights & Biases</div><div class="tech-desc">Experiment tracking and model monitoring. Popular in research labs and ML teams. W&B on a resume signals someone who tracks experiments rigorously, not just "vibes-based" ML.</div></div>
+        <div class="tech-item"><div class="tech-name">SageMaker</div><div class="tech-desc">AWS's ML platform. End-to-end: data labeling, training, deployment, monitoring. If a company is on AWS and does ML, they probably use SageMaker.</div></div>
+        <div class="tech-item"><div class="tech-name">Feature Stores</div><div class="tech-desc">Centralized repositories for ML features (Feast, Tecton, Hopsworks). Having "feature store" on a resume means they've built production ML systems, not just notebooks.</div></div>
+        <div class="tech-item"><div class="tech-name">Model Monitoring</div><div class="tech-desc">Tracking model performance in production. Detecting drift, bias, and degradation. Tools: Evidently, Arize, WhyLabs. Signals mature ML operations.</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-left">
+    <span style="font-family: var(--mono); font-weight: 700; color: var(--accent); font-size: 14px;">SOURCINGNAV</span>
+    <span style="margin-left: 12px;">Talent Engineering Platform &middot; Open Source &middot; MIT License</span>
+  </div>
+  <div class="foot-right">
+    <a href="https://sourcingnav.com/">Home</a>
+    <a href="https://sourcingnav.com/ui/dashboard.html">Agency</a>
+    <a href="https://sourcingnav.com/ui/people-ops.html">Company</a>
+    <a href="https://github.com/shotwellj/placement-ops" target="_blank">GitHub</a>
+    <a href="#">Back to top &uarr;</a>
+  </div>
+</footer>
+
+
+<script>
+// Tab switching
+function switchTab(section, tabName) {
+  const sectionEl = document.getElementById(section) || document.querySelector(`#${section}`).closest('.section');
+  const parent = sectionEl || document;
+  
+  // Update tab buttons
+  const tabs = parent.querySelectorAll ? parent.querySelectorAll('.tab-btn') : document.querySelectorAll(`#${section}Tabs .tab-btn, #${section} .tab-btn`);
+  
+  // Find the right tab bar
+  let tabBar;
+  if (section === 'prompts') tabBar = document.getElementById('promptTabs');
+  else if (section === 'tools') tabBar = document.getElementById('toolTabs');
+  
+  if (tabBar) {
+    tabBar.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  // Show/hide panels within the section
+  const sectionNode = tabBar ? tabBar.closest('.section') : document.getElementById(section);
+  if (sectionNode) {
+    sectionNode.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    const target = sectionNode.querySelector(`#tab-${tabName}`);
+    if (target) target.classList.add('active');
+  }
+}
+
+// Copy prompt
+function copyPrompt(btn) {
+  const code = btn.parentElement;
+  const text = code.innerText.replace('Copy', '').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+// Global search
+function filterAll(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('[data-search]').forEach(el => {
+    const match = el.getAttribute('data-search').toLowerCase().includes(q) || 
+                  el.textContent.toLowerCase().includes(q);
+    el.style.display = match || q === '' ? '' : 'none';
+  });
+}
+
+// Smooth scroll for page nav
+document.querySelectorAll('.page-nav-link').forEach(link => {
+  link.addEventListener('click', function(e) {
+    const href = this.getAttribute('href');
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      document.querySelector(href).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('.page-nav-link').forEach(a => a.classList.remove('active'));
+      this.classList.add('active');
+    }
+  });
+});
+
+// Scroll spy for page nav
+window.addEventListener('scroll', () => {
+  const sections = ['prompts', 'boolean-gen', 'tools', 'resources', 'contact-intel', 'automations', 'build-ats', 'tech'];
+  let current = '';
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && window.scrollY >= el.offsetTop - 140) current = id;
+  });
+  document.querySelectorAll('.page-nav-link').forEach(a => {
+    a.classList.remove('active');
+    if (a.getAttribute('href') === `#${current}`) a.classList.add('active');
+  });
+});
+
+// Boolean Generator
+function generateBoolean() {
+  const role = document.getElementById('boolRole').value.trim();
+  const location = document.getElementById('boolLocation').value.trim();
+  const skills = document.getElementById('boolSkills').value.split(',').map(s => s.trim()).filter(Boolean);
+  const nice = document.getElementById('boolNice').value.split(',').map(s => s.trim()).filter(Boolean);
+
+  if (!role || skills.length === 0) {
+    alert('Please enter a role title and at least one required skill.');
+    return;
+  }
+
+  // Title variations
+  const titleMap = {
+    'data engineer': ['"Data Engineer"', '"Analytics Engineer"', '"Data Platform Engineer"', '"ETL Developer"', '"Big Data Engineer"'],
+    'data scientist': ['"Data Scientist"', '"Applied Scientist"', '"Research Scientist"', '"ML Scientist"', '"Quantitative Analyst"'],
+    'machine learning engineer': ['"Machine Learning Engineer"', '"ML Engineer"', '"MLOps Engineer"', '"AI Engineer"', '"Applied ML Engineer"'],
+    'software engineer': ['"Software Engineer"', '"Software Developer"', '"Backend Engineer"', '"Full Stack Engineer"', '"SDE"'],
+    'frontend engineer': ['"Frontend Engineer"', '"Front End Developer"', '"UI Engineer"', '"React Developer"', '"Web Developer"'],
+    'devops engineer': ['"DevOps Engineer"', '"Platform Engineer"', '"Site Reliability Engineer"', '"SRE"', '"Infrastructure Engineer"'],
+    'product manager': ['"Product Manager"', '"Product Lead"', '"PM"', '"Group Product Manager"', '"Technical Product Manager"'],
+    'engineering manager': ['"Engineering Manager"', '"Software Engineering Manager"', '"Dev Manager"', '"Technical Manager"', '"Head of Engineering"'],
+  };
+
+  const roleLower = role.toLowerCase();
+  let titles = titleMap[roleLower];
+  if (!titles) {
+    const words = role.split(' ');
+    titles = [
+      `"${role}"`,
+      `"Senior ${role}"`,
+      `"Staff ${role}"`,
+      `"Lead ${role}"`,
+      `"Principal ${role}"`,
+    ];
+  }
+
+  // LinkedIn Boolean
+  const titleBool = '(' + titles.join(' OR ') + ')';
+  const skillBool = '(' + skills.map(s => `"${s}"`).join(' AND ') + ')';
+  const niceBool = nice.length ? ' AND (' + nice.map(s => `"${s}"`).join(' OR ') + ')' : '';
+  const locationBool = location ? `\n\nLocation filter: ${location}` : '';
+  const linkedInStr = `${titleBool} AND ${skillBool}${niceBool}${locationBool}`;
+
+  // Google X-Ray
+  const xrayStr = `site:linkedin.com/in/ ${titles.slice(0,3).join(' OR ')} ${skills.map(s => `"${s}"`).join(' ')}${location ? ' "' + location + '"' : ''}`;
+
+  // GitHub X-Ray
+  const ghStr = `site:github.com ${skills.map(s => `"${s}"`).join(' ')} "${role}"${location ? ' "' + location + '"' : ''}`;
+
+  // Title variations output
+  const titlesStr = titles.map((t, i) => `${i + 1}. ${t}`).join('\n');
+
+  // Set outputs
+  document.getElementById('boolLinkedIn').innerHTML = linkedInStr + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>';
+  document.getElementById('boolXray').innerHTML = xrayStr + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>';
+  document.getElementById('boolGitHub').innerHTML = ghStr + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>';
+  document.getElementById('boolTitles').innerHTML = titlesStr + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>';
+  document.getElementById('boolOutput').style.display = 'block';
+  document.getElementById('boolOutput').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+
+</body>
+</html>
