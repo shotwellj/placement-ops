@@ -202,6 +202,8 @@ a:hover { text-decoration:underline; }
     <li><a href="#step6">Step 6: Automate with n8n/Make/Zapier</a></li>
     <li><a href="#prompts">The system prompts (copy-paste ready)</a></li>
     <li><a href="#cost">Cost breakdown: Yours vs. Juicebox</a></li>
+    <li><a href="#openai-version">Alternative: Build it with OpenAI / ChatGPT</a></li>
+    <li><a href="#openclaw-version">Advanced: Build it with OpenClaw (autonomous agent)</a></li>
   </ol>
 </div>
 
@@ -723,6 +725,196 @@ For each company, tell me:
 </ul>
 
 <p>Questions? Ideas? Want to share what you've built? <a href="https://github.com/shotwellj/placement-ops" target="_blank">Open an issue on GitHub</a> or reach out on <a href="https://sourcingnav.com/ui/knowledge-hub.html">the Knowledge Hub</a>.</p>
+
+<!-- ALTERNATIVE: OPENAI / CHATGPT VERSION -->
+<h2 id="openai-version">Alternative: Build It with OpenAI / ChatGPT</h2>
+
+<p>Everything above works with ChatGPT too. Here's what changes:</p>
+
+<div class="step">
+  <div class="step-num amber">ChatGPT setup</div>
+  <ol>
+    <li>Go to <a href="https://chat.openai.com" target="_blank">chat.openai.com</a> (free tier works, Plus at $20/mo is better)</li>
+    <li>Create a custom GPT (Plus required) or just paste the system prompt into a new conversation</li>
+    <li>If you have Plus, use GPTs like <a href="https://chatgpt.com/g/g-681e5dacac2c81918b3917cc43d32334-sourcing-jamboard" target="_blank">Sourcing Jamboard</a> and <a href="https://chatgpt.com/g/g-69136712619c81919104f160bae88c7f-candidatiq-sourcing-grandmaster" target="_blank">CandidatIQ Sourcing Grandmaster</a> which are pre-built sourcing assistants ready to go</li>
+  </ol>
+</div>
+
+<div class="step">
+  <div class="step-num amber">Key differences from Claude</div>
+  <ul>
+    <li><strong>Custom GPTs:</strong> ChatGPT lets you build a "GPT" with instructions baked in permanently. No need to paste the system prompt every time. Claude has Projects which do the same thing.</li>
+    <li><strong>Web browsing:</strong> ChatGPT Plus can browse the web mid-conversation. Useful for real-time company research. Claude has web search built in too.</li>
+    <li><strong>API pricing:</strong> OpenAI API is slightly cheaper for high volume. Claude API is slightly better at nuanced evaluation. Both work fine.</li>
+    <li><strong>The prompts are identical.</strong> Every system prompt in this guide works in ChatGPT. Just paste them the same way.</li>
+  </ul>
+</div>
+
+<div class="code-block">
+  <span class="code-label">OpenAI API call (for automation tools)</span>
+  <pre>URL: https://api.openai.com/v1/chat/completions
+Method: POST
+Headers:
+  Authorization: Bearer [YOUR_OPENAI_API_KEY]
+  Content-Type: application/json
+
+Body:
+{
+  "model": "gpt-4o",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a recruiting sourcing assistant. When given a candidate and role, write personalized outreach under 100 words."
+    },
+    {
+      "role": "user",
+      "content": "Write outreach for [CANDIDATE] at [COMPANY] for my [ROLE] opening at [CLIENT]."
+    }
+  ]
+}</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<table class="compare">
+  <thead><tr><th></th><th>Claude</th><th>ChatGPT</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Free tier</strong></td><td>Yes (limited messages)</td><td>Yes (limited messages)</td></tr>
+    <tr><td><strong>Paid tier</strong></td><td>$20/mo (Pro)</td><td>$20/mo (Plus)</td></tr>
+    <tr><td><strong>Saved instructions</strong></td><td>Projects</td><td>Custom GPTs</td></tr>
+    <tr><td><strong>Web search</strong></td><td>Built in</td><td>Built in (Plus)</td></tr>
+    <tr><td><strong>Best at</strong></td><td>Long analysis, nuanced evaluation, writing</td><td>Quick answers, web browsing, image generation</td></tr>
+    <tr><td><strong>API model</strong></td><td>claude-sonnet-4-20250514</td><td>gpt-4o</td></tr>
+  </tbody>
+</table>
+
+<!-- ALTERNATIVE: OPENCLAW VERSION -->
+<h2 id="openclaw-version">Advanced: Build It with OpenClaw (Autonomous Agent)</h2>
+
+<p>OpenClaw is an open-source AI agent that runs on your own computer and works through messaging apps like Telegram, WhatsApp, or Signal. Unlike Claude or ChatGPT where you chat back and forth, OpenClaw runs autonomously: you give it a task and it executes it in the background, even while you sleep.</p>
+
+<div class="callout warn">
+  <p><strong>Heads up:</strong> OpenClaw is more technical to set up than Claude or ChatGPT. You need to be comfortable with a terminal. If you've never used a command line, start with Claude or ChatGPT above and come back to this when you're ready to level up.</p>
+</div>
+
+<div class="step">
+  <div class="step-num violet">What makes OpenClaw different</div>
+  <ul>
+    <li><strong>Autonomous:</strong> You text it "find me 10 ML engineers in NYC" and walk away. It searches, evaluates, and reports back.</li>
+    <li><strong>Always on:</strong> Set up cron jobs to monitor career pages daily, scan GitHub trending repos, or check for new layoff announcements.</li>
+    <li><strong>Self-hosted:</strong> All candidate data stays on your machine. Nothing goes to a third-party server. Critical for compliance.</li>
+    <li><strong>Skill-based:</strong> Install pre-built skills for recruiting: <code>recruitment-automation</code>, <code>agent-browser</code> for LinkedIn research, <code>gog</code> for Gmail/Calendar.</li>
+    <li><strong>Any LLM:</strong> Works with Claude API, OpenAI API, or DeepSeek. You pick the brain.</li>
+  </ul>
+</div>
+
+<div class="step">
+  <div class="step-num violet">Step 1: Install OpenClaw</div>
+  <p>You'll need a computer that stays on (or a $6/month VPS). Don't install on your daily work machine.</p>
+</div>
+
+<div class="code-block">
+  <span class="code-label">Terminal commands</span>
+  <pre># Install OpenClaw
+npx openclaw@latest onboard
+
+# It will walk you through:
+# 1. Setting up a messaging channel (Telegram is easiest)
+# 2. Connecting an LLM (Claude API or OpenAI API key)
+# 3. Enabling web search (Exa API - free credits on signup)</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="step">
+  <div class="step-num violet">Step 2: Install recruiting skills</div>
+</div>
+
+<div class="code-block">
+  <span class="code-label">Install recruiting-specific skills</span>
+  <pre># Resume parsing + candidate scoring + outreach drafting
+npx playbooks add skill openclaw/skills --skill recruitment-automation
+
+# Browser automation for LinkedIn/GitHub research
+npx playbooks add skill TheSethRose/agent-browser
+
+# Gmail + Google Calendar integration
+openclaw skill install gog
+
+# Web search for candidate research
+openclaw skill install exa</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="step">
+  <div class="step-num violet">Step 3: Configure your recruiting agent</div>
+  <p>Create a SOUL.md file that defines your agent's recruiting personality:</p>
+</div>
+
+<div class="code-block">
+  <span class="code-label">~/.openclaw/workspace/SOUL.md</span>
+  <pre># Recruiting Agent
+
+You are a senior technical recruiter specializing in Data, ML, and AI roles.
+
+## Your workflow
+1. When given a job description, parse it into structured criteria
+2. Search GitHub, LinkedIn (via browser), and the web for matching candidates
+3. Score each candidate 1-5 against the requirements
+4. Populate a Google Sheet with the shortlist
+5. Draft personalized outreach emails for the top candidates
+
+## Rules
+- Never submit candidates below a 4.0 score
+- Always verify current employment before outreach
+- Keep outreach under 100 words
+- Lead with what's impressive about the candidate, not the job
+- Log every action for audit trail
+
+## Daily routine
+- 7:00 AM: Check for new job postings at target companies
+- 9:00 AM: Brief me on yesterday's outreach responses
+- 5:00 PM: Summary of candidates sourced today</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="step">
+  <div class="step-num violet">Step 4: Set up automated monitoring</div>
+</div>
+
+<div class="code-block">
+  <span class="code-label">Cron jobs for autonomous sourcing</span>
+  <pre># Monitor GitHub trending for ML engineers every morning
+openclaw cron add --name "github-ml-monitor" \
+  --schedule "0 8 * * *" \
+  --prompt "Search GitHub trending Python repos tagged machine-learning. Find contributors in San Francisco with 50+ commits. Add promising profiles to my recruiting sheet."
+
+# Check target company career pages daily
+openclaw cron add --name "career-page-scan" \
+  --schedule "0 9 * * *" \
+  --prompt "Visit the careers pages for Anthropic, Scale AI, Databricks, and Snowflake. Report any new ML or Data Engineering roles posted in the last 24 hours."
+
+# Weekly layoff alert
+openclaw cron add --name "layoff-monitor" \
+  --schedule "0 10 * * 1" \
+  --prompt "Search for tech layoffs announced in the past week. Focus on companies in AI, data, and fintech. For each, estimate how many ML/Data engineers were affected."</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="callout tip">
+  <p><strong>The power move:</strong> OpenClaw + Claude API + the recruitment-automation skill = an autonomous sourcing agent that monitors career pages, finds candidates, scores them, populates your pipeline spreadsheet, and drafts outreach. All running 24/7 while you focus on client calls and closing placements. This is closer to what Juicebox's $300/month "Agent" add-on does, except you own it.</p>
+</div>
+
+<table class="compare">
+  <thead><tr><th></th><th>Claude / ChatGPT</th><th>OpenClaw</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Setup difficulty</strong></td><td>None (browser-based)</td><td>Moderate (terminal required)</td></tr>
+    <tr><td><strong>Autonomy</strong></td><td>Interactive (you drive)</td><td>Autonomous (it runs alone)</td></tr>
+    <tr><td><strong>Data privacy</strong></td><td>Cloud-based</td><td>100% local, self-hosted</td></tr>
+    <tr><td><strong>Cost</strong></td><td>$0-20/mo</td><td>$0-6/mo (VPS) + API costs</td></tr>
+    <tr><td><strong>Always on</strong></td><td>No (only when you're chatting)</td><td>Yes (cron jobs run 24/7)</td></tr>
+    <tr><td><strong>Best for</strong></td><td>Solo sourcers, manual workflow</td><td>Power users who want full automation</td></tr>
+    <tr><td><strong>Closest Juicebox feature</strong></td><td>PeopleGPT search</td><td>Juicebox Agents ($300/mo add-on)</td></tr>
+  </tbody>
+</table>
 
 </div>
 
