@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SourcingNav — Build Your Own Juicebox with Claude</title>
-<meta name="description" content="Step-by-step guide for recruiters to build their own AI people search tool like Juicebox using Claude. No coding required.">
+<title>SourcingNav — Build Your Own AI People Search Engine with Claude</title>
+<meta name="description" content="Step-by-step guide for recruiters to build their own AI-powered people search tool using Claude, ChatGPT, or OpenClaw. No coding required.">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -181,18 +181,18 @@ a:hover { text-decoration:underline; }
 <!-- ARTICLE -->
 <div class="article">
 
-<h1>Build Your Own <span>Juicebox</span> Using Claude</h1>
-<p class="subtitle">Juicebox charges $99-$129/month to search people with AI. You can build 80% of it for free using Claude + public APIs. This guide shows you exactly how, step by step. No coding experience needed.</p>
+<h1>Build Your Own <span>AI People Search Engine</span> Using Claude</h1>
+<p class="subtitle">AI people search tools charge $99-$300/month. You can build 80% of the functionality for free using Claude + public APIs. This guide shows you exactly how, step by step. No coding experience needed.</p>
 
 <div class="callout">
-  <p><strong>What is Juicebox?</strong> An AI-powered people search engine. You type "senior data engineers in SF who've worked at fintech startups" and it finds matching candidates from 800M+ profiles. It raised $36M from Sequoia. You're going to build your own version for $0-$20/month.</p>
+  <p><strong>What are AI people search tools?</strong> Platforms like PeopleGPT, SeekOut, and hireEZ let you type "senior data engineers in SF who've worked at fintech startups" and find matching candidates from hundreds of millions of profiles. They charge $99-$300/month. You're going to build your own version for $0-$20/month.</p>
 </div>
 
 <!-- TOC -->
 <div class="toc">
   <h3>What You'll Build</h3>
   <ol>
-    <li><a href="#what-juicebox-does">What Juicebox actually does (and what you're replicating)</a></li>
+    <li><a href="#what-tools-do">What AI people search tools do (and what you're replicating)</a></li>
     <li><a href="#architecture">Your architecture (the 4 pieces)</a></li>
     <li><a href="#step1">Step 1: Set up Claude as your search brain</a></li>
     <li><a href="#step2">Step 2: Connect free people data APIs</a></li>
@@ -201,16 +201,16 @@ a:hover { text-decoration:underline; }
     <li><a href="#step5">Step 5: Create your candidate pipeline</a></li>
     <li><a href="#step6">Step 6: Automate with n8n/Make/Zapier</a></li>
     <li><a href="#prompts">The system prompts (copy-paste ready)</a></li>
-    <li><a href="#cost">Cost breakdown: Yours vs. Juicebox</a></li>
+    <li><a href="#cost">Cost breakdown: Yours vs. paid tools</a></li>
     <li><a href="#openai-version">Alternative: Build it with OpenAI / ChatGPT</a></li>
     <li><a href="#openclaw-version">Advanced: Build it with OpenClaw (autonomous agent)</a></li>
   </ol>
 </div>
 
 
-<!-- SECTION: WHAT JUICEBOX DOES -->
-<h2 id="what-juicebox-does">What Juicebox Actually Does</h2>
-<p>Strip away the marketing and Juicebox does four things:</p>
+<!-- SECTION: WHAT AI PEOPLE SEARCH TOOLS DO -->
+<h2 id="what-tools-do">What AI People Search Tools Actually Do</h2>
+<p>Strip away the marketing and these tools do four things:</p>
 <ol>
   <li><strong>Natural language search.</strong> You describe a candidate in plain English. The AI converts that into structured search criteria (skills, titles, companies, locations, experience level).</li>
   <li><strong>People database lookup.</strong> It searches across LinkedIn, GitHub, and 30+ data sources to find matching profiles.</li>
@@ -220,26 +220,26 @@ a:hover { text-decoration:underline; }
 <p>You're going to replicate each of these. Here's the honest truth about what you can match and what you can't:</p>
 
 <table class="compare">
-  <thead><tr><th>Feature</th><th>Juicebox ($129/mo)</th><th>Your Build ($0-20/mo)</th></tr></thead>
+  <thead><tr><th>Feature</th><th>Paid Tools ($99-300/mo)</th><th>Your Build ($0-20/mo)</th></tr></thead>
   <tbody>
-    <tr><td><strong>Natural language search</strong></td><td>Built-in PeopleGPT</td><td>Claude (better AI, actually)</td></tr>
-    <tr><td><strong>People database</strong></td><td>800M profiles, 30+ sources</td><td>Public APIs + Google X-ray (smaller but free)</td></tr>
+    <tr><td><strong>Natural language search</strong></td><td>Proprietary AI search</td><td>Claude (better AI, actually)</td></tr>
+    <tr><td><strong>People database</strong></td><td>500M-800M profiles</td><td>Public APIs + Google X-ray (smaller but free)</td></tr>
     <tr><td><strong>Contact finding</strong></td><td>Email + phone included</td><td>Hunter.io free tier (50/mo) + GitHub commits</td></tr>
     <tr><td><strong>Outreach sequences</strong></td><td>Built-in email sequences</td><td>Claude drafts + Gmail/Outlook sends</td></tr>
     <tr><td><strong>ATS integration</strong></td><td>41 ATS integrations</td><td>Manual export or Zapier connection</td></tr>
     <tr><td><strong>AI learning</strong></td><td>Agents learn from feedback</td><td>Claude remembers context within conversation</td></tr>
-    <tr><td><strong>Risk</strong></td><td>LinkedIn suspension reports</td><td>No extension, no risk</td></tr>
+    <tr><td><strong>Risk</strong></td><td>LinkedIn suspension risk (extensions)</td><td>No extension, no risk</td></tr>
   </tbody>
 </table>
 
 <div class="callout tip">
-  <p><strong>The trade-off:</strong> Juicebox has a bigger database. Your version has a smarter AI brain (Claude), costs nothing, and won't get your LinkedIn account banned. For most sourcers filling 2-5 roles at a time, your version is more than enough.</p>
+  <p><strong>The trade-off:</strong> Paid tools have bigger databases. Your version has a smarter AI brain (Claude), costs nothing, and won't get your LinkedIn account banned. For most sourcers filling 2-5 roles at a time, your version is more than enough.</p>
 </div>
 
 
 <!-- ARCHITECTURE -->
 <h2 id="architecture">Your Architecture (The 4 Pieces)</h2>
-<p>Here's how your DIY Juicebox works. Four tools connected together:</p>
+<p>Here's how your DIY people search works. Four tools connected together:</p>
 
 <div class="arch">
   <div class="arch-box" style="border-color:rgba(59,130,246,0.3); color:var(--accent);">Claude AI<br><span style="font-size:11px; color:var(--text-muted);">Search brain<br>JD parser<br>Outreach writer</span></div>
@@ -262,7 +262,7 @@ a:hover { text-decoration:underline; }
   <p>A <a href="https://claude.ai" target="_blank">Claude.ai</a> account. The free tier works. Claude Pro ($20/mo) gives you more messages and is worth it if you're sourcing daily.</p>
 </div>
 
-<p>The key to making Claude work like Juicebox is giving it a system prompt that turns it into a sourcing machine. Don't just ask Claude random questions. Give it a role, a process, and a format.</p>
+<p>The key to making Claude work is giving it a system prompt that turns it into a sourcing machine. Don't just ask Claude random questions. Give it a role, a process, and a format.</p>
 
 <p>Open Claude and paste this prompt at the start of every sourcing session:</p>
 
@@ -309,7 +309,7 @@ When I ask for outreach, write personalized messages under 100 words.</pre>
 <!-- STEP 2 -->
 <h2 id="step2">Step 2: Connect Free People Data APIs</h2>
 
-<p>Juicebox's biggest advantage is its 800M profile database. You won't match that, but you can tap into several free data sources that cover most of what you need for technical hiring.</p>
+<p>The biggest advantage paid tools have is their profile databases. You won't match that, but you can tap into several free data sources that cover most of what you need for technical hiring.</p>
 
 <div class="step">
   <div class="step-num cyan">API 1: GitHub API (free, 5,000 requests/hour)</div>
@@ -390,7 +390,7 @@ site:github.com "contributions" "pytorch" "tensorflow" "machine learning"</pre>
   </ol>
 </div>
 
-<p>That's it. That's the Juicebox workflow, just with Claude as the AI brain instead of PeopleGPT. The difference: you control every step, you see the logic, and it costs you nothing.</p>
+<p>That's it. That's the AI people search workflow, just with Claude as the AI brain instead of a proprietary search engine. The difference: you control every step, you see the logic, and it costs you nothing.</p>
 
 <div class="code-block">
   <span class="code-label">Example: full search conversation with Claude</span>
@@ -422,7 +422,7 @@ CLAUDE: [writes two personalized messages]</pre>
 <!-- STEP 4 -->
 <h2 id="step4">Step 4: Add Contact Finding</h2>
 
-<p>Juicebox includes email and phone lookup. Here's how to replicate that for free or cheap:</p>
+<p>Paid tools include email and phone lookup. Here's how to replicate that for free or cheap:</p>
 
 <div class="step">
   <div class="step-num amber">Method 1: Hunter.io (50 free lookups/month)</div>
@@ -466,7 +466,7 @@ CLAUDE: [writes two personalized messages]</pre>
 <!-- STEP 5 -->
 <h2 id="step5">Step 5: Create Your Candidate Pipeline</h2>
 
-<p>Juicebox has a built-in CRM. You're going to use Airtable (free) or Google Sheets.</p>
+<p>Paid tools have built-in CRMs. You're going to use Airtable (free) or Google Sheets.</p>
 
 <div class="step">
   <div class="step-num violet">Option A: Airtable (recommended, free tier)</div>
@@ -497,7 +497,7 @@ for status tracking. Make it color-coded so I can see my pipeline at a glance.</
 <!-- STEP 6 -->
 <h2 id="step6">Step 6: Automate with n8n / Make / Zapier</h2>
 
-<p>This is where your DIY Juicebox goes from manual to semi-automatic. Connect the pieces so data flows without you copy-pasting.</p>
+<p>This is where your DIY people search goes from manual to semi-automatic. Connect the pieces so data flows without you copy-pasting.</p>
 
 <div class="step">
   <div class="step-num rose">Automation 1: New candidate alert</div>
@@ -684,10 +684,10 @@ For each company, tell me:
 
 
 <!-- COST COMPARISON -->
-<h2 id="cost">Cost Breakdown: Yours vs. Juicebox</h2>
+<h2 id="cost">Cost Breakdown: Yours vs. Paid Tools</h2>
 
 <table class="compare">
-  <thead><tr><th>Item</th><th>Juicebox</th><th>Your DIY Version</th></tr></thead>
+  <thead><tr><th>Item</th><th>Paid Tools</th><th>Your DIY Version</th></tr></thead>
   <tbody>
     <tr><td><strong>AI search brain</strong></td><td>Included</td><td>Claude Free or Pro ($20/mo) <span class="tag free">free-$20</span></td></tr>
     <tr><td><strong>People database</strong></td><td>Included</td><td>GitHub API + Google X-ray <span class="tag free">free</span></td></tr>
@@ -710,7 +710,7 @@ For each company, tell me:
 </table>
 
 <div class="callout tip">
-  <p><strong>The bottom line:</strong> You're trading a polished UI for flexibility, control, and savings. If you fill 2+ roles per month, the time you spend setting this up pays for itself in the first week. And unlike Juicebox, your LinkedIn account stays safe.</p>
+  <p><strong>The bottom line:</strong> You're trading a polished UI for flexibility, control, and savings. If you fill 2+ roles per month, the time you spend setting this up pays for itself in the first week. And your LinkedIn account stays safe.</p>
 </div>
 
 <h2>What's Next</h2>
@@ -900,7 +900,7 @@ openclaw cron add --name "layoff-monitor" \
 </div>
 
 <div class="callout tip">
-  <p><strong>The power move:</strong> OpenClaw + Claude API + the recruitment-automation skill = an autonomous sourcing agent that monitors career pages, finds candidates, scores them, populates your pipeline spreadsheet, and drafts outreach. All running 24/7 while you focus on client calls and closing placements. This is closer to what Juicebox's $300/month "Agent" add-on does, except you own it.</p>
+  <p><strong>The power move:</strong> OpenClaw + Claude API + the recruitment-automation skill = an autonomous sourcing agent that monitors career pages, finds candidates, scores them, populates your pipeline spreadsheet, and drafts outreach. All running 24/7 while you focus on client calls and closing placements. This is closer to what paid AI agent add-ons ($200-$300/month) do, except you own it.</p>
 </div>
 
 <table class="compare">
@@ -912,7 +912,7 @@ openclaw cron add --name "layoff-monitor" \
     <tr><td><strong>Cost</strong></td><td>$0-20/mo</td><td>$0-6/mo (VPS) + API costs</td></tr>
     <tr><td><strong>Always on</strong></td><td>No (only when you're chatting)</td><td>Yes (cron jobs run 24/7)</td></tr>
     <tr><td><strong>Best for</strong></td><td>Solo sourcers, manual workflow</td><td>Power users who want full automation</td></tr>
-    <tr><td><strong>Closest Juicebox feature</strong></td><td>PeopleGPT search</td><td>Juicebox Agents ($300/mo add-on)</td></tr>
+    <tr><td><strong>Closest paid tool equivalent</strong></td><td>AI-powered people search</td><td>Autonomous sourcing agents ($200-300/mo)</td></tr>
   </tbody>
 </table>
 
