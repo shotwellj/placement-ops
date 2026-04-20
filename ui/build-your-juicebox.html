@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SourcingNav — Build Your Own Juicebox with Claude</title>
+<meta name="description" content="Step-by-step guide for recruiters to build their own AI people search tool like Juicebox using Claude. No coding required.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06060b;
+  --bg-card: #111119;
+  --bg-card-hover: #17171f;
+  --border: #1e1e2e;
+  --border-hover: #2e2e42;
+  --text: #eaeaf2;
+  --text-dim: #8b8ba8;
+  --text-muted: #55556e;
+  --accent: #3b82f6;
+  --accent-dim: rgba(59,130,246,0.1);
+  --cyan: #06b6d4;
+  --cyan-dim: rgba(6,182,212,0.1);
+  --emerald: #34d399;
+  --emerald-dim: rgba(52,211,153,0.1);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.1);
+  --violet: #8b5cf6;
+  --violet-dim: rgba(139,92,246,0.1);
+  --rose: #fb7185;
+  --rose-dim: rgba(251,113,133,0.1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:var(--bg); color:var(--text);
+  line-height:1.7; -webkit-font-smoothing:antialiased;
+}
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+
+/* Nav */
+.nav { position:fixed; top:0; left:0; right:0; z-index:100;
+  backdrop-filter:blur(20px); background:rgba(6,6,11,0.85);
+  border-bottom:1px solid var(--border); }
+.nav-inner { max-width:800px; margin:0 auto; padding:0 24px;
+  display:flex; align-items:center; height:56px; }
+.nav-brand { font-size:16px; font-weight:800; letter-spacing:-0.5px;
+  background:linear-gradient(135deg,#3b82f6,#06b6d4);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  text-decoration:none; }
+.nav-links { margin-left:auto; display:flex; gap:20px; }
+.nav-links a { font-size:13px; font-weight:500; color:var(--text-dim);
+  text-decoration:none; }
+.nav-links a:hover { color:var(--text); }
+
+/* Article layout */
+.article { max-width:760px; margin:0 auto; padding:100px 24px 80px; }
+.article h1 { font-size:clamp(28px,5vw,42px); font-weight:900;
+  letter-spacing:-1.5px; line-height:1.1; margin-bottom:16px; }
+.article h1 span { background:linear-gradient(135deg,#3b82f6,#06b6d4);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.article .subtitle { font-size:18px; color:var(--text-dim);
+  margin-bottom:40px; line-height:1.6; }
+.article h2 { font-size:24px; font-weight:800; letter-spacing:-0.5px;
+  margin:56px 0 16px; padding-top:24px;
+  border-top:1px solid var(--border); }
+.article h2:first-of-type { border-top:none; margin-top:0; }
+.article h3 { font-size:18px; font-weight:700; margin:32px 0 12px; }
+.article p { font-size:15px; color:var(--text-dim); margin-bottom:16px; }
+.article ul, .article ol { padding-left:20px; margin-bottom:16px; }
+.article li { font-size:15px; color:var(--text-dim); margin-bottom:8px; }
+.article li strong { color:var(--text); }
+.article img { max-width:100%; border-radius:8px; margin:20px 0; }
+
+/* Step cards */
+.step { background:var(--bg-card); border:1px solid var(--border);
+  border-radius:12px; padding:28px; margin:24px 0; }
+.step:hover { border-color:var(--border-hover); }
+.step-num { font-family:'JetBrains Mono',monospace; font-size:12px;
+  font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  margin-bottom:12px; }
+.step-num.blue { color:var(--accent); }
+.step-num.cyan { color:var(--cyan); }
+.step-num.emerald { color:var(--emerald); }
+.step-num.amber { color:var(--amber); }
+.step-num.violet { color:var(--violet); }
+.step-num.rose { color:var(--rose); }
+
+/* Code blocks */
+.code-block { background:rgba(0,0,0,0.4); border:1px solid var(--border);
+  border-radius:8px; padding:20px; margin:16px 0; overflow-x:auto;
+  position:relative; }
+.code-block pre { font-family:'JetBrains Mono',monospace; font-size:13px;
+  line-height:1.6; color:var(--text-dim); white-space:pre-wrap; }
+.code-label { font-family:'JetBrains Mono',monospace; font-size:11px;
+  letter-spacing:1px; text-transform:uppercase; color:var(--text-muted);
+  margin-bottom:8px; display:block; }
+.copy-btn { position:absolute; top:12px; right:12px; background:var(--bg-card);
+  border:1px solid var(--border); color:var(--text-dim);
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+  padding:4px 10px; border-radius:4px; cursor:pointer; }
+.copy-btn:hover { color:var(--accent); border-color:var(--accent); }
+
+/* Callout */
+.callout { background:var(--accent-dim); border:1px solid rgba(59,130,246,0.2);
+  border-radius:8px; padding:20px; margin:20px 0; }
+.callout.warn { background:var(--amber-dim);
+  border-color:rgba(245,158,11,0.2); }
+.callout.tip { background:var(--emerald-dim);
+  border-color:rgba(52,211,153,0.2); }
+.callout p { color:var(--text); margin:0; font-size:14px; }
+.callout strong { font-weight:700; }
+
+/* Comparison table */
+.compare { width:100%; border-collapse:collapse; margin:20px 0; }
+.compare th { text-align:left; font-family:'JetBrains Mono',monospace;
+  font-size:11px; letter-spacing:1px; text-transform:uppercase;
+  color:var(--text-muted); padding:12px; border-bottom:1px solid var(--border); }
+.compare td { padding:12px; border-bottom:1px solid var(--border);
+  font-size:14px; color:var(--text-dim); }
+.compare tr:hover td { background:var(--bg-card); }
+
+/* Architecture diagram */
+.arch { display:flex; flex-wrap:wrap; gap:12px; justify-content:center;
+  align-items:center; margin:24px 0; }
+.arch-box { background:var(--bg-card); border:1px solid var(--border);
+  border-radius:8px; padding:16px 20px; text-align:center;
+  font-family:'JetBrains Mono',monospace; font-size:13px; min-width:140px; }
+.arch-arrow { color:var(--text-muted); font-size:20px; }
+
+/* Tag */
+.tag { font-family:'JetBrains Mono',monospace; font-size:11px;
+  padding:3px 10px; border-radius:4px; display:inline-block; }
+.tag.free { background:var(--emerald-dim); color:var(--emerald); }
+.tag.paid { background:var(--violet-dim); color:var(--violet); }
+.tag.freemium { background:var(--amber-dim); color:var(--amber); }
+
+/* TOC */
+.toc { background:var(--bg-card); border:1px solid var(--border);
+  border-radius:12px; padding:24px 28px; margin:32px 0; }
+.toc h3 { font-size:14px; font-weight:700; margin-bottom:12px; }
+.toc ol { padding-left:20px; }
+.toc li { font-size:14px; margin-bottom:6px; }
+.toc a { color:var(--accent); text-decoration:none; }
+.toc a:hover { text-decoration:underline; }
+
+/* Footer */
+.footer { border-top:1px solid var(--border); padding:40px 24px;
+  max-width:800px; margin:0 auto; text-align:center; }
+.footer-brand { font-size:16px; font-weight:800;
+  background:linear-gradient(135deg,#3b82f6,#06b6d4);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.footer p { font-size:12px; color:var(--text-muted); margin-top:8px; }
+.footer-links { margin-top:12px; display:flex; justify-content:center; gap:20px; }
+.footer-links a { font-size:12px; color:var(--text-muted); text-decoration:none; }
+.footer-links a:hover { color:var(--text-dim); }
+
+@media(max-width:600px) {
+  .nav-links { display:none; }
+  .arch { flex-direction:column; }
+  .arch-arrow { transform:rotate(90deg); }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="https://sourcingnav.com/" class="nav-brand">SOURCINGNAV</a>
+    <div class="nav-links">
+      <a href="https://sourcingnav.com/">Home</a>
+      <a href="https://sourcingnav.com/ui/knowledge-hub.html">Knowledge Hub</a>
+      <a href="https://sourcingnav.com/ui/dashboard.html">Agency</a>
+      <a href="https://github.com/shotwellj/placement-ops" target="_blank">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ARTICLE -->
+<div class="article">
+
+<h1>Build Your Own <span>Juicebox</span> Using Claude</h1>
+<p class="subtitle">Juicebox charges $99-$129/month to search people with AI. You can build 80% of it for free using Claude + public APIs. This guide shows you exactly how, step by step. No coding experience needed.</p>
+
+<div class="callout">
+  <p><strong>What is Juicebox?</strong> An AI-powered people search engine. You type "senior data engineers in SF who've worked at fintech startups" and it finds matching candidates from 800M+ profiles. It raised $36M from Sequoia. You're going to build your own version for $0-$20/month.</p>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <h3>What You'll Build</h3>
+  <ol>
+    <li><a href="#what-juicebox-does">What Juicebox actually does (and what you're replicating)</a></li>
+    <li><a href="#architecture">Your architecture (the 4 pieces)</a></li>
+    <li><a href="#step1">Step 1: Set up Claude as your search brain</a></li>
+    <li><a href="#step2">Step 2: Connect free people data APIs</a></li>
+    <li><a href="#step3">Step 3: Build your search workflow</a></li>
+    <li><a href="#step4">Step 4: Add contact finding</a></li>
+    <li><a href="#step5">Step 5: Create your candidate pipeline</a></li>
+    <li><a href="#step6">Step 6: Automate with n8n/Make/Zapier</a></li>
+    <li><a href="#prompts">The system prompts (copy-paste ready)</a></li>
+    <li><a href="#cost">Cost breakdown: Yours vs. Juicebox</a></li>
+  </ol>
+</div>
+
+
+<!-- SECTION: WHAT JUICEBOX DOES -->
+<h2 id="what-juicebox-does">What Juicebox Actually Does</h2>
+<p>Strip away the marketing and Juicebox does four things:</p>
+<ol>
+  <li><strong>Natural language search.</strong> You describe a candidate in plain English. The AI converts that into structured search criteria (skills, titles, companies, locations, experience level).</li>
+  <li><strong>People database lookup.</strong> It searches across LinkedIn, GitHub, and 30+ data sources to find matching profiles.</li>
+  <li><strong>Profile enrichment.</strong> It pulls in additional data: email, phone, career history, education, skills.</li>
+  <li><strong>Outreach.</strong> It sends personalized emails to the candidates it finds.</li>
+</ol>
+<p>You're going to replicate each of these. Here's the honest truth about what you can match and what you can't:</p>
+
+<table class="compare">
+  <thead><tr><th>Feature</th><th>Juicebox ($129/mo)</th><th>Your Build ($0-20/mo)</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Natural language search</strong></td><td>Built-in PeopleGPT</td><td>Claude (better AI, actually)</td></tr>
+    <tr><td><strong>People database</strong></td><td>800M profiles, 30+ sources</td><td>Public APIs + Google X-ray (smaller but free)</td></tr>
+    <tr><td><strong>Contact finding</strong></td><td>Email + phone included</td><td>Hunter.io free tier (50/mo) + GitHub commits</td></tr>
+    <tr><td><strong>Outreach sequences</strong></td><td>Built-in email sequences</td><td>Claude drafts + Gmail/Outlook sends</td></tr>
+    <tr><td><strong>ATS integration</strong></td><td>41 ATS integrations</td><td>Manual export or Zapier connection</td></tr>
+    <tr><td><strong>AI learning</strong></td><td>Agents learn from feedback</td><td>Claude remembers context within conversation</td></tr>
+    <tr><td><strong>Risk</strong></td><td>LinkedIn suspension reports</td><td>No extension, no risk</td></tr>
+  </tbody>
+</table>
+
+<div class="callout tip">
+  <p><strong>The trade-off:</strong> Juicebox has a bigger database. Your version has a smarter AI brain (Claude), costs nothing, and won't get your LinkedIn account banned. For most sourcers filling 2-5 roles at a time, your version is more than enough.</p>
+</div>
+
+
+<!-- ARCHITECTURE -->
+<h2 id="architecture">Your Architecture (The 4 Pieces)</h2>
+<p>Here's how your DIY Juicebox works. Four tools connected together:</p>
+
+<div class="arch">
+  <div class="arch-box" style="border-color:rgba(59,130,246,0.3); color:var(--accent);">Claude AI<br><span style="font-size:11px; color:var(--text-muted);">Search brain<br>JD parser<br>Outreach writer</span></div>
+  <div class="arch-arrow">&rarr;</div>
+  <div class="arch-box" style="border-color:rgba(6,182,212,0.3); color:var(--cyan);">People APIs<br><span style="font-size:11px; color:var(--text-muted);">GitHub API<br>Google X-ray<br>Hunter.io</span></div>
+  <div class="arch-arrow">&rarr;</div>
+  <div class="arch-box" style="border-color:rgba(52,211,153,0.3); color:var(--emerald);">Pipeline DB<br><span style="font-size:11px; color:var(--text-muted);">Airtable or<br>Google Sheets</span></div>
+  <div class="arch-arrow">&rarr;</div>
+  <div class="arch-box" style="border-color:rgba(245,158,11,0.3); color:var(--amber);">Automation<br><span style="font-size:11px; color:var(--text-muted);">n8n / Make<br>Zapier</span></div>
+</div>
+
+<p>Claude is the brain. It takes your plain-English search ("find me ML engineers who've contributed to PyTorch and work at Series B startups"), breaks it into structured criteria, generates the search queries, evaluates results, writes outreach, and manages your pipeline. The APIs find the people. The automation connects everything.</p>
+
+
+<!-- STEP 1 -->
+<h2 id="step1">Step 1: Set Up Claude as Your Search Brain</h2>
+
+<div class="step">
+  <div class="step-num blue">What you need</div>
+  <p>A <a href="https://claude.ai" target="_blank">Claude.ai</a> account. The free tier works. Claude Pro ($20/mo) gives you more messages and is worth it if you're sourcing daily.</p>
+</div>
+
+<p>The key to making Claude work like Juicebox is giving it a system prompt that turns it into a sourcing machine. Don't just ask Claude random questions. Give it a role, a process, and a format.</p>
+
+<p>Open Claude and paste this prompt at the start of every sourcing session:</p>
+
+<div class="code-block">
+  <span class="code-label">System prompt: paste this into Claude</span>
+  <pre>You are my AI sourcing assistant. When I describe a candidate I'm looking for, you will:
+
+1. PARSE my request into structured criteria:
+   - Job titles (3-5 variations they might use)
+   - Must-have skills vs. nice-to-have skills
+   - Years of experience range
+   - Target companies (where this person likely works now)
+   - Location requirements
+   - Seniority level
+
+2. GENERATE search queries for each platform:
+   - LinkedIn Boolean string (broad + targeted versions)
+   - Google X-ray string for LinkedIn profiles
+   - Google X-ray string for GitHub profiles
+   - Google X-ray string for personal sites/portfolios
+
+3. BUILD a talent map:
+   - Tier 1: Direct competitors (same product/market)
+   - Tier 2: Companies with similar tech stacks
+   - Tier 3: Non-obvious companies where this talent hides
+
+4. CREATE an ideal candidate persona:
+   - What their LinkedIn headline probably says
+   - What repos they contribute to on GitHub
+   - What conferences they speak at
+   - What motivates them to move
+
+Always output in a structured format I can act on immediately.
+When I share candidate profiles with you, evaluate them against my criteria and score them 1-5.
+When I ask for outreach, write personalized messages under 100 words.</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="callout tip">
+  <p><strong>Pro tip:</strong> Save this as a Claude Project. Go to Claude.ai, click Projects, create one called "Sourcing Desk." Add this system prompt as the project instructions. Now every conversation in that project starts with Claude already in sourcing mode.</p>
+</div>
+
+
+<!-- STEP 2 -->
+<h2 id="step2">Step 2: Connect Free People Data APIs</h2>
+
+<p>Juicebox's biggest advantage is its 800M profile database. You won't match that, but you can tap into several free data sources that cover most of what you need for technical hiring.</p>
+
+<div class="step">
+  <div class="step-num cyan">API 1: GitHub API (free, 5,000 requests/hour)</div>
+  <h3>Why it matters</h3>
+  <p>GitHub profiles show you what engineers actually build, not just what they claim on LinkedIn. You can search by language, location, repos, and contributions.</p>
+  <h3>How to set it up</h3>
+  <ol>
+    <li>Go to <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a></li>
+    <li>Click "Generate new token (classic)"</li>
+    <li>Name it "sourcing" and select no scopes (public data only)</li>
+    <li>Copy the token and save it somewhere safe</li>
+  </ol>
+  <h3>How to use it with Claude</h3>
+  <p>You don't need to write code. Just use these Google search patterns that Claude will generate for you:</p>
+</div>
+
+<div class="code-block">
+  <span class="code-label">Ask Claude this</span>
+  <pre>I'm looking for ML engineers who work with PyTorch and are based in the Bay Area. Generate GitHub search queries I can run in my browser.</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<p>Claude will give you queries like:</p>
+
+<div class="code-block">
+  <span class="code-label">Claude's output (example)</span>
+  <pre>Browser search (paste into github.com/search):
+  language:python "pytorch" location:"San Francisco" type:users
+
+Google X-ray for GitHub:
+  site:github.com "pytorch" "machine learning" "San Francisco" -site:github.com/topics
+
+Direct profile search:
+  https://github.com/search?q=location%3A%22San+Francisco%22+language%3APython+pytorch&type=users</pre>
+</div>
+
+<div class="step">
+  <div class="step-num cyan">API 2: Google Custom Search (free, 100 queries/day)</div>
+  <h3>Why it matters</h3>
+  <p>This is your X-ray engine. Google indexes LinkedIn profiles, personal sites, conference talks, and resumes. You're searching the entire public internet.</p>
+  <h3>How to set it up</h3>
+  <ol>
+    <li>Go to <a href="https://programmablesearchengine.google.com/" target="_blank">Google Programmable Search</a></li>
+    <li>Click "Add" to create a new search engine</li>
+    <li>Under "Sites to search," enter: <strong>linkedin.com/in/*</strong></li>
+    <li>Name it "LinkedIn X-ray" and create it</li>
+    <li>Go to "Customize" and get your Search Engine ID</li>
+    <li>Then go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a> and create an API key</li>
+  </ol>
+  <h3>How to use it</h3>
+  <p>You can paste X-ray searches directly into Google. No API needed for basic use:</p>
+</div>
+
+<div class="code-block">
+  <span class="code-label">Google X-ray searches (paste into Google)</span>
+  <pre>site:linkedin.com/in/ "machine learning engineer" "PyTorch" "San Francisco"
+
+site:linkedin.com/in/ ("senior data engineer" OR "staff data engineer") "Spark" "Snowflake" "remote"
+
+site:github.com "contributions" "pytorch" "tensorflow" "machine learning"</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+
+<!-- STEP 3 -->
+<h2 id="step3">Step 3: Build Your Search Workflow</h2>
+
+<p>Here's the actual workflow. This is what you do every time you get a new req:</p>
+
+<div class="step">
+  <div class="step-num emerald">The 5-minute search workflow</div>
+  <ol>
+    <li><strong>Paste the JD into Claude</strong> with: "Parse this JD and give me structured search criteria plus Boolean strings for LinkedIn and Google X-ray."</li>
+    <li><strong>Run the LinkedIn Boolean</strong> Claude generates in LinkedIn Recruiter or Sales Navigator.</li>
+    <li><strong>Run the Google X-ray strings</strong> in your browser. Open interesting profiles in new tabs.</li>
+    <li><strong>Run the GitHub search</strong> if it's a technical role. Find people by their actual code.</li>
+    <li><strong>Paste interesting profiles back into Claude</strong> with: "Evaluate these candidates against the JD. Score each one 1-5 and tell me who to reach out to first."</li>
+  </ol>
+</div>
+
+<p>That's it. That's the Juicebox workflow, just with Claude as the AI brain instead of PeopleGPT. The difference: you control every step, you see the logic, and it costs you nothing.</p>
+
+<div class="code-block">
+  <span class="code-label">Example: full search conversation with Claude</span>
+  <pre>YOU: Here's a JD for a Senior ML Engineer at a Series B fintech startup 
+in NYC. [paste JD]
+
+Parse this and give me:
+1. Structured criteria
+2. LinkedIn Boolean (broad and targeted)
+3. Google X-ray for LinkedIn
+4. Google X-ray for GitHub
+5. Top 15 companies where this person probably works today
+
+CLAUDE: [gives you all of the above]
+
+YOU: I found these 5 profiles. [paste LinkedIn URLs or summaries]
+Score each one against the JD and rank them.
+
+CLAUDE: [scores and ranks them with reasoning]
+
+YOU: Write a personalized outreach message for the top 2 candidates.
+Lead with what's impressive about THEM, not the job.
+
+CLAUDE: [writes two personalized messages]</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+
+<!-- STEP 4 -->
+<h2 id="step4">Step 4: Add Contact Finding</h2>
+
+<p>Juicebox includes email and phone lookup. Here's how to replicate that for free or cheap:</p>
+
+<div class="step">
+  <div class="step-num amber">Method 1: Hunter.io (50 free lookups/month)</div>
+  <ol>
+    <li>Sign up at <a href="https://hunter.io" target="_blank">hunter.io</a> (free account)</li>
+    <li>Use "Domain Search" to find the email pattern for any company</li>
+    <li>Use "Email Finder" to find a specific person's email</li>
+    <li>Use "Email Verifier" to check if the email is valid before sending</li>
+  </ol>
+  <p>50 free lookups per month covers most solo sourcers. If you need more, Apollo.io gives you more free credits.</p>
+</div>
+
+<div class="step">
+  <div class="step-num amber">Method 2: GitHub commit emails (unlimited, free)</div>
+  <p>Every git commit contains the author's email. If a candidate has public repos:</p>
+  <ol>
+    <li>Go to their GitHub profile</li>
+    <li>Click on any repository they've contributed to</li>
+    <li>Click on a recent commit</li>
+    <li>Add <strong>.patch</strong> to the end of the commit URL</li>
+    <li>The email appears in the "From:" line at the top</li>
+  </ol>
+  <p>This works even when they've hidden their email in their GitHub settings. It's public data embedded in every commit.</p>
+</div>
+
+<div class="step">
+  <div class="step-num amber">Method 3: Apollo.io (free tier)</div>
+  <ol>
+    <li>Sign up at <a href="https://apollo.io" target="_blank">apollo.io</a> (free account)</li>
+    <li>You get email credits each month for free</li>
+    <li>Search by company, title, and location</li>
+    <li>Export emails directly or use their Chrome extension on LinkedIn</li>
+  </ol>
+</div>
+
+<div class="callout warn">
+  <p><strong>Important:</strong> Always verify emails before sending. A bounced email hurts your sender reputation. Use Hunter.io's free verifier or NeverBounce's free tier to check each email before outreach.</p>
+</div>
+
+
+<!-- STEP 5 -->
+<h2 id="step5">Step 5: Create Your Candidate Pipeline</h2>
+
+<p>Juicebox has a built-in CRM. You're going to use Airtable (free) or Google Sheets.</p>
+
+<div class="step">
+  <div class="step-num violet">Option A: Airtable (recommended, free tier)</div>
+  <p>Create a base with these tables:</p>
+  <ol>
+    <li><strong>Candidates:</strong> Name, LinkedIn URL, GitHub URL, Email, Skills, Current Company, Current Title, Location, Source, Notes, Score (1-5)</li>
+    <li><strong>Requisitions:</strong> Company, Role Title, JD Link, Priority (Hot/Warm/Cold), Status, Fee, Hiring Manager</li>
+    <li><strong>Submissions:</strong> Links a Candidate to a Requisition with Status (Sourced, Contacted, Responded, Screened, Submitted, Interviewing, Offered, Placed, Rejected)</li>
+  </ol>
+  <p>Airtable's free tier gives you 1,000 records per base. That's enough for most solo sourcers.</p>
+</div>
+
+<div class="step">
+  <div class="step-num violet">Option B: Google Sheets (100% free, unlimited)</div>
+  <p>Same structure, just in tabs. Less pretty, but it works and it's completely free. Claude can help you build the template:</p>
+</div>
+
+<div class="code-block">
+  <span class="code-label">Ask Claude this</span>
+  <pre>Create a Google Sheets template for a recruiting pipeline tracker. 
+I need tabs for: Candidates, Requisitions, Submissions, and Activity Log.
+Include columns, data validation rules, and conditional formatting 
+for status tracking. Make it color-coded so I can see my pipeline at a glance.</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+
+<!-- STEP 6 -->
+<h2 id="step6">Step 6: Automate with n8n / Make / Zapier</h2>
+
+<p>This is where your DIY Juicebox goes from manual to semi-automatic. Connect the pieces so data flows without you copy-pasting.</p>
+
+<div class="step">
+  <div class="step-num rose">Automation 1: New candidate alert</div>
+  <p><strong>Trigger:</strong> You add a candidate to Airtable<br>
+  <strong>Action:</strong> Claude API generates a personalized outreach message<br>
+  <strong>Action:</strong> Draft appears in your Gmail as a ready-to-send email<br>
+  <strong>Tool:</strong> Zapier (easiest) or Make (more powerful)</p>
+</div>
+
+<div class="step">
+  <div class="step-num rose">Automation 2: Follow-up reminders</div>
+  <p><strong>Trigger:</strong> Candidate status is "Contacted" for 3+ days<br>
+  <strong>Action:</strong> Slack/email reminder to follow up<br>
+  <strong>Action:</strong> Claude API generates a follow-up message variant<br>
+  <strong>Tool:</strong> Any of the three platforms</p>
+</div>
+
+<div class="step">
+  <div class="step-num rose">Automation 3: Weekly pipeline report</div>
+  <p><strong>Trigger:</strong> Every Friday at 5pm<br>
+  <strong>Action:</strong> Pull pipeline data from Airtable<br>
+  <strong>Action:</strong> Claude API summarizes: candidates sourced, contacted, responded, submitted this week<br>
+  <strong>Action:</strong> Send formatted summary to your email or Slack<br>
+  <strong>Tool:</strong> n8n (best for this) or Make</p>
+</div>
+
+<div class="callout">
+  <p><strong>Which automation tool should you pick?</strong><br>
+  <strong>Zapier</strong> if you've never automated anything (easiest to learn).<br>
+  <strong>Make</strong> if you want visual workflows with complex logic.<br>
+  <strong>n8n</strong> if you want to self-host and keep candidate data private (important for compliance).</p>
+</div>
+
+<h3>Connecting Claude's API to your automation</h3>
+<p>To use Claude in automations (not just the chat), you need an API key:</p>
+<ol>
+  <li>Go to <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a></li>
+  <li>Create an account and add a payment method (pay-per-use, usually $5-20/month for sourcing)</li>
+  <li>Go to API Keys and create a new key</li>
+  <li>In Zapier/Make/n8n, use the "HTTP Request" module to call Claude's API</li>
+</ol>
+
+<div class="code-block">
+  <span class="code-label">Claude API call (for your automation tool's HTTP module)</span>
+  <pre>URL: https://api.anthropic.com/v1/messages
+Method: POST
+Headers:
+  x-api-key: [YOUR_API_KEY]
+  anthropic-version: 2023-06-01
+  content-type: application/json
+
+Body:
+{
+  "model": "claude-sonnet-4-20250514",
+  "max_tokens": 1024,
+  "messages": [
+    {
+      "role": "user", 
+      "content": "Write a personalized recruiting outreach message for [CANDIDATE NAME] who is a [TITLE] at [COMPANY]. I'm pitching a [ROLE] at [CLIENT]. Keep it under 100 words. Lead with something specific about their background."
+    }
+  ]
+}</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+
+<!-- PROMPTS SECTION -->
+<h2 id="prompts">The System Prompts (Copy-Paste Ready)</h2>
+
+<p>Here are the specialized prompts for each part of your workflow. Save these in a Claude Project or paste them when you need them.</p>
+
+<div class="step">
+  <div class="step-num blue">Prompt 1: JD Parser</div>
+</div>
+<div class="code-block">
+  <pre>Parse this job description and extract:
+
+1. MUST-HAVE skills (true dealbreakers, not wish list)
+2. NICE-TO-HAVE skills (won't reject without)
+3. Hidden requirements (implied but not stated)
+4. Title variations (what this person calls themselves on LinkedIn)
+5. Seniority signals (IC vs lead vs manager)
+6. Comp estimate based on requirements + market
+7. Top 10 companies where this exact person works today
+8. Red flags (unrealistic combos, title/comp mismatch)
+
+JD:
+[PASTE JD HERE]</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="step">
+  <div class="step-num cyan">Prompt 2: Boolean Generator</div>
+</div>
+<div class="code-block">
+  <pre>Generate search strings for this role:
+
+Title: [ROLE]
+Skills: [SKILLS]
+Location: [LOCATION]
+Experience: [YEARS]
+
+I need:
+1. LinkedIn Boolean (broad version, 200+ results)
+2. LinkedIn Boolean (targeted version, 30-50 results)
+3. Google X-ray for LinkedIn: site:linkedin.com/in/
+4. Google X-ray for GitHub: site:github.com
+5. Google X-ray for personal sites (exclude LinkedIn and GitHub)
+6. Title variations I should also search
+
+For each string, explain the logic so I can modify it.</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="step">
+  <div class="step-num emerald">Prompt 3: Candidate Evaluator</div>
+</div>
+<div class="code-block">
+  <pre>Evaluate this candidate against the role we discussed.
+
+Candidate info:
+[PASTE LINKEDIN SUMMARY, RESUME, OR GITHUB PROFILE]
+
+Score on these dimensions (1-5):
+1. Technical skill match
+2. Seniority alignment
+3. Industry relevance
+4. Career trajectory (trending up or down?)
+5. Risk factors (gaps, hopping, title inflation)
+
+Then give me:
+- Overall verdict: SUBMIT / MAYBE / PASS
+- Top 3 strengths to highlight to the client
+- Top 3 risks to probe in a screen
+- Suggested talking points for the candidate call</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="step">
+  <div class="step-num amber">Prompt 4: Outreach Writer</div>
+</div>
+<div class="code-block">
+  <pre>Write a cold outreach message for this candidate:
+
+Name: [NAME]
+Current role: [TITLE at COMPANY]
+Something notable: [SPECIFIC DETAIL - project, patent, talk, open source work]
+Role I'm pitching: [TITLE at CLIENT COMPANY]
+Why this role is compelling: [2-3 selling points]
+
+Rules:
+- Under 100 words
+- Lead with what impressed me about THEM
+- No "exciting opportunity" or "I came across your profile"
+- No corporate buzzwords
+- End with a low-friction ask (15-min call, not a full interview)
+- Sound like a human texting a colleague, not a recruiter template</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+<div class="step">
+  <div class="step-num violet">Prompt 5: Talent Map Builder</div>
+</div>
+<div class="code-block">
+  <pre>I'm sourcing for [ROLE] with [KEY SKILLS]. Build me a talent map.
+
+List 20 companies organized by:
+
+TIER 1 - Direct competitors (same product/market):
+[list companies + which team/org to target]
+
+TIER 2 - Adjacent companies (similar tech stack):
+[list companies + why their engineers would have these skills]
+
+TIER 3 - Non-obvious sources:
+[list companies nobody else is looking at + why this talent exists there]
+
+For each company, tell me:
+- Estimated team size for this function
+- Recent news (layoffs, funding, product launches) that affects hiring
+- Are they currently hiring for similar roles? (competition signal)</pre>
+  <button class="copy-btn" onclick="copyText(this)">Copy</button>
+</div>
+
+
+<!-- COST COMPARISON -->
+<h2 id="cost">Cost Breakdown: Yours vs. Juicebox</h2>
+
+<table class="compare">
+  <thead><tr><th>Item</th><th>Juicebox</th><th>Your DIY Version</th></tr></thead>
+  <tbody>
+    <tr><td><strong>AI search brain</strong></td><td>Included</td><td>Claude Free or Pro ($20/mo) <span class="tag free">free-$20</span></td></tr>
+    <tr><td><strong>People database</strong></td><td>Included</td><td>GitHub API + Google X-ray <span class="tag free">free</span></td></tr>
+    <tr><td><strong>Contact finding</strong></td><td>Included (250 credits)</td><td>Hunter.io (50/mo free) + Apollo.io free tier <span class="tag free">free</span></td></tr>
+    <tr><td><strong>CRM/Pipeline</strong></td><td>Basic built-in</td><td>Airtable or Google Sheets <span class="tag free">free</span></td></tr>
+    <tr><td><strong>Outreach</strong></td><td>Built-in sequences</td><td>Claude writes + Gmail sends <span class="tag free">free</span></td></tr>
+    <tr><td><strong>Automation</strong></td><td>Included</td><td>Zapier free tier or n8n self-hosted <span class="tag free">free</span></td></tr>
+    <tr><td><strong>API usage (optional)</strong></td><td>N/A</td><td>Claude API for automations <span class="tag freemium">~$5-10/mo</span></td></tr>
+    <tr style="border-top:2px solid var(--accent);">
+      <td><strong>TOTAL MONTHLY COST</strong></td>
+      <td><strong style="color:var(--rose);">$99-$129/mo</strong></td>
+      <td><strong style="color:var(--emerald);">$0-$20/mo</strong></td>
+    </tr>
+    <tr>
+      <td><strong>ANNUAL SAVINGS</strong></td>
+      <td></td>
+      <td><strong style="color:var(--emerald);">$948-$1,548/year</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout tip">
+  <p><strong>The bottom line:</strong> You're trading a polished UI for flexibility, control, and savings. If you fill 2+ roles per month, the time you spend setting this up pays for itself in the first week. And unlike Juicebox, your LinkedIn account stays safe.</p>
+</div>
+
+<h2>What's Next</h2>
+
+<p>Once you have this workflow running, you can level it up:</p>
+<ul>
+  <li><strong>Save your Claude Project</strong> with all prompts pre-loaded. Every new search starts instantly.</li>
+  <li><strong>Build a prompt library</strong> for different role types (ML engineer, data engineer, frontend, etc.).</li>
+  <li><strong>Add more data sources:</strong> Stack Overflow profiles, arXiv papers, conference speaker lists, patent databases.</li>
+  <li><strong>Connect to your ATS</strong> via Zapier or Make if your ATS has an API (Greenhouse, Lever, Ashby all do).</li>
+  <li><strong>Track what works:</strong> Note which outreach messages get responses. Feed that back to Claude so it learns your style.</li>
+</ul>
+
+<p>Questions? Ideas? Want to share what you've built? <a href="https://github.com/shotwellj/placement-ops" target="_blank">Open an issue on GitHub</a> or reach out on <a href="https://sourcingnav.com/ui/knowledge-hub.html">the Knowledge Hub</a>.</p>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-brand">SOURCINGNAV</div>
+  <p>Talent Engineering Platform &middot; Open Source &middot; MIT License</p>
+  <div class="footer-links">
+    <a href="https://sourcingnav.com/">Home</a>
+    <a href="https://sourcingnav.com/ui/knowledge-hub.html">Knowledge Hub</a>
+    <a href="https://sourcingnav.com/ui/dashboard.html">Agency</a>
+    <a href="https://github.com/shotwellj/placement-ops" target="_blank">GitHub</a>
+  </div>
+</footer>
+
+<script>
+function copyText(btn) {
+  const block = btn.closest('.code-block');
+  const pre = block.querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+</script>
+</body>
+</html>
