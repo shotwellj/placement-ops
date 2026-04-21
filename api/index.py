@@ -768,7 +768,12 @@ async def send_magic_link(
 
     link = f"https://sourcingnav.com/app/?token={token}"
 
-    # Step 3: send email via Resend
+    # Step 3a: log the attempt FIRST (so rate-limiting works even when email send fails).
+    # If this isn't here, an attacker hitting the endpoint with random emails would
+    # never get rate-limited because Resend would reject the send and we'd skip logging.
+    await log_login_attempt(req.email, ip, success=False)
+
+    # Step 3b: send email via Resend
     # NOTE: Using onboarding@resend.dev (Resend's sandbox sender) until sourcingnav.com
     # is verified as a sending domain at resend.com/domains. The sandbox sender only
     # delivers to the email address that owns the Resend account.
@@ -790,7 +795,6 @@ async def send_magic_link(
                 },
             )
         if r.status_code >= 400:
-            # Surface Resend error details so we can debug
             try:
                 err_body = r.json()
                 msg = err_body.get("message") or err_body.get("error") or r.text[:200]
@@ -802,8 +806,16 @@ async def send_magic_link(
     except Exception as e:
         raise HTTPException(500, f"Email error: {type(e).__name__}: {str(e)[:200]}")
 
-    # Step 4: best-effort log of the attempt (for rate limiting future requests)
-    await log_login_attempt(req.email, ip, success=True)
+    # Step 4: mark the attempt as successful (delivered)
+    try:
+        async with db() as client:
+            await client.execute(
+                """UPDATE login_attempts SET success = 1
+                   WHERE email = ? AND attempted_at > datetime('now', '-1 minute')""",
+                [req.email],
+            )
+    except Exception:
+        pass
 
     return {"ok": True, "message": "Check your email for the login link"}
 
