@@ -2012,29 +2012,135 @@ function generateBoolean() {
     return;
   }
 
-  // Title variations
-  const titleMap = {
+  // Title variations — pattern-matched by role family, not exact match
+  // Thinks like a sourcer: what do people with this job ACTUALLY call themselves?
+  const roleLower = role.toLowerCase();
+  // "Product Manager" is an IC title despite containing "manager". Same for some others.
+  const isProductManager = /\bproduct\s+manager\b/i.test(roleLower) || /\bpm\b/i.test(roleLower);
+  const isManager = !isProductManager && /\b(manager|director|head of|vp|vice president)\b/.test(roleLower);
+  const isIC = !isManager;
+
+  // Try exact-match first
+  const exactMap = {
     'data engineer': ['"Data Engineer"', '"Analytics Engineer"', '"Data Platform Engineer"', '"ETL Developer"', '"Big Data Engineer"'],
     'data scientist': ['"Data Scientist"', '"Applied Scientist"', '"Research Scientist"', '"ML Scientist"', '"Quantitative Analyst"'],
     'machine learning engineer': ['"Machine Learning Engineer"', '"ML Engineer"', '"MLOps Engineer"', '"AI Engineer"', '"Applied ML Engineer"'],
     'software engineer': ['"Software Engineer"', '"Software Developer"', '"Backend Engineer"', '"Full Stack Engineer"', '"SDE"'],
     'frontend engineer': ['"Frontend Engineer"', '"Front End Developer"', '"UI Engineer"', '"React Developer"', '"Web Developer"'],
     'devops engineer': ['"DevOps Engineer"', '"Platform Engineer"', '"Site Reliability Engineer"', '"SRE"', '"Infrastructure Engineer"'],
-    'product manager': ['"Product Manager"', '"Product Lead"', '"PM"', '"Group Product Manager"', '"Technical Product Manager"'],
+    'product manager': ['"Product Manager"', '"Product Lead"', '"Group Product Manager"', '"Technical Product Manager"', '"Senior Product Manager"'],
     'engineering manager': ['"Engineering Manager"', '"Software Engineering Manager"', '"Dev Manager"', '"Technical Manager"', '"Head of Engineering"'],
   };
 
-  const roleLower = role.toLowerCase();
-  let titles = titleMap[roleLower];
+  let titles = exactMap[roleLower];
+
+  // Pattern-based detection for anything not in the exact map
   if (!titles) {
-    const words = role.split(' ');
-    titles = [
-      `"${role}"`,
-      `"Senior ${role}"`,
-      `"Staff ${role}"`,
-      `"Lead ${role}"`,
-      `"Principal ${role}"`,
-    ];
+    const stripWords = /\b(senior|staff|lead|principal|sr\.?|junior|jr\.?|manager|director|head of|head|vp|vice president|of|for|the|a|an)\b/gi;
+    const domain = roleLower
+      .replace(stripWords, ' ')
+      .replace(/[,]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const ACRONYMS = new Set(['ml','ai','sre','qa','ux','ui','db','ios','api','saas','seo','llm','nlp','cv','aws','gcp','k8s','devops','mlops','etl','sdk','hr','it','pm','cto','cio','cfo']);
+    const domainTitle = domain.split(' ')
+      .filter(w => w.length > 0)
+      .map(w => ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+
+    const dt = domainTitle || role;
+
+    // Detect the FAMILY of the role, so we don't jam "Engineer" onto designers/recruiters/analysts
+    // Families: engineer, designer, analyst, recruiter, marketer, sales, pm, generic
+    let family = 'engineer'; // default
+    if (/\b(designer|design)\b/i.test(roleLower)) family = 'designer';
+    else if (/\b(recruiter|sourcer|talent)\b/i.test(roleLower)) family = 'recruiter';
+    else if (/\b(analyst|analytics)\b/i.test(roleLower) && !/\b(engineer|engineering)\b/i.test(roleLower)) family = 'analyst';
+    else if (/\b(marketer|marketing)\b/i.test(roleLower) && !/\b(engineer|engineering)\b/i.test(roleLower)) family = 'marketer';
+    else if (/\b(sales|account executive|ae|sdr|bdr)\b/i.test(roleLower)) family = 'sales';
+    else if (/\bproduct\s+manager\b/i.test(roleLower) || /\bpm\b/i.test(roleLower)) family = 'pm';
+    else if (!/\b(engineer|engineering|developer|architect)\b/i.test(roleLower)) family = 'generic';
+
+    const roleNoun = {
+      engineer: 'Engineer', designer: 'Designer', recruiter: 'Recruiter',
+      analyst: 'Analyst', marketer: 'Marketer', sales: '', pm: 'Product Manager', generic: ''
+    }[family];
+
+    const hasRoleSuffix = new RegExp(`\\b${roleNoun}s?\\b|\\bengineering\\b|\\brecruiting\\b|\\bdesign\\b|\\banalytics\\b|\\bmarketing\\b`, 'i').test(dt);
+    const dtBare = dt.replace(/\s*(engineers?|engineering|designers?|design|recruiters?|recruiting|analysts?|analytics|marketers?|marketing)$/i, '').trim();
+    const displayDt = dtBare || dt;
+
+    if (isManager) {
+      const base = [
+        `"${role}"`,
+        `"Manager, ${dt}"`,
+        `"Manager of ${dt}"`,
+        `"Head of ${dt}"`,
+        `"Director of ${dt}"`,
+        `"Director, ${dt}"`,
+        `"VP of ${dt}"`,
+        `"VP, ${dt}"`,
+        `"${displayDt} Lead"`,
+      ];
+      // Only add engineering-flavored titles if the role is actually an engineering role
+      if (family === 'engineer') {
+        base.push(`"Engineering Manager, ${displayDt}"`);
+        base.push(`"Lead ${displayDt} Engineer"`);
+      } else if (roleNoun) {
+        base.push(`"Lead ${displayDt} ${roleNoun}"`);
+      }
+      titles = [...new Set(base.map(t => t.replace(/\s+/g, ' ').replace(/\s+"/g, '"').replace(/"\s+/g, '"')))].slice(0, 10);
+    } else {
+      // IC role — adapt title variations to the role family
+      if (family === 'engineer') {
+        const base = [
+          `"${role}"`,
+          hasRoleSuffix ? null : `"${displayDt} Engineer"`,
+          `"Senior ${displayDt} Engineer"`,
+          `"Staff ${displayDt} Engineer"`,
+          `"Principal ${displayDt} Engineer"`,
+          `"${displayDt} Developer"`,
+          `"${displayDt} Architect"`,
+          `"Lead ${displayDt} Engineer"`,
+        ].filter(Boolean);
+        titles = [...new Set(base.map(t => t.replace(/\s+/g, ' ').replace(/\s+"/g, '"')))].slice(0, 9);
+      } else if (family === 'designer') {
+        const base = [
+          `"${role}"`, `"Senior ${displayDt} Designer"`, `"Staff ${displayDt} Designer"`,
+          `"Lead ${displayDt} Designer"`, `"${displayDt} Design Lead"`, `"Principal ${displayDt} Designer"`,
+        ];
+        titles = [...new Set(base.map(t => t.replace(/\s+/g, ' ').replace(/\s+"/g, '"')))];
+      } else if (family === 'recruiter') {
+        const base = [
+          `"${role}"`, `"Technical Sourcer"`, `"Senior ${displayDt} Recruiter"`,
+          `"Lead ${displayDt} Recruiter"`, `"${displayDt} Talent Partner"`, `"Sr. Technical Recruiter"`,
+        ];
+        titles = [...new Set(base.map(t => t.replace(/\s+/g, ' ').replace(/\s+"/g, '"')))];
+      } else if (family === 'analyst') {
+        const base = [
+          `"${role}"`, `"Senior ${displayDt} Analyst"`, `"Staff ${displayDt} Analyst"`,
+          `"Lead ${displayDt} Analyst"`, `"${displayDt} Consultant"`, `"Principal ${displayDt} Analyst"`,
+        ];
+        titles = [...new Set(base.map(t => t.replace(/\s+/g, ' ').replace(/\s+"/g, '"')))];
+      } else if (family === 'pm') {
+        // Always use a clean PM title set regardless of input phrasing
+        titles = [
+          `"${role}"`, `"Senior Product Manager"`, `"Group Product Manager"`,
+          `"Principal Product Manager"`, `"Lead Product Manager"`, `"Technical Product Manager"`,
+        ];
+        titles = [...new Set(titles)];
+      } else {
+        // Generic fallback — keep it simple
+        const base = [
+          `"${role}"`,
+          `"Senior ${role}"`,
+          `"Lead ${role}"`,
+          `"Principal ${role}"`,
+        ];
+        titles = [...new Set(base.map(t => t.replace(/\s+/g, ' ').replace(/\s+"/g, '"')))];
+      }
+    }
   }
 
   // LinkedIn Boolean
