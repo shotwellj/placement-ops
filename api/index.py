@@ -435,19 +435,23 @@ MAGIC_LINK_RATE_LIMIT_PER_IP_PER_HOUR = 20  # max per IP across all emails
 
 
 async def check_magic_link_rate_limit(email: str, ip: Optional[str]):
-    """Raise HTTPException(429) if email or IP has exceeded magic-link rate limits."""
-    one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    """Raise HTTPException(429) if email or IP has exceeded magic-link rate limits.
+
+    NOTE: SQLite/Turso stores TIMESTAMP DEFAULT CURRENT_TIMESTAMP as 'YYYY-MM-DD HH:MM:SS'
+    (no T, no tz). We use the SQL function datetime('now', '-1 hour') to do the
+    comparison server-side so format matching is automatic.
+    """
     async with db() as client:
         rs = await client.execute(
-            "SELECT COUNT(*) FROM login_attempts WHERE email = ? AND attempted_at > ?",
-            [email, one_hour_ago],
+            "SELECT COUNT(*) FROM login_attempts WHERE email = ? AND attempted_at > datetime('now', '-1 hour')",
+            [email],
         )
         if rs.rows and rs.rows[0][0] >= MAGIC_LINK_RATE_LIMIT_PER_HOUR:
-            raise HTTPException(429, f"Too many login attempts for this email. Try again in an hour.")
+            raise HTTPException(429, "Too many login attempts for this email. Try again in an hour.")
         if ip:
             rs = await client.execute(
-                "SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND attempted_at > ?",
-                [ip, one_hour_ago],
+                "SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND attempted_at > datetime('now', '-1 hour')",
+                [ip],
             )
             if rs.rows and rs.rows[0][0] >= MAGIC_LINK_RATE_LIMIT_PER_IP_PER_HOUR:
                 raise HTTPException(429, "Too many login attempts from this network. Try again in an hour.")
