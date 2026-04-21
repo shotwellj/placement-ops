@@ -606,19 +606,26 @@ async def verify(req: VerifyTokenRequest):
 
 @app.get("/api/user/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    async with db() as client:
-        rs = await client.execute(
-            "SELECT plan, usage_intake, usage_eval, usage_outreach, byok_provider FROM users WHERE id = ?",
-            [user["id"]],
-        )
-        r = rs.rows[0]
-        return {
-            **user, "plan": r[0],
-            "usage": {"intake": r[1], "eval": r[2], "outreach": r[3]},
-            "caps": FREE_CAPS if r[0] == "free" else {"intake": 100, "eval": None, "outreach": None},
-            "byok_provider": r[4],
-            "byok_configured": bool(r[4]),
-        }
+    try:
+        async with db() as client:
+            rs = await client.execute(
+                "SELECT plan, usage_intake, usage_eval, usage_outreach, byok_provider FROM users WHERE id = ?",
+                [user["id"]],
+            )
+            if not rs.rows:
+                raise HTTPException(404, "User not found in DB")
+            r = rs.rows[0]
+            return {
+                **user, "plan": r[0],
+                "usage": {"intake": r[1] or 0, "eval": r[2] or 0, "outreach": r[3] or 0},
+                "caps": FREE_CAPS if r[0] == "free" else {"intake": 100, "eval": None, "outreach": None},
+                "byok_provider": r[4],
+                "byok_configured": bool(r[4]),
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[me] {type(e).__name__}: {str(e)[:200]}")
 
 
 @app.post("/api/user/byok-key")
@@ -637,48 +644,80 @@ async def save_byok_key(req: ByokRequest, user: dict = Depends(get_current_user)
 @app.post("/api/intake")
 async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     """Paste JD → parsed analysis + Boolean strings. Saves as a requisition."""
-    await check_and_increment_cap(user["id"], "intake")
+    # Step 0: rate limit
+    try:
+        await check_and_increment_cap(user["id"], "intake")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[cap] {type(e).__name__}: {str(e)[:200]}")
 
-    parsed_text = await call_ai(user["id"], JD_PARSER_PROMPT.format(jd=req.jd_text))
-    parsed = parse_json_strict(parsed_text)
+    # Step 1: parse JD with AI
+    try:
+        parsed_text = await call_ai(user["id"], JD_PARSER_PROMPT.format(jd=req.jd_text))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[ai-parse] {type(e).__name__}: {str(e)[:300]}")
 
-    boolean_text = await call_ai(
-        user["id"],
-        BOOLEAN_BUILDER_PROMPT.format(parsed_jd=json.dumps(parsed, indent=2)),
-    )
-    booleans = parse_json_strict(boolean_text)
-
-    org_name = req.org_name or parsed.get("core", {}).get("company") or "Unspecified"
-    req_title = req.req_title or parsed.get("core", {}).get("role_title") or "Untitled Role"
-
-    async with db() as client:
-        rs = await client.execute(
-            "SELECT id FROM organizations WHERE user_id = ? AND name = ?",
-            [user["id"], org_name],
+    # Step 2: JSON-parse the AI response
+    try:
+        parsed = parse_json_strict(parsed_text)
+    except Exception as e:
+        raise HTTPException(
+            500,
+            f"[json-parse] {type(e).__name__}: {str(e)[:200]}. AI returned: {parsed_text[:300]}",
         )
-        if rs.rows:
-            org_id = rs.rows[0][0]
-        else:
-            org_id = str(uuid.uuid4())
+
+    # Step 3: generate Boolean strings with AI
+    try:
+        boolean_text = await call_ai(
+            user["id"],
+            BOOLEAN_BUILDER_PROMPT.format(parsed_jd=json.dumps(parsed, indent=2)),
+        )
+        booleans = parse_json_strict(boolean_text)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[ai-bool] {type(e).__name__}: {str(e)[:300]}")
+
+    # Step 4: save to DB
+    try:
+        org_name = req.org_name or parsed.get("core", {}).get("company") or "Unspecified"
+        req_title = req.req_title or parsed.get("core", {}).get("role_title") or "Untitled Role"
+
+        async with db() as client:
+            rs = await client.execute(
+                "SELECT id FROM organizations WHERE user_id = ? AND name = ?",
+                [user["id"], org_name],
+            )
+            if rs.rows:
+                org_id = rs.rows[0][0]
+            else:
+                org_id = str(uuid.uuid4())
+                await client.execute(
+                    "INSERT INTO organizations (id, user_id, name, org_type) VALUES (?, ?, ?, ?)",
+                    [org_id, user["id"], org_name, "client" if user["mode"] == "agency" else "own"],
+                )
+
+            req_id = str(uuid.uuid4())
+            now = datetime.now(timezone.utc).isoformat()
             await client.execute(
-                "INSERT INTO organizations (id, user_id, name, org_type) VALUES (?, ?, ?, ?)",
-                [org_id, user["id"], org_name, "client" if user["mode"] == "agency" else "own"],
+                """INSERT INTO requisitions
+                   (id, org_id, user_id, title, jd_raw, parsed_json, boolean_strings_json, status, opened_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)""",
+                [req_id, org_id, user["id"], req_title, req.jd_text,
+                 json.dumps(parsed), json.dumps(booleans), now, now],
             )
 
-        req_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
-        await client.execute(
-            """INSERT INTO requisitions
-               (id, org_id, user_id, title, jd_raw, parsed_json, boolean_strings_json, status, opened_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)""",
-            [req_id, org_id, user["id"], req_title, req.jd_text,
-             json.dumps(parsed), json.dumps(booleans), now, now],
-        )
-
-        await client.execute(
-            "INSERT INTO activity_log (id, user_id, entity_type, entity_id, action, metadata_json) VALUES (?, ?, ?, ?, ?, ?)",
-            [str(uuid.uuid4()), user["id"], "req", req_id, "created", json.dumps({"source": "intake"})],
-        )
+            await client.execute(
+                "INSERT INTO activity_log (id, user_id, entity_type, entity_id, action, metadata_json) VALUES (?, ?, ?, ?, ?, ?)",
+                [str(uuid.uuid4()), user["id"], "req", req_id, "created", json.dumps({"source": "intake"})],
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[db-save] {type(e).__name__}: {str(e)[:300]}")
 
     return {
         "req_id": req_id,
