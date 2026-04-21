@@ -1,23 +1,66 @@
 """
-SourcingNav API — Read-only FastAPI backend.
+SourcingNav Talent Engine — API v1
+Deployed at sourcingnav.com/api/*
 
-Serves seed data from /api/seed/*.json to the frontend dashboards.
-Deploy target: Vercel serverless Python functions.
-Local dev: `uvicorn api.index:app --reload --port 8000` from the repo root.
+Two tiers of endpoints in one file:
+1. DEMO endpoints (/api/dashboard/*, /api/candidates, etc) — read-only seed data
+   powering the hardcoded demos at /ui/dashboard.html and /ui/people-ops.html.
+2. PRODUCTION endpoints (/api/intake, /api/auth/*, /api/reqs/*, etc) — the real
+   talent engine at /app/, backed by Turso SQLite + BYOK AI.
 """
 
+import os
 import json
+import uuid
+import hashlib
+import httpx
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from typing import Optional
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr, Field
+
+# Optional deps (graceful if missing so demos still deploy)
+try:
+    import libsql_client
+    HAS_DB = True
+except ImportError:
+    HAS_DB = False
+
+try:
+    from cryptography.fernet import Fernet
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
+
+
+# ---------- CONFIG ----------
+
+TURSO_URL = os.environ.get("TURSO_URL", "")
+TURSO_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "")
+BYOK_ENCRYPTION_KEY = os.environ.get("BYOK_ENCRYPTION_KEY", "")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+MAGIC_LINK_SECRET = os.environ.get("MAGIC_LINK_SECRET", "")
+
+fernet = None
+if HAS_CRYPTO and BYOK_ENCRYPTION_KEY:
+    try:
+        fernet = Fernet(BYOK_ENCRYPTION_KEY.encode() if isinstance(BYOK_ENCRYPTION_KEY, str) else BYOK_ENCRYPTION_KEY)
+    except Exception:
+        fernet = None
+
+SEED_DIR = Path(__file__).parent / "seed"
+
+# ---------- APP ----------
 
 app = FastAPI(
-    title="SourcingNav API",
-    description="Read-only API powering the SourcingNav agency + company dashboards.",
-    version="0.1.0",
+    title="SourcingNav Talent Engine",
+    description="Demos (read-only) + production talent engine.",
+    version="1.0.0",
+    docs_url="/api/docs",
 )
 
-# Allow the frontend (sourcingnav.com + localhost) to call the API from the browser.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -25,115 +68,532 @@ app.add_middleware(
         "https://www.sourcingnav.com",
         "http://localhost:8000",
         "http://localhost:3000",
-        "http://127.0.0.1:5500",
-        "*",  # open for demo; tighten later
+        "*",
     ],
-    allow_credentials=False,
-    allow_methods=["GET"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Seed data lives next to this file in /api/seed/
-SEED_DIR = Path(__file__).parent / "seed"
-
 
 def load_seed(name: str) -> dict:
-    """Load a JSON seed file by name (without the .json extension)."""
     path = SEED_DIR / f"{name}.json"
     if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Seed file '{name}' not found")
+        raise HTTPException(status_code=404, detail=f"Seed '{name}' not found")
     with open(path, "r") as f:
         return json.load(f)
 
 
-# ---------- Meta ----------
+def db():
+    if not HAS_DB or not TURSO_URL or not TURSO_TOKEN:
+        raise HTTPException(503, "Database not configured yet. Set TURSO_URL and TURSO_AUTH_TOKEN in Vercel.")
+    return libsql_client.create_client(url=TURSO_URL, auth_token=TURSO_TOKEN)
+
+
+# ---------- META ----------
 
 @app.get("/api")
 def root():
     return {
-        "name": "SourcingNav API",
-        "version": "0.1.0",
+        "name": "SourcingNav Talent Engine",
+        "version": "1.0.0",
         "status": "ok",
-        "endpoints": [
-            "/api/health",
-            "/api/dashboard/agency",
-            "/api/dashboard/company",
-            "/api/candidates",
-            "/api/candidates/{candidate_id}",
-            "/api/pipeline",
-            "/api/market-intel",
-            "/api/scan",
-            "/api/batch",
-            "/api/calibration",
-            "/api/integrations",
+        "demo_endpoints": [
+            "/api/health", "/api/dashboard/agency", "/api/dashboard/company",
+            "/api/candidates", "/api/pipeline", "/api/market-intel",
+            "/api/scan", "/api/batch", "/api/calibration", "/api/integrations",
+        ],
+        "app_endpoints": [
+            "/api/auth/magic-link", "/api/auth/verify",
+            "/api/user/me", "/api/user/byok-key",
+            "/api/intake", "/api/reqs", "/api/reqs/{id}",
         ],
     }
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "sourcingnav-api"}
+    return {
+        "status": "ok",
+        "service": "sourcingnav-api",
+        "db_configured": bool(TURSO_URL and TURSO_TOKEN),
+        "crypto_configured": fernet is not None,
+        "time": datetime.now(timezone.utc).isoformat(),
+    }
 
 
-# ---------- Dashboard KPIs ----------
+# =====================================================================
+# DEMO ENDPOINTS — read-only, unchanged from v0.1
+# Powers the hardcoded demos at /ui/dashboard.html and /ui/people-ops.html
+# =====================================================================
 
 @app.get("/api/dashboard/agency")
 def dashboard_agency():
-    data = load_seed("dashboard")
-    return data["agency"]
+    return load_seed("dashboard")["agency"]
 
 
 @app.get("/api/dashboard/company")
 def dashboard_company():
-    data = load_seed("dashboard")
-    return data["company"]
+    return load_seed("dashboard")["company"]
 
-
-# ---------- Candidates ----------
 
 @app.get("/api/candidates")
-def list_candidates():
+def list_candidates_demo():
     return load_seed("candidates")
 
 
 @app.get("/api/candidates/{candidate_id}")
-def get_candidate(candidate_id: str):
+def get_candidate_demo(candidate_id: str):
     data = load_seed("candidates")
     for c in data["candidates"]:
         if c["id"] == candidate_id:
             return c
-    raise HTTPException(status_code=404, detail=f"Candidate '{candidate_id}' not found")
+    raise HTTPException(404, f"Candidate '{candidate_id}' not found")
 
-
-# ---------- Pipeline (agency searches) ----------
 
 @app.get("/api/pipeline")
-def pipeline():
+def pipeline_demo():
     return load_seed("pipeline")
 
 
-# ---------- Intelligence views ----------
-
 @app.get("/api/market-intel")
-def market_intel():
+def market_intel_demo():
     return load_seed("market_intel")
 
 
 @app.get("/api/scan")
-def scan():
+def scan_demo():
     return load_seed("scan")
 
 
 @app.get("/api/batch")
-def batch():
+def batch_demo():
     return load_seed("batch")
 
 
 @app.get("/api/calibration")
-def calibration():
+def calibration_demo():
     return load_seed("calibration")
 
 
 @app.get("/api/integrations")
-def integrations():
+def integrations_demo():
     return load_seed("integrations")
+
+
+# =====================================================================
+# PRODUCTION — the real talent engine at /app/
+# =====================================================================
+
+FREE_CAPS = {"intake": 5, "eval": 10, "outreach": 10}
+
+
+async def check_and_increment_cap(user_id: str, cap_type: str):
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT plan, usage_intake, usage_eval, usage_outreach FROM users WHERE id = ?",
+            [user_id],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "User not found")
+        row = rs.rows[0]
+        plan = row[0]
+        usage_map = {"intake": row[1], "eval": row[2], "outreach": row[3]}
+        if plan == "free" and usage_map[cap_type] >= FREE_CAPS[cap_type]:
+            raise HTTPException(402, f"Free tier cap reached ({FREE_CAPS[cap_type]}/mo). Upgrade to Pro.")
+        col = f"usage_{cap_type}"
+        await client.execute(
+            f"UPDATE users SET {col} = {col} + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [user_id],
+        )
+
+
+# ---------- AUTH ----------
+
+class MagicLinkRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyTokenRequest(BaseModel):
+    token: str
+
+
+def sign_token(email: str, exp_minutes: int = 15) -> str:
+    exp = int((datetime.now(timezone.utc) + timedelta(minutes=exp_minutes)).timestamp())
+    payload = f"{email}|{exp}"
+    sig = hashlib.sha256(f"{payload}|{MAGIC_LINK_SECRET}".encode()).hexdigest()[:32]
+    return f"{email}|{exp}|{sig}"
+
+
+def verify_token(token: str) -> Optional[str]:
+    try:
+        email, exp_str, sig = token.split("|")
+        exp = int(exp_str)
+        if datetime.now(timezone.utc).timestamp() > exp:
+            return None
+        expected = hashlib.sha256(f"{email}|{exp}|{MAGIC_LINK_SECRET}".encode()).hexdigest()[:32]
+        if sig != expected:
+            return None
+        return email
+    except Exception:
+        return None
+
+
+async def get_current_user(authorization: str = Header(None)) -> dict:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Missing or invalid Authorization header")
+    token = authorization.replace("Bearer ", "")
+    email = verify_token(token)
+    if not email:
+        raise HTTPException(401, "Invalid or expired token")
+    async with db() as client:
+        rs = await client.execute("SELECT id, email, mode, plan FROM users WHERE email = ?", [email])
+        if not rs.rows:
+            raise HTTPException(404, "User not found")
+        r = rs.rows[0]
+        return {"id": r[0], "email": r[1], "mode": r[2], "plan": r[3]}
+
+
+# ---------- AI ROUTER (BYOK) ----------
+
+async def call_ai(user_id: str, prompt: str, max_tokens: int = 8000) -> str:
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT byok_provider, byok_key_enc FROM users WHERE id = ?", [user_id]
+        )
+        if not rs.rows or not rs.rows[0][0]:
+            raise HTTPException(400, "No AI provider configured. Add your API key in Settings.")
+        provider, key_enc = rs.rows[0][0], rs.rows[0][1]
+
+    if not fernet:
+        raise HTTPException(500, "Encryption not configured on server")
+    api_key = fernet.decrypt(key_enc.encode()).decode()
+
+    if provider == "anthropic":
+        return await _call_anthropic(api_key, prompt, max_tokens)
+    if provider == "openai":
+        return await _call_openai(api_key, prompt, max_tokens)
+    if provider == "together":
+        return await _call_together(api_key, prompt, max_tokens)
+    raise HTTPException(400, f"Unknown provider: {provider}")
+
+
+async def _call_anthropic(api_key: str, prompt: str, max_tokens: int) -> str:
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        r = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-sonnet-4-5",
+                "max_tokens": max_tokens,
+                "temperature": 0.3,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
+        r.raise_for_status()
+        return r.json()["content"][0]["text"]
+
+
+async def _call_openai(api_key: str, prompt: str, max_tokens: int) -> str:
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        r = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "gpt-4o",
+                "max_tokens": max_tokens,
+                "temperature": 0.3,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+
+
+async def _call_together(api_key: str, prompt: str, max_tokens: int) -> str:
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        r = await client.post(
+            "https://api.together.xyz/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "max_tokens": max_tokens,
+                "temperature": 0.3,
+                "messages": [
+                    {"role": "system", "content": "Respond with valid JSON only. No markdown code fences."},
+                    {"role": "user", "content": prompt},
+                ],
+            },
+        )
+        r.raise_for_status()
+        text = r.json()["choices"][0]["message"]["content"]
+        if "<think>" in text and "</think>" in text:
+            text = text.split("</think>")[-1].strip()
+        return text.replace("```json", "").replace("```", "").strip()
+
+
+def parse_json_strict(text: str) -> dict:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.strip("`").strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start:end + 1]
+    return json.loads(text)
+
+
+# ---------- PROMPTS ----------
+
+JD_PARSER_PROMPT = """You are an expert technical recruiter with 13+ years in sourcing.
+
+Parse this job description and return a structured JSON analysis.
+
+JOB DESCRIPTION:
+{jd}
+
+Return ONLY valid JSON with this shape:
+{{
+  "core": {{
+    "role_title": "...", "level": "...", "company": "...",
+    "location": "...", "remote_policy": "remote|hybrid|onsite", "industry": "..."
+  }},
+  "executive_brief": {{
+    "summary": "2-3 sentences on what this role is really about",
+    "market_temperature": "hot|warm|cool",
+    "recommended_first_moves": ["action 1", "action 2", "action 3"]
+  }},
+  "must_have_skills": [{{"skill": "...", "rationale": "...", "severity": "blocker"}}],
+  "nice_to_have_skills": [{{"skill": "...", "rationale": "..."}}],
+  "transferable_skill_clusters": [{{"cluster_name": "...", "variants": [], "adjacent_skills": []}}],
+  "alt_titles": {{"ic_junior": [], "ic_mid": [], "ic_senior": [], "ic_staff_plus": []}},
+  "comp_snapshot": {{"base_range": "...", "total_comp_range": "...", "negotiation_notes": "..."}},
+  "market_dynamics": {{
+    "talent_saturation": "low|medium|high",
+    "time_to_fill_days": [30, 60],
+    "difficulty_score": 7
+  }},
+  "market360": {{
+    "top_hiring_companies": [],
+    "talent_hotspots": [],
+    "poaching_targets": [{{"company": "...", "tier": 1, "rationale": "..."}}]
+  }},
+  "sourcing_strategy": {{"priority_channels": [], "key_tactics": []}}
+}}
+
+No em dashes. No code fences. Just JSON.
+"""
+
+BOOLEAN_BUILDER_PROMPT = """You are an expert sourcer. Based on this parsed JD, generate Boolean search strings.
+
+PARSED JD:
+{parsed_jd}
+
+Return ONLY valid JSON:
+{{
+  "linkedin_sniper": "...", "linkedin_precision": "...",
+  "linkedin_expanded": "...", "linkedin_dragnet": "...",
+  "google_xray": "site:linkedin.com/in/ ...",
+  "github_xray": "site:github.com ...", "company_targeted": "...",
+  "company_clusters": {{
+    "tier_1_direct_competitors": [],
+    "tier_2_adjacent": []
+  }},
+  "mentor_notes": {{"sourcing_strategy": "...", "keyword_reasoning": "..."}}
+}}
+
+Rules: No em dashes. Boolean strings must be valid LinkedIn Recruiter syntax.
+Tier 1 = same product/market. Tier 2 = adjacent industry/skill overlap.
+"""
+
+
+# ---------- MODELS ----------
+
+class IntakeRequest(BaseModel):
+    jd_text: str = Field(..., min_length=50)
+    org_name: Optional[str] = None
+    req_title: Optional[str] = None
+
+
+class ByokRequest(BaseModel):
+    provider: str = Field(..., pattern="^(anthropic|openai|together)$")
+    api_key: str = Field(..., min_length=10)
+
+
+# ---------- PRODUCTION ROUTES ----------
+
+@app.post("/api/auth/magic-link")
+async def send_magic_link(req: MagicLinkRequest):
+    if not RESEND_API_KEY:
+        raise HTTPException(500, "Email service not configured")
+
+    async with db() as client:
+        rs = await client.execute("SELECT id FROM users WHERE email = ?", [req.email])
+        if not rs.rows:
+            user_id = str(uuid.uuid4())
+            await client.execute("INSERT INTO users (id, email) VALUES (?, ?)", [user_id, req.email])
+
+    token = sign_token(req.email)
+    link = f"https://sourcingnav.com/app/?token={token}"
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        await client.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+            json={
+                "from": "SourcingNav <login@sourcingnav.com>",
+                "to": req.email,
+                "subject": "Your SourcingNav login link",
+                "html": f"<p>Click to sign in to SourcingNav:</p><p><a href='{link}'>{link}</a></p><p>Expires in 15 minutes.</p>",
+            },
+        )
+    return {"ok": True, "message": "Check your email"}
+
+
+@app.post("/api/auth/verify")
+async def verify(req: VerifyTokenRequest):
+    email = verify_token(req.token)
+    if not email:
+        raise HTTPException(401, "Invalid or expired token")
+    async with db() as client:
+        rs = await client.execute("SELECT id, mode, plan FROM users WHERE email = ?", [email])
+        if not rs.rows:
+            raise HTTPException(404, "User not found")
+        return {
+            "access_token": req.token,
+            "user": {"id": rs.rows[0][0], "email": email, "mode": rs.rows[0][1], "plan": rs.rows[0][2]},
+        }
+
+
+@app.get("/api/user/me")
+async def get_me(user: dict = Depends(get_current_user)):
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT plan, usage_intake, usage_eval, usage_outreach, byok_provider FROM users WHERE id = ?",
+            [user["id"]],
+        )
+        r = rs.rows[0]
+        return {
+            **user, "plan": r[0],
+            "usage": {"intake": r[1], "eval": r[2], "outreach": r[3]},
+            "caps": FREE_CAPS if r[0] == "free" else {"intake": 100, "eval": None, "outreach": None},
+            "byok_provider": r[4],
+            "byok_configured": bool(r[4]),
+        }
+
+
+@app.post("/api/user/byok-key")
+async def save_byok_key(req: ByokRequest, user: dict = Depends(get_current_user)):
+    if not fernet:
+        raise HTTPException(500, "Encryption not configured")
+    encrypted = fernet.encrypt(req.api_key.encode()).decode()
+    async with db() as client:
+        await client.execute(
+            "UPDATE users SET byok_provider = ?, byok_key_enc = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [req.provider, encrypted, user["id"]],
+        )
+    return {"ok": True, "provider": req.provider}
+
+
+@app.post("/api/intake")
+async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
+    """Paste JD → parsed analysis + Boolean strings. Saves as a requisition."""
+    await check_and_increment_cap(user["id"], "intake")
+
+    parsed_text = await call_ai(user["id"], JD_PARSER_PROMPT.format(jd=req.jd_text))
+    parsed = parse_json_strict(parsed_text)
+
+    boolean_text = await call_ai(
+        user["id"],
+        BOOLEAN_BUILDER_PROMPT.format(parsed_jd=json.dumps(parsed, indent=2)),
+    )
+    booleans = parse_json_strict(boolean_text)
+
+    org_name = req.org_name or parsed.get("core", {}).get("company") or "Unspecified"
+    req_title = req.req_title or parsed.get("core", {}).get("role_title") or "Untitled Role"
+
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT id FROM organizations WHERE user_id = ? AND name = ?",
+            [user["id"], org_name],
+        )
+        if rs.rows:
+            org_id = rs.rows[0][0]
+        else:
+            org_id = str(uuid.uuid4())
+            await client.execute(
+                "INSERT INTO organizations (id, user_id, name, org_type) VALUES (?, ?, ?, ?)",
+                [org_id, user["id"], org_name, "client" if user["mode"] == "agency" else "own"],
+            )
+
+        req_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        await client.execute(
+            """INSERT INTO requisitions
+               (id, org_id, user_id, title, jd_raw, parsed_json, boolean_strings_json, status, opened_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)""",
+            [req_id, org_id, user["id"], req_title, req.jd_text,
+             json.dumps(parsed), json.dumps(booleans), now, now],
+        )
+
+        await client.execute(
+            "INSERT INTO activity_log (id, user_id, entity_type, entity_id, action, metadata_json) VALUES (?, ?, ?, ?, ?, ?)",
+            [str(uuid.uuid4()), user["id"], "req", req_id, "created", json.dumps({"source": "intake"})],
+        )
+
+    return {
+        "req_id": req_id,
+        "parsed": parsed,
+        "boolean_strings": booleans,
+        "created_at": now,
+    }
+
+
+@app.get("/api/reqs")
+async def list_reqs(user: dict = Depends(get_current_user), status: Optional[str] = None):
+    async with db() as client:
+        query = """
+            SELECT r.id, r.title, r.status, r.fee_estimate, r.opened_at, o.name
+            FROM requisitions r JOIN organizations o ON r.org_id = o.id
+            WHERE r.user_id = ?
+        """
+        params = [user["id"]]
+        if status:
+            query += " AND r.status = ?"
+            params.append(status)
+        query += " ORDER BY r.opened_at DESC"
+        rs = await client.execute(query, params)
+        return {
+            "reqs": [
+                {"id": r[0], "title": r[1], "status": r[2], "fee_estimate": r[3],
+                 "opened_at": r[4], "org_name": r[5]} for r in rs.rows
+            ]
+        }
+
+
+@app.get("/api/reqs/{req_id}")
+async def get_req(req_id: str, user: dict = Depends(get_current_user)):
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT r.id, r.title, r.jd_raw, r.parsed_json, r.boolean_strings_json,
+                      r.status, r.opened_at, o.name
+               FROM requisitions r JOIN organizations o ON r.org_id = o.id
+               WHERE r.id = ? AND r.user_id = ?""",
+            [req_id, user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Requisition not found")
+        r = rs.rows[0]
+        return {
+            "id": r[0], "title": r[1], "jd_raw": r[2],
+            "parsed": json.loads(r[3]) if r[3] else None,
+            "boolean_strings": json.loads(r[4]) if r[4] else None,
+            "status": r[5], "opened_at": r[6], "org_name": r[7],
+        }

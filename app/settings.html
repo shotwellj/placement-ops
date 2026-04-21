@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings · SourcingNav</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a; --bg-elev: #111827; --bg-card: #151d2e;
+    --border: #1f2a3f; --border-strong: #2d3a54;
+    --text: #e8ecf4; --text-dim: #8b9bb3; --text-mute: #5a6c85;
+    --accent: #3dd9d6; --blue: #4a9eff;
+    --gradient: linear-gradient(135deg, #3dd9d6 0%, #4a9eff 100%);
+    --good: #4ade80; --danger: #ff6b6b;
+    --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5;
+    background-image: radial-gradient(ellipse at top right, rgba(61, 217, 214, 0.06) 0%, transparent 50%); }
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
+  .nav-inner { max-width: 1400px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; letter-spacing: 0.08em; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+  .nav-right { display: flex; align-items: center; gap: 1.5rem; font-size: 0.85rem; }
+  .nav-link { color: var(--text-dim); text-decoration: none; }
+  .nav-link.active { color: var(--text); }
+  .nav-link:hover { color: var(--accent); }
+</style>
+<style>
+  .page { max-width: 800px; margin: 0 auto; padding: 3rem 2rem; }
+  .page-title { font-size: 2rem; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+  .page-desc { color: var(--text-dim); margin-bottom: 2.5rem; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; }
+  .card-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .card-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; }
+  .field { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+  .field label { font-size: 0.85rem; color: var(--text-dim); }
+  .field input, .field select { padding: 0.8rem 1rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 0.95rem; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.75rem; border: none; border-radius: 8px; font-family: var(--font-body); font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+  .btn-primary { background: var(--gradient); color: #0a0e1a; }
+  .status { font-size: 0.85rem; margin-top: 0.75rem; display: none; }
+  .status.ok { color: var(--good); display: block; }
+  .status.err { color: var(--danger); display: block; }
+  .help-links a { color: var(--accent); text-decoration: none; }
+  .help-links a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="brand">SOURCINGNAV</a>
+    <div class="nav-right">
+      <a href="/app/" class="nav-link">Intake</a>
+      <a href="/app/pipeline.html" class="nav-link">Pipeline</a>
+      <a href="/app/candidates.html" class="nav-link">Candidates</a>
+      <a href="/app/settings.html" class="nav-link active">Settings</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page">
+  <h1 class="page-title">Settings</h1>
+  <p class="page-desc">Bring your own API key. Your key, your tokens, your cost. Stored encrypted, never logged.</p>
+
+  <section class="card">
+    <div class="card-label">AI Provider</div>
+    <h2 class="card-title">Connect your API key</h2>
+    <div class="field">
+      <label for="provider">Provider</label>
+      <select id="provider">
+        <option value="anthropic">Anthropic (Claude), best quality, ~$0.08/intake</option>
+        <option value="openai">OpenAI (GPT-4o), good quality, ~$0.05/intake</option>
+        <option value="together">Together.ai (Qwen 3 235B), cheapest, ~$0.01/intake</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="apiKey">API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-..., sk-..., or tgp_...">
+    </div>
+    <button id="saveBtn" class="btn btn-primary">Save key</button>
+    <div id="status" class="status"></div>
+
+    <div class="help-links" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim);">
+      <p style="margin-bottom: 0.75rem;"><strong>Don't have a key yet?</strong></p>
+      <p style="margin-bottom: 0.4rem;">Anthropic: <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a></p>
+      <p style="margin-bottom: 0.4rem;">OpenAI: <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></p>
+      <p>Together.ai: <a href="https://api.together.xyz/settings/api-keys" target="_blank">api.together.xyz</a> ($1 free credit on signup)</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-label">Account</div>
+    <h2 class="card-title">Your plan</h2>
+    <div id="accountInfo" style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-dim); line-height: 2;">Loading...</div>
+  </section>
+</main>
+
+<script>
+const API = '/api';
+const token = localStorage.getItem('sn_token');
+if (!token) location.href = '/app/';
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) };
+  const res = await fetch(`${API}${path}`, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed');
+  }
+  return res.json();
+}
+
+async function loadAccount() {
+  try {
+    const user = await api('/user/me');
+    document.getElementById('accountInfo').innerHTML = `
+      <div>Email: ${user.email}</div>
+      <div>Plan: ${user.plan.toUpperCase()}</div>
+      <div>Mode: ${user.mode}</div>
+      <div>Usage: ${user.usage.intake} intakes / ${user.usage.eval} evals / ${user.usage.outreach} outreach</div>
+      <div>Current provider: ${user.byok_provider || 'not configured'}</div>
+    `;
+    if (user.byok_provider) document.getElementById('provider').value = user.byok_provider;
+  } catch (e) {
+    document.getElementById('accountInfo').textContent = 'Could not load account';
+  }
+}
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const provider = document.getElementById('provider').value;
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const status = document.getElementById('status');
+  if (!apiKey || apiKey.length < 10) {
+    status.className = 'status err';
+    status.textContent = 'Enter a valid API key';
+    return;
+  }
+  try {
+    await api('/user/byok-key', {
+      method: 'POST',
+      body: JSON.stringify({ provider, api_key: apiKey }),
+    });
+    status.className = 'status ok';
+    status.textContent = '✓ Key saved. You can now run intakes.';
+    document.getElementById('apiKey').value = '';
+    loadAccount();
+  } catch (e) {
+    status.className = 'status err';
+    status.textContent = e.message;
+  }
+});
+
+loadAccount();
+</script>
+</body>
+</html>

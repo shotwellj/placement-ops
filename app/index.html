@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intake · SourcingNav Talent Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a; --bg-elev: #111827; --bg-card: #151d2e;
+    --border: #1f2a3f; --border-strong: #2d3a54;
+    --text: #e8ecf4; --text-dim: #8b9bb3; --text-mute: #5a6c85;
+    --accent: #3dd9d6; --accent-deep: #2eb8b5; --blue: #4a9eff;
+    --accent-glow: rgba(61, 217, 214, 0.15);
+    --gradient: linear-gradient(135deg, #3dd9d6 0%, #4a9eff 100%);
+    --danger: #ff6b6b; --warn: #ffb74d; --good: #4ade80;
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body); background: var(--bg); color: var(--text);
+    min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(ellipse at top right, rgba(61, 217, 214, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom left, rgba(74, 158, 255, 0.04) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+</style>
+<style>
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
+  .nav-inner { max-width: 1400px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; letter-spacing: 0.08em; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+  .brand-sub { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); margin-left: 0.75rem; padding-left: 0.75rem; border-left: 1px solid var(--border-strong); }
+  .nav-right { display: flex; align-items: center; gap: 1.5rem; font-size: 0.85rem; }
+  .nav-link { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+  .nav-link:hover { color: var(--accent); }
+  .nav-link.active { color: var(--text); }
+  .usage-pill { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.3rem 0.7rem; border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text-dim); }
+  .usage-pill.warn { border-color: var(--warn); color: var(--warn); }
+  .page { max-width: 1400px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+  .page-header { margin-bottom: 3rem; }
+  .page-kicker { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.75rem; }
+  .page-title { font-size: 2.75rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 1rem; }
+  .page-title em { font-style: italic; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .page-desc { color: var(--text-dim); font-size: 1.05rem; max-width: 640px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; }
+  .card-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .card-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.25rem; }
+</style>
+<style>
+  textarea.jd-input { width: 100%; min-height: 320px; padding: 1.25rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.6; resize: vertical; transition: border-color 0.15s; }
+  textarea.jd-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+  .input-field { padding: 0.8rem 1rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 0.9rem; }
+  .input-field:focus { outline: none; border-color: var(--accent); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.9rem 2rem; border: none; border-radius: 8px; font-family: var(--font-body); font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: transform 0.1s, box-shadow 0.2s; text-decoration: none; }
+  .btn-primary { background: var(--gradient); color: #0a0e1a; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(61, 217, 214, 0.3); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border-strong); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+  .btn-row { display: flex; gap: 0.75rem; margin-top: 1.5rem; align-items: center; }
+  .loading { display: none; padding: 2rem; text-align: center; }
+  .loading.active { display: block; }
+  .loader-bar { width: 100%; max-width: 400px; height: 3px; background: var(--bg-elev); border-radius: 3px; overflow: hidden; margin: 0 auto 1rem; position: relative; }
+  .loader-bar::after { content: ""; position: absolute; top: 0; left: -30%; width: 30%; height: 100%; background: var(--gradient); animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { 0% { left: -30%; } 100% { left: 100%; } }
+  .loader-text { font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent); }
+  .results { display: none; }
+  .results.active { display: block; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+  @media (max-width: 900px) { .result-grid { grid-template-columns: 1fr; } }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi { padding: 1.25rem; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; }
+  .kpi-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .kpi-value { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+  .kpi-value.text { font-size: 1rem; color: var(--text); }
+</style>
+<style>
+  .skill-list { list-style: none; }
+  .skill-item { padding: 0.7rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+  .skill-item:last-child { border-bottom: none; }
+  .skill-name { font-weight: 500; }
+  .skill-rationale { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.25rem; }
+  .severity { font-family: var(--font-mono); font-size: 0.65rem; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.05em; text-transform: uppercase; flex-shrink: 0; }
+  .severity.blocker { background: rgba(255, 107, 107, 0.15); color: var(--danger); }
+  .severity.preferred { background: rgba(255, 183, 77, 0.15); color: var(--warn); }
+  .severity.nice { background: rgba(139, 155, 179, 0.15); color: var(--text-dim); }
+  .boolean-block { position: relative; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; }
+  .boolean-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .boolean-text { font-family: var(--font-mono); font-size: 0.82rem; color: var(--text); line-height: 1.6; word-break: break-word; padding-right: 3rem; }
+  .copy-btn { position: absolute; top: 0.75rem; right: 0.75rem; padding: 0.3rem 0.7rem; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 4px; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); cursor: pointer; transition: all 0.15s; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--good); border-color: var(--good); }
+  .company-tier { margin-top: 1rem; }
+  .tier-label { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .company-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .chip { padding: 0.35rem 0.75rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 6px; font-size: 0.8rem; color: var(--text-dim); }
+  .chip.poaching { border-color: var(--accent-deep); color: var(--accent); }
+  .error-banner { display: none; padding: 1rem 1.5rem; background: rgba(255, 107, 107, 0.08); border: 1px solid rgba(255, 107, 107, 0.3); border-radius: 8px; color: var(--danger); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .error-banner.active { display: block; }
+  .auth-modal { display: none; position: fixed; inset: 0; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 2rem; }
+  .auth-modal.active { display: flex; }
+  .auth-box { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 12px; padding: 2.5rem; max-width: 440px; width: 100%; }
+  .auth-box h2 { margin-bottom: 0.75rem; }
+  .auth-box p { color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.92rem; }
+  .auth-input { width: 100%; padding: 0.9rem 1rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-size: 1rem; margin-bottom: 1rem; }
+  .auth-input:focus { outline: none; border-color: var(--accent); }
+  .auth-msg { font-size: 0.85rem; color: var(--accent); margin-top: 0.75rem; display: none; }
+  .auth-msg.active { display: block; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <div style="display: flex; align-items: center;">
+      <a href="/" class="brand">SOURCINGNAV</a>
+      <span class="brand-sub">Talent Engine</span>
+    </div>
+    <div class="nav-right">
+      <a href="/app/" class="nav-link active">Intake</a>
+      <a href="/app/pipeline.html" class="nav-link">Pipeline</a>
+      <a href="/app/candidates.html" class="nav-link">Candidates</a>
+      <a href="/app/settings.html" class="nav-link">Settings</a>
+      <span id="usagePill" class="usage-pill">Free</span>
+    </div>
+  </div>
+</nav>
+
+<main class="page">
+  <header class="page-header">
+    <div class="page-kicker">01 — Intake Engine</div>
+    <h1 class="page-title">Paste a JD.<br><em>Get the strategy.</em></h1>
+    <p class="page-desc">One paste, two AI engines chain automatically. JD parsed, Boolean strings generated, company clusters mapped. Everything a senior sourcer does in the first hour of a new req, in about 30 seconds.</p>
+  </header>
+
+  <div id="errorBanner" class="error-banner"></div>
+
+  <section class="card" id="inputCard">
+    <div class="card-label">JD Input</div>
+    <h2 class="card-title">Paste the job description</h2>
+    <textarea id="jdInput" class="jd-input" placeholder="Paste the full job description here. Include title, company, location, comp if available, requirements, and responsibilities."></textarea>
+    <div class="input-row">
+      <input type="text" id="companyName" class="input-field" placeholder="Company name (optional, auto-detected)">
+      <input type="text" id="roleTitle" class="input-field" placeholder="Role title (optional, auto-detected)">
+    </div>
+    <div class="btn-row">
+      <button id="runBtn" class="btn btn-primary"><span>Run Intake</span><span style="font-family: var(--font-mono); opacity: 0.6;">→</span></button>
+      <button id="clearBtn" class="btn btn-ghost">Clear</button>
+      <span style="color: var(--text-mute); font-size: 0.85rem; margin-left: auto;"><span id="charCount">0</span> chars</span>
+    </div>
+  </section>
+
+  <div id="loading" class="loading card">
+    <div class="loader-bar"></div>
+    <div class="loader-text" id="loaderText">Parsing JD...</div>
+  </div>
+
+  <div id="results" class="results">
+    <section class="card">
+      <div class="card-label">Core Analysis</div>
+      <h2 class="card-title" id="resultTitle">Role Summary</h2>
+      <div class="kpi-row" id="coreKpis"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-label">Executive Brief</div>
+      <h2 class="card-title">What this role really is</h2>
+      <p id="execSummary" style="color: var(--text-dim); margin-bottom: 1rem;"></p>
+      <div class="card-label" style="margin-top: 1.5rem;">Recommended First Moves</div>
+      <ul id="firstMoves" style="list-style: none; margin-top: 0.5rem;"></ul>
+    </section>
+
+    <div class="result-grid">
+      <section class="card">
+        <div class="card-label">Must-Have Skills</div>
+        <h2 class="card-title">True blockers</h2>
+        <ul class="skill-list" id="mustHaveList"></ul>
+      </section>
+      <section class="card">
+        <div class="card-label">Nice-to-Have</div>
+        <h2 class="card-title">Bonus, not dealbreakers</h2>
+        <ul class="skill-list" id="niceToHaveList"></ul>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-label">Boolean Strings</div>
+      <h2 class="card-title">Ready to paste</h2>
+      <div id="booleanBlocks"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-label">Company Clusters</div>
+      <h2 class="card-title">Where to source from</h2>
+      <div class="company-tier">
+        <div class="tier-label">Tier 1 · Direct Competitors (start here)</div>
+        <div class="company-chips" id="tier1Chips"></div>
+      </div>
+      <div class="company-tier">
+        <div class="tier-label">Tier 2 · Adjacent (expand to these)</div>
+        <div class="company-chips" id="tier2Chips"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-label">Saved</div>
+      <h2 class="card-title">This intake is saved as a requisition</h2>
+      <p style="color: var(--text-dim); margin-bottom: 1rem;">Full analysis is now in your pipeline. Next: add candidates and score them against this role.</p>
+      <div class="btn-row">
+        <a id="pipelineLink" href="/app/pipeline.html" class="btn btn-primary">View in Pipeline</a>
+        <button id="newIntake" class="btn btn-ghost">New Intake</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="authModal" class="auth-modal">
+  <div class="auth-box">
+    <h2>Sign in to continue</h2>
+    <p>Enter your email. We'll send you a magic link. No password required.</p>
+    <input id="authEmail" type="email" class="auth-input" placeholder="you@company.com">
+    <button id="authSend" class="btn btn-primary" style="width: 100%;">Send magic link</button>
+    <div id="authMsg" class="auth-msg">Check your email for the login link.</div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+let token = localStorage.getItem('sn_token');
+let user = null;
+
+function $(id) { return document.getElementById(id); }
+
+function showError(msg) {
+  const b = $('errorBanner');
+  b.textContent = msg;
+  b.classList.add('active');
+  setTimeout(() => b.classList.remove('active'), 8000);
+}
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API}${path}`, { ...opts, headers });
+  if (res.status === 401) {
+    localStorage.removeItem('sn_token');
+    token = null;
+    $('authModal').classList.add('active');
+    throw new Error('Please sign in');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+const urlToken = new URLSearchParams(location.search).get('token');
+if (urlToken) {
+  (async () => {
+    try {
+      const res = await fetch(`${API}/auth/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: urlToken }),
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        localStorage.setItem('sn_token', data.access_token);
+        token = data.access_token;
+        history.replaceState({}, '', '/app/');
+        location.reload();
+      }
+    } catch (e) { console.error(e); }
+  })();
+}
+</script>
+
+<script>
+async function loadUser() {
+  if (!token) { $('authModal').classList.add('active'); return; }
+  try {
+    user = await api('/user/me');
+    updateUsagePill();
+  } catch (e) {}
+}
+
+function updateUsagePill() {
+  const pill = $('usagePill');
+  if (!user) return;
+  if (user.plan === 'free') {
+    const used = user.usage.intake;
+    const cap = user.caps.intake;
+    pill.textContent = `Free · ${used}/${cap} intakes`;
+    if (used >= cap - 1) pill.classList.add('warn');
+  } else { pill.textContent = 'Pro'; }
+}
+
+$('authSend').addEventListener('click', async () => {
+  const email = $('authEmail').value.trim();
+  if (!email) return;
+  try {
+    await fetch(`${API}/auth/magic-link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    $('authMsg').classList.add('active');
+  } catch (e) { showError('Could not send login link. Try again.'); }
+});
+
+$('jdInput').addEventListener('input', () => {
+  $('charCount').textContent = $('jdInput').value.length.toLocaleString();
+});
+
+$('clearBtn').addEventListener('click', () => {
+  $('jdInput').value = '';
+  $('charCount').textContent = '0';
+  $('results').classList.remove('active');
+});
+
+$('newIntake').addEventListener('click', () => {
+  $('jdInput').value = '';
+  $('companyName').value = '';
+  $('roleTitle').value = '';
+  $('results').classList.remove('active');
+  $('inputCard').scrollIntoView({ behavior: 'smooth' });
+});
+</script>
+
+<script>
+$('runBtn').addEventListener('click', async () => {
+  const jdText = $('jdInput').value.trim();
+  if (jdText.length < 50) { showError('JD is too short. Paste the full job description.'); return; }
+  if (!token) { $('authModal').classList.add('active'); return; }
+  if (user && !user.byok_configured) {
+    showError('Add your API key in Settings first. This app uses your own API key.');
+    return;
+  }
+
+  $('runBtn').disabled = true;
+  $('results').classList.remove('active');
+  $('loading').classList.add('active');
+
+  const stages = ['Parsing JD...', 'Mapping skills...', 'Generating Boolean strings...', 'Identifying company clusters...'];
+  let stageIdx = 0;
+  const stageTimer = setInterval(() => {
+    stageIdx = (stageIdx + 1) % stages.length;
+    $('loaderText').textContent = stages[stageIdx];
+  }, 2500);
+
+  try {
+    const body = {
+      jd_text: jdText,
+      org_name: $('companyName').value.trim() || null,
+      req_title: $('roleTitle').value.trim() || null,
+    };
+    const data = await api('/intake', { method: 'POST', body: JSON.stringify(body) });
+    renderResults(data);
+    await loadUser();
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    clearInterval(stageTimer);
+    $('loading').classList.remove('active');
+    $('runBtn').disabled = false;
+  }
+});
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function escapeAttr(s) { return String(s || '').replace(/"/g, '&quot;'); }
+</script>
+
+<script>
+function renderResults(data) {
+  const p = data.parsed;
+  const b = data.boolean_strings;
+  const core = p.core || {};
+
+  $('resultTitle').textContent = `${core.role_title || 'Role'} at ${core.company || 'Unspecified'}`;
+  $('coreKpis').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Level</div><div class="kpi-value text">${core.level || '—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Location</div><div class="kpi-value text">${core.location || '—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Remote</div><div class="kpi-value text">${core.remote_policy || '—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Industry</div><div class="kpi-value text">${core.industry || '—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Difficulty</div><div class="kpi-value">${(p.market_dynamics && p.market_dynamics.difficulty_score) || '—'}/10</div></div>
+    <div class="kpi"><div class="kpi-label">Market Temp</div><div class="kpi-value text">${(p.executive_brief && p.executive_brief.market_temperature) || '—'}</div></div>
+  `;
+
+  $('execSummary').textContent = (p.executive_brief && p.executive_brief.summary) || '';
+  const moves = (p.executive_brief && p.executive_brief.recommended_first_moves) || [];
+  $('firstMoves').innerHTML = moves.map((m, i) => `
+    <li style="padding: 0.75rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 1rem;">
+      <span style="font-family: var(--font-mono); color: var(--accent); font-size: 0.85rem;">0${i + 1}</span>
+      <span>${escapeHtml(m)}</span>
+    </li>`).join('');
+
+  $('mustHaveList').innerHTML = (p.must_have_skills || []).map(s => `
+    <li class="skill-item">
+      <div><div class="skill-name">${escapeHtml(s.skill)}</div><div class="skill-rationale">${escapeHtml(s.rationale || '')}</div></div>
+      <span class="severity ${s.severity || 'blocker'}">${s.severity || 'blocker'}</span>
+    </li>`).join('');
+
+  $('niceToHaveList').innerHTML = (p.nice_to_have_skills || []).map(s => `
+    <li class="skill-item">
+      <div><div class="skill-name">${escapeHtml(s.skill)}</div><div class="skill-rationale">${escapeHtml(s.rationale || '')}</div></div>
+      <span class="severity nice">nice</span>
+    </li>`).join('');
+}
+</script>
+
+<script>
+// Continue renderResults: booleans and clusters
+const _originalRender = renderResults;
+renderResults = function(data) {
+  _originalRender(data);
+  const b = data.boolean_strings;
+
+  const boolMap = [
+    ['linkedin_sniper', 'LinkedIn · Sniper'],
+    ['linkedin_precision', 'LinkedIn · Precision'],
+    ['linkedin_expanded', 'LinkedIn · Expanded'],
+    ['linkedin_dragnet', 'LinkedIn · Dragnet'],
+    ['google_xray', 'Google X-Ray'],
+    ['github_xray', 'GitHub X-Ray'],
+    ['company_targeted', 'Company Targeted'],
+  ];
+  $('booleanBlocks').innerHTML = boolMap
+    .filter(([k]) => b[k])
+    .map(([k, label]) => `
+      <div class="boolean-block">
+        <div class="boolean-label">${label}</div>
+        <div class="boolean-text">${escapeHtml(b[k])}</div>
+        <button class="copy-btn" data-text="${escapeAttr(b[k])}">Copy</button>
+      </div>`).join('');
+
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.text);
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    });
+  });
+
+  const clusters = b.company_clusters || {};
+  const renderChip = c => `<span class="chip poaching">${escapeHtml(typeof c === 'string' ? c : c.company || c.name || '')}</span>`;
+  const renderChipPlain = c => `<span class="chip">${escapeHtml(typeof c === 'string' ? c : c.company || c.name || '')}</span>`;
+
+  $('tier1Chips').innerHTML = (clusters.tier_1_direct_competitors || []).map(renderChip).join('') || '<span class="chip">No tier 1 identified</span>';
+  $('tier2Chips').innerHTML = (clusters.tier_2_adjacent || []).map(renderChipPlain).join('') || '<span class="chip">No tier 2 identified</span>';
+
+  $('pipelineLink').href = `/app/pipeline.html?req=${data.req_id}`;
+  $('results').classList.add('active');
+  $('results').scrollIntoView({ behavior: 'smooth' });
+};
+
+loadUser();
+</script>
+</body>
+</html>
