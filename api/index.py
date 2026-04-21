@@ -284,7 +284,8 @@ def integrations_demo():
 FREE_CAPS = {"intake": 5, "eval": 10, "outreach": 10}
 
 
-async def check_and_increment_cap(user_id: str, cap_type: str):
+async def check_cap(user_id: str, cap_type: str):
+    """Check the cap WITHOUT incrementing. Raises 402 if the user is over."""
     async with db() as client:
         rs = await client.execute(
             "SELECT plan, usage_intake, usage_eval, usage_outreach FROM users WHERE id = ?",
@@ -294,14 +295,25 @@ async def check_and_increment_cap(user_id: str, cap_type: str):
             raise HTTPException(404, "User not found")
         row = rs.rows[0]
         plan = row[0]
-        usage_map = {"intake": row[1], "eval": row[2], "outreach": row[3]}
+        usage_map = {"intake": row[1] or 0, "eval": row[2] or 0, "outreach": row[3] or 0}
         if plan == "free" and usage_map[cap_type] >= FREE_CAPS[cap_type]:
             raise HTTPException(402, f"Free tier cap reached ({FREE_CAPS[cap_type]}/mo). Upgrade to Pro.")
-        col = f"usage_{cap_type}"
+
+
+async def increment_cap(user_id: str, cap_type: str):
+    """Increment the usage counter. Call this ONLY after the work succeeds."""
+    col = f"usage_{cap_type}"
+    async with db() as client:
         await client.execute(
             f"UPDATE users SET {col} = {col} + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             [user_id],
         )
+
+
+async def check_and_increment_cap(user_id: str, cap_type: str):
+    """Legacy combined function — kept for any callers that want the old behavior."""
+    await check_cap(user_id, cap_type)
+    await increment_cap(user_id, cap_type)
 
 
 # ---------- AUTH ----------
@@ -643,10 +655,15 @@ async def save_byok_key(req: ByokRequest, user: dict = Depends(get_current_user)
 
 @app.post("/api/intake")
 async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
-    """Paste JD → parsed analysis + Boolean strings. Saves as a requisition."""
-    # Step 0: rate limit
+    """Paste JD → parsed analysis + Boolean strings. Saves as a requisition.
+
+    Cap policy: check upfront so we reject over-cap requests cleanly,
+    but only INCREMENT after the AI calls succeed. Failed AI calls don't
+    burn quota.
+    """
+    # Step 0: rate-limit check (does NOT increment)
     try:
-        await check_and_increment_cap(user["id"], "intake")
+        await check_cap(user["id"], "intake")
     except HTTPException:
         raise
     except Exception as e:
@@ -718,6 +735,13 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         raise
     except Exception as e:
         raise HTTPException(500, f"[db-save] {type(e).__name__}: {str(e)[:300]}")
+
+    # Step 5: NOW increment the usage counter (everything succeeded)
+    # Wrapped so a failure here doesn't break the user-facing return.
+    try:
+        await increment_cap(user["id"], "intake")
+    except Exception:
+        pass  # silently swallow — the work is done, accounting is best-effort
 
     return {
         "req_id": req_id,
