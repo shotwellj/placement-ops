@@ -214,6 +214,12 @@
       </div>
     </section>
 
+    <section class="card" id="mentorCard" style="display: none;">
+      <div class="card-label">Sourcer's Notes</div>
+      <h2 class="card-title">How to actually run this</h2>
+      <div id="mentorNotes" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+    </section>
+
     <section class="card">
       <div class="card-label">Saved</div>
       <h2 class="card-title">This intake is saved as a requisition</h2>
@@ -451,23 +457,55 @@ renderResults = function(data) {
   _originalRender(data);
   const b = data.boolean_strings;
 
-  const boolMap = [
-    ['linkedin_sniper', 'LinkedIn · Sniper'],
-    ['linkedin_precision', 'LinkedIn · Precision'],
-    ['linkedin_expanded', 'LinkedIn · Expanded'],
-    ['linkedin_dragnet', 'LinkedIn · Dragnet'],
-    ['google_xray', 'Google X-Ray'],
-    ['github_xray', 'GitHub X-Ray'],
-    ['company_targeted', 'Company Targeted'],
+  // Support both new nested structure and old flat structure (for backwards compat
+  // with reqs created before the prompt was updated)
+  const lr = b.linkedin_recruiter || {
+    sniper: b.linkedin_sniper,
+    precision: b.linkedin_precision,
+    expanded: b.linkedin_expanded,
+  };
+  const xray = b.xray || {
+    linkedin: b.google_xray,
+    github: b.github_xray,
+  };
+
+  const lrMap = [
+    ['sniper', 'LinkedIn Recruiter · Sniper', 'Tightest match. Use first.'],
+    ['precision', 'LinkedIn Recruiter · Precision', 'Strong + senior signal.'],
+    ['expanded', 'LinkedIn Recruiter · Expanded', 'Broader recall, adjacent skills.'],
   ];
-  $('booleanBlocks').innerHTML = boolMap
-    .filter(([k]) => b[k])
-    .map(([k, label]) => `
-      <div class="boolean-block">
-        <div class="boolean-label">${label}</div>
-        <div class="boolean-text">${escapeHtml(b[k])}</div>
-        <button class="copy-btn" data-text="${escapeAttr(b[k])}">Copy</button>
-      </div>`).join('');
+  const xrayMap = [
+    ['linkedin', 'X-Ray · LinkedIn', 'Find LinkedIn profiles via Google. No LR seat needed.'],
+    ['github', 'X-Ray · GitHub', 'Public code, bios, and READMEs.'],
+    ['twitter', 'X-Ray · Twitter / X', 'Practitioners talking about their work.'],
+    ['stackoverflow', 'X-Ray · Stack Overflow', 'Active answerers in domain tags.'],
+    ['conferences', 'X-Ray · Conferences', 'Speakers, talks, presentations.'],
+    ['personal_sites', 'X-Ray · Personal Sites', 'Resumes and portfolios. Bypasses LinkedIn.'],
+    ['specialty', 'X-Ray · Specialty Boards', 'HuggingFace, Kaggle, Devpost, etc.'],
+  ];
+
+  const renderBlock = (key, label, hint, value) => `
+    <div class="boolean-block">
+      <div class="boolean-label">${label}</div>
+      ${hint ? `<div style="color: var(--text-mute); font-size: 0.75rem; margin-bottom: 0.5rem;">${hint}</div>` : ''}
+      <div class="boolean-text">${escapeHtml(value)}</div>
+      <button class="copy-btn" data-text="${escapeAttr(value)}">Copy</button>
+    </div>`;
+
+  const lrHtml = lrMap
+    .filter(([k]) => lr[k])
+    .map(([k, label, hint]) => renderBlock(k, label, hint, lr[k]))
+    .join('');
+
+  const xrayHtml = xrayMap
+    .filter(([k]) => xray[k])
+    .map(([k, label, hint]) => renderBlock(k, label, hint, xray[k]))
+    .join('');
+
+  $('booleanBlocks').innerHTML = `
+    ${lrHtml ? `<div class="boolean-section-label" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin: 0 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-strong);">LinkedIn Recruiter (paid)</div>${lrHtml}` : ''}
+    ${xrayHtml ? `<div class="boolean-section-label" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin: 1.5rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-strong);">X-Ray Searches (free for everyone)</div>${xrayHtml}` : ''}
+  `;
 
   document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -484,6 +522,25 @@ renderResults = function(data) {
 
   $('tier1Chips').innerHTML = (clusters.tier_1_direct_competitors || []).map(renderChip).join('') || '<span class="chip">No tier 1 identified</span>';
   $('tier2Chips').innerHTML = (clusters.tier_2_adjacent || []).map(renderChipPlain).join('') || '<span class="chip">No tier 2 identified</span>';
+
+  // Mentor notes card — only show if AI returned them
+  const notes = b.mentor_notes || {};
+  const noteRows = [
+    ['Best X-ray to start with', notes.best_xray_to_start || notes.sourcing_strategy],
+    ['Why these keywords', notes.keyword_reasoning],
+    ['Pro tip', notes.pro_tip],
+  ].filter(([_, v]) => v);
+  if (noteRows.length > 0) {
+    $('mentorNotes').innerHTML = noteRows.map(([label, value]) => `
+      <div>
+        <div style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.3rem;">${label}</div>
+        <div style="color: var(--text-dim); font-size: 0.92rem;">${escapeHtml(value)}</div>
+      </div>
+    `).join('');
+    $('mentorCard').style.display = 'block';
+  } else {
+    $('mentorCard').style.display = 'none';
+  }
 
   $('pipelineLink').href = `/app/pipeline.html?req=${data.req_id}`;
   $('results').classList.add('active');

@@ -544,26 +544,58 @@ Return ONLY valid JSON with this shape:
 No em dashes. No code fences. Just JSON.
 """
 
-BOOLEAN_BUILDER_PROMPT = """You are an expert sourcer. Based on this parsed JD, generate Boolean search strings.
+BOOLEAN_BUILDER_PROMPT = """You are an expert sourcer with 13+ years of Boolean search experience.
 
 PARSED JD:
 {parsed_jd}
 
+Generate 10 Boolean strings: 3 LinkedIn Recruiter strings (for paid LR users) and
+7 X-ray search strings (Google operators that work for everyone, no LR seat needed).
+
+X-ray searches are the universal sourcer's weapon. They find candidates who:
+  - Aren't on LinkedIn Recruiter at all
+  - Have public work (GitHub commits, Kaggle notebooks, conference talks)
+  - Host resumes on personal sites
+  - Talk publicly about their work (Twitter/X)
+  - Are active on niche platforms (HuggingFace, Devpost, Stack Overflow)
+
+Use REAL technology names from the parsed JD (Verilog not "HDL", PyTorch not "ML framework").
+Use proper Google syntax for X-ray: site:, intitle:, in:bio, in:readme, OR, AND, quoted phrases.
+
 Return ONLY valid JSON:
 {{
-  "linkedin_sniper": "...", "linkedin_precision": "...",
-  "linkedin_expanded": "...", "linkedin_dragnet": "...",
-  "google_xray": "site:linkedin.com/in/ ...",
-  "github_xray": "site:github.com ...", "company_targeted": "...",
-  "company_clusters": {{
-    "tier_1_direct_competitors": [],
-    "tier_2_adjacent": []
+  "linkedin_recruiter": {{
+    "sniper": "tightest possible, 3-5 must-have terms, expect <100 results",
+    "precision": "strong matches with seniority signal, ~50-200 results",
+    "expanded": "broader recall with adjacent skills, ~200-1000 results"
   }},
-  "mentor_notes": {{"sourcing_strategy": "...", "keyword_reasoning": "..."}}
+  "xray": {{
+    "linkedin": "site:linkedin.com/in/ ... — find LinkedIn profiles via Google",
+    "github": "site:github.com ... — use in:bio, in:readme, language: where useful",
+    "twitter": "(site:twitter.com OR site:x.com) ... — find practitioners talking publicly",
+    "stackoverflow": "site:stackoverflow.com/users ... — active answerers in [tags]",
+    "conferences": "(site:youtube.com OR site:slideshare.net) ... 'speaker' OR 'talk' — speakers/presenters",
+    "personal_sites": "(intitle:resume OR intitle:CV OR intitle:portfolio) ... -site:linkedin.com -site:indeed.com",
+    "specialty": "site:huggingface.co OR site:kaggle.com OR site:devpost.com ... — domain-specific platforms"
+  }},
+  "company_clusters": {{
+    "tier_1_direct_competitors": ["Company1", "Company2", "Company3"],
+    "tier_2_adjacent": ["Company4", "Company5", "Company6"]
+  }},
+  "mentor_notes": {{
+    "best_xray_to_start": "1 sentence: which X-ray to run first and why",
+    "keyword_reasoning": "1 sentence: why these specific keywords",
+    "pro_tip": "1 sentence: a tactical tip a senior sourcer would share"
+  }}
 }}
 
-Rules: No em dashes. Boolean strings must be valid LinkedIn Recruiter syntax.
-Tier 1 = same product/market. Tier 2 = adjacent industry/skill overlap.
+Rules:
+- No em dashes anywhere
+- LR strings use LR syntax (title:, location:, current_company:)
+- X-ray strings use Google syntax (site:, intitle:, OR, AND, quoted phrases)
+- Tier 1 = same product/market as the hiring company
+- Tier 2 = adjacent industry/skill overlap
+- Be specific. Generic strings like "engineer AND python" are useless.
 """
 
 
