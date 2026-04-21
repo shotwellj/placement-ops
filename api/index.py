@@ -326,21 +326,43 @@ class VerifyTokenRequest(BaseModel):
     token: str
 
 
-def sign_token(email: str, exp_minutes: int = 15) -> str:
+def sign_token(email: str, exp_minutes: int = 15, kind: str = "magic_link") -> str:
+    """Sign a token with an email, expiry, and purpose tag.
+
+    kind="magic_link" — short-lived (15 min), sent via email, used once
+    kind="session"    — long-lived (30 days), stored in browser, used for API auth
+    """
     exp = int((datetime.now(timezone.utc) + timedelta(minutes=exp_minutes)).timestamp())
-    payload = f"{email}|{exp}"
+    payload = f"{email}|{exp}|{kind}"
     sig = hashlib.sha256(f"{payload}|{MAGIC_LINK_SECRET}".encode()).hexdigest()[:32]
-    return f"{email}|{exp}|{sig}"
+    return f"{email}|{exp}|{kind}|{sig}"
 
 
-def verify_token(token: str) -> Optional[str]:
+def verify_token(token: str, expected_kind: Optional[str] = None) -> Optional[str]:
+    """Verify a signed token. If expected_kind is set, require it match."""
     try:
-        email, exp_str, sig = token.split("|")
+        parts = token.split("|")
+        # New format: email|exp|kind|sig (4 parts)
+        # Old format: email|exp|sig (3 parts) — treat as session for backwards compat
+        if len(parts) == 4:
+            email, exp_str, kind, sig = parts
+        elif len(parts) == 3:
+            email, exp_str, sig = parts
+            kind = "session"  # legacy tokens get treated as sessions
+        else:
+            return None
         exp = int(exp_str)
         if datetime.now(timezone.utc).timestamp() > exp:
             return None
-        expected = hashlib.sha256(f"{email}|{exp}|{MAGIC_LINK_SECRET}".encode()).hexdigest()[:32]
+        if len(parts) == 4:
+            expected = hashlib.sha256(f"{email}|{exp}|{kind}|{MAGIC_LINK_SECRET}".encode()).hexdigest()[:32]
+        else:
+            # Legacy signature format
+            expected = hashlib.sha256(f"{email}|{exp}|{MAGIC_LINK_SECRET}".encode()).hexdigest()[:32]
         if sig != expected:
+            return None
+        if expected_kind and kind != expected_kind and kind != "session":
+            # Sessions can be used anywhere; but a magic_link can't be used as a session
             return None
         return email
     except Exception:
@@ -351,6 +373,7 @@ async def get_current_user(authorization: str = Header(None)) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing or invalid Authorization header")
     token = authorization.replace("Bearer ", "")
+    # Accept any valid token for API auth (magic_link upgrades to session on /verify)
     email = verify_token(token)
     if not email:
         raise HTTPException(401, "Invalid or expired token")
@@ -680,6 +703,11 @@ async def send_magic_link(req: MagicLinkRequest):
 
 @app.post("/api/auth/verify")
 async def verify(req: VerifyTokenRequest):
+    """Verify a magic-link token and exchange it for a long-lived session token.
+
+    The magic-link token has a 15-minute expiry (sent via email, used once).
+    The session token has a 30-day expiry (stored in browser localStorage).
+    """
     email = verify_token(req.token)
     if not email:
         raise HTTPException(401, "Invalid or expired token")
@@ -687,8 +715,10 @@ async def verify(req: VerifyTokenRequest):
         rs = await client.execute("SELECT id, mode, plan FROM users WHERE email = ?", [email])
         if not rs.rows:
             raise HTTPException(404, "User not found")
+        # Issue a fresh 30-day session token, NOT the original magic-link token
+        session_token = sign_token(email, exp_minutes=30 * 24 * 60, kind="session")
         return {
-            "access_token": req.token,
+            "access_token": session_token,
             "user": {"id": rs.rows[0][0], "email": email, "mode": rs.rows[0][1], "plan": rs.rows[0][2]},
         }
 
