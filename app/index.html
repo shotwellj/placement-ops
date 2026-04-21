@@ -174,10 +174,18 @@
       <ul id="firstMoves" style="list-style: none; margin-top: 0.5rem;"></ul>
     </section>
 
+    <section class="card" id="compCard">
+      <div class="card-label">Compensation Snapshot</div>
+      <h2 class="card-title">What this role pays</h2>
+      <div class="kpi-row" id="compKpis"></div>
+      <p id="compNotes" style="color: var(--text-dim); font-size: 0.92rem; margin-top: 0.75rem;"></p>
+    </section>
+
     <div class="result-grid">
       <section class="card">
-        <div class="card-label">Must-Have Skills</div>
-        <h2 class="card-title">True blockers</h2>
+        <div class="card-label">Required Skills</div>
+        <h2 class="card-title">Blockers vs preferences</h2>
+        <p style="color: var(--text-mute); font-size: 0.85rem; margin-bottom: 1rem;">Red badges are true blockers (auto-reject if missing). Amber badges are preferred but negotiable.</p>
         <ul class="skill-list" id="mustHaveList"></ul>
       </section>
       <section class="card">
@@ -403,7 +411,26 @@ function renderResults(data) {
       <span>${escapeHtml(m)}</span>
     </li>`).join('');
 
-  $('mustHaveList').innerHTML = (p.must_have_skills || []).map(s => `
+  // Comp snapshot
+  const comp = p.comp_snapshot || {};
+  if (comp.base_range || comp.total_comp_range) {
+    $('compKpis').innerHTML = `
+      <div class="kpi"><div class="kpi-label">Base Range</div><div class="kpi-value text">${escapeHtml(comp.base_range || '—')}</div></div>
+      <div class="kpi"><div class="kpi-label">Total Comp</div><div class="kpi-value text">${escapeHtml(comp.total_comp_range || '—')}</div></div>
+      ${comp.equity_notes ? `<div class="kpi"><div class="kpi-label">Equity</div><div class="kpi-value text" style="font-size: 0.85rem;">${escapeHtml(comp.equity_notes)}</div></div>` : ''}
+    `;
+    $('compNotes').textContent = comp.negotiation_notes || '';
+    $('compCard').style.display = 'block';
+  } else {
+    $('compCard').style.display = 'none';
+  }
+
+  // Sort must-haves so blockers appear before preferred
+  const skills = (p.must_have_skills || []).slice().sort((a, b) => {
+    const order = { blocker: 0, preferred: 1, nice: 2 };
+    return (order[a.severity] || 0) - (order[b.severity] || 0);
+  });
+  $('mustHaveList').innerHTML = skills.map(s => `
     <li class="skill-item">
       <div><div class="skill-name">${escapeHtml(s.skill)}</div><div class="skill-rationale">${escapeHtml(s.rationale || '')}</div></div>
       <span class="severity ${s.severity || 'blocker'}">${s.severity || 'blocker'}</span>

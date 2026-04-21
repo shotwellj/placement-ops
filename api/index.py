@@ -478,6 +478,32 @@ Parse this job description and return a structured JSON analysis.
 JOB DESCRIPTION:
 {jd}
 
+CRITICAL RULES FOR must_have_skills:
+You MUST stratify the must-haves by REAL hiring impact, not by what the JD claims is required.
+JDs lie. They list 15 required skills but realistically only 2-4 will get a candidate
+auto-rejected at the resume screen. Use these severity levels:
+
+  - "blocker"   = Cannot proceed without this. Resume gets tossed in 30 seconds.
+                  Examples: specific years of experience in the core domain, a license/cert
+                  that's legally required, a hard technical skill that defines the role
+                  (RTL for chip design, Solidity for blockchain, FDA experience for medical).
+                  HARD CAP: maximum 4 blockers.
+
+  - "preferred" = Listed as required in the JD, but realistically the hiring manager will
+                  trade off if everything else is great. Most "must-haves" in JDs are
+                  actually preferences. The remaining required-section items go here.
+
+Be honest. If a JD lists "10+ years of experience" but the role is a Senior IC, that's
+a preference, not a blocker. Most "team player / strong communication" requirements are
+preferences, not blockers, unless the role is explicitly customer/sales-facing.
+
+CRITICAL RULES FOR comp_snapshot:
+ALWAYS populate this with realistic ranges, even if comp is not in the JD.
+Use your knowledge of the role title, level, location, company tier, and industry.
+Format ranges as "$XXXk - $XXXk" (e.g. "$220k - $280k"). Include equity guidance for
+startups/late-stage tech companies. negotiation_notes should be 1-2 sentences on what
+levers to pull (cash vs equity, signing bonus, level matching, location adjust).
+
 Return ONLY valid JSON with this shape:
 {{
   "core": {{
@@ -489,11 +515,19 @@ Return ONLY valid JSON with this shape:
     "market_temperature": "hot|warm|cool",
     "recommended_first_moves": ["action 1", "action 2", "action 3"]
   }},
-  "must_have_skills": [{{"skill": "...", "rationale": "...", "severity": "blocker"}}],
+  "must_have_skills": [
+    {{"skill": "...", "rationale": "why this is a true blocker", "severity": "blocker"}},
+    {{"skill": "...", "rationale": "why this is preferred but negotiable", "severity": "preferred"}}
+  ],
   "nice_to_have_skills": [{{"skill": "...", "rationale": "..."}}],
   "transferable_skill_clusters": [{{"cluster_name": "...", "variants": [], "adjacent_skills": []}}],
   "alt_titles": {{"ic_junior": [], "ic_mid": [], "ic_senior": [], "ic_staff_plus": []}},
-  "comp_snapshot": {{"base_range": "...", "total_comp_range": "...", "negotiation_notes": "..."}},
+  "comp_snapshot": {{
+    "base_range": "$XXXk - $XXXk",
+    "total_comp_range": "$XXXk - $XXXk (incl. equity/bonus)",
+    "equity_notes": "...",
+    "negotiation_notes": "..."
+  }},
   "market_dynamics": {{
     "talent_saturation": "low|medium|high",
     "time_to_fill_days": [30, 60],
