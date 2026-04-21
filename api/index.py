@@ -369,20 +369,100 @@ def verify_token(token: str, expected_kind: Optional[str] = None) -> Optional[st
         return None
 
 
-async def get_current_user(authorization: str = Header(None)) -> dict:
+def _hash_token(token: str) -> str:
+    """Hash a session token for storage. We never store raw tokens."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _client_ip(request_headers: dict) -> Optional[str]:
+    """Extract the real client IP from Vercel's x-forwarded-for header."""
+    xff = request_headers.get("x-forwarded-for") or request_headers.get("x-real-ip")
+    if xff:
+        return xff.split(",")[0].strip()
+    return None
+
+
+async def get_current_user(authorization: str = Header(None), user_agent: Optional[str] = Header(None)) -> dict:
+    """Validate the bearer token AND check the session row exists + isn't revoked.
+
+    Backwards compatible: tokens issued before sessions table existed will still work
+    (no session row found just means "legacy token, accept on signature alone").
+    """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing or invalid Authorization header")
     token = authorization.replace("Bearer ", "")
-    # Accept any valid token for API auth (magic_link upgrades to session on /verify)
+
+    # Step 1: validate signature + expiry
     email = verify_token(token)
     if not email:
         raise HTTPException(401, "Invalid or expired token")
+
+    token_hash = _hash_token(token)
+
+    # Step 2: check session row (skip the check for legacy tokens with no session row)
     async with db() as client:
+        rs = await client.execute(
+            "SELECT id, user_id, revoked_at, expires_at FROM sessions WHERE session_token_hash = ?",
+            [token_hash],
+        )
+        if rs.rows:
+            session_id, _user_id, revoked_at, expires_at = rs.rows[0]
+            if revoked_at is not None:
+                raise HTTPException(401, "Session revoked. Please sign in again.")
+            # last_used_at update — best-effort, don't fail the request if it errors
+            try:
+                await client.execute(
+                    "UPDATE sessions SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    [session_id],
+                )
+            except Exception:
+                pass
+        # If no session row found, this is a legacy token (issued before this table existed).
+        # We accept it based on signature alone — they'll get a proper session next login.
+
+        # Step 3: load the user
         rs = await client.execute("SELECT id, email, mode, plan FROM users WHERE email = ?", [email])
         if not rs.rows:
             raise HTTPException(404, "User not found")
         r = rs.rows[0]
         return {"id": r[0], "email": r[1], "mode": r[2], "plan": r[3]}
+
+
+# ---------- RATE LIMITING ----------
+
+MAGIC_LINK_RATE_LIMIT_PER_HOUR = 5  # max magic-link requests per email per hour
+MAGIC_LINK_RATE_LIMIT_PER_IP_PER_HOUR = 20  # max per IP across all emails
+
+
+async def check_magic_link_rate_limit(email: str, ip: Optional[str]):
+    """Raise HTTPException(429) if email or IP has exceeded magic-link rate limits."""
+    one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT COUNT(*) FROM login_attempts WHERE email = ? AND attempted_at > ?",
+            [email, one_hour_ago],
+        )
+        if rs.rows and rs.rows[0][0] >= MAGIC_LINK_RATE_LIMIT_PER_HOUR:
+            raise HTTPException(429, f"Too many login attempts for this email. Try again in an hour.")
+        if ip:
+            rs = await client.execute(
+                "SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND attempted_at > ?",
+                [ip, one_hour_ago],
+            )
+            if rs.rows and rs.rows[0][0] >= MAGIC_LINK_RATE_LIMIT_PER_IP_PER_HOUR:
+                raise HTTPException(429, "Too many login attempts from this network. Try again in an hour.")
+
+
+async def log_login_attempt(email: str, ip: Optional[str], success: bool):
+    """Best-effort logging of login attempts. Never raises."""
+    try:
+        async with db() as client:
+            await client.execute(
+                "INSERT INTO login_attempts (id, email, ip_address, success) VALUES (?, ?, ?, ?)",
+                [str(uuid.uuid4()), email, ip, 1 if success else 0],
+            )
+    except Exception:
+        pass
 
 
 # ---------- AI ROUTER (BYOK) ----------
@@ -638,11 +718,31 @@ class ByokRequest(BaseModel):
 # ---------- PRODUCTION ROUTES ----------
 
 @app.post("/api/auth/magic-link")
-async def send_magic_link(req: MagicLinkRequest):
+async def send_magic_link(
+    req: MagicLinkRequest,
+    x_forwarded_for: Optional[str] = Header(None),
+    x_real_ip: Optional[str] = Header(None),
+):
     if not RESEND_API_KEY:
         raise HTTPException(500, "Email service not configured")
     if not MAGIC_LINK_SECRET:
         raise HTTPException(500, "Magic link secret not configured")
+
+    # Get client IP from Vercel headers
+    ip = None
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(",")[0].strip()
+    elif x_real_ip:
+        ip = x_real_ip
+
+    # Step 0: rate limit check (raises 429 if over limits)
+    try:
+        await check_magic_link_rate_limit(req.email, ip)
+    except HTTPException:
+        raise
+    except Exception as e:
+        # If rate-limit DB query fails, log and continue (don't block legit logins)
+        pass
 
     # Step 1: ensure user exists
     try:
@@ -698,29 +798,129 @@ async def send_magic_link(req: MagicLinkRequest):
     except Exception as e:
         raise HTTPException(500, f"Email error: {type(e).__name__}: {str(e)[:200]}")
 
+    # Step 4: best-effort log of the attempt (for rate limiting future requests)
+    await log_login_attempt(req.email, ip, success=True)
+
     return {"ok": True, "message": "Check your email for the login link"}
 
 
 @app.post("/api/auth/verify")
-async def verify(req: VerifyTokenRequest):
+async def verify(
+    req: VerifyTokenRequest,
+    x_forwarded_for: Optional[str] = Header(None),
+    x_real_ip: Optional[str] = Header(None),
+    user_agent: Optional[str] = Header(None),
+):
     """Verify a magic-link token and exchange it for a long-lived session token.
 
-    The magic-link token has a 15-minute expiry (sent via email, used once).
-    The session token has a 30-day expiry (stored in browser localStorage).
+    Magic-link token: 15-min expiry, sent via email, used once.
+    Session token: 30-day expiry, stored in browser localStorage.
+    Creates a row in the sessions table so the session can be revoked later.
     """
     email = verify_token(req.token)
     if not email:
         raise HTTPException(401, "Invalid or expired token")
+
+    ip = None
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(",")[0].strip()
+    elif x_real_ip:
+        ip = x_real_ip
+
     async with db() as client:
         rs = await client.execute("SELECT id, mode, plan FROM users WHERE email = ?", [email])
         if not rs.rows:
             raise HTTPException(404, "User not found")
-        # Issue a fresh 30-day session token, NOT the original magic-link token
+        user_id, mode, plan = rs.rows[0]
+
         session_token = sign_token(email, exp_minutes=30 * 24 * 60, kind="session")
+        token_hash = _hash_token(session_token)
+        session_id = str(uuid.uuid4())
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+
+        try:
+            await client.execute(
+                """INSERT INTO sessions
+                   (id, user_id, session_token_hash, user_agent, ip_address, expires_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [session_id, user_id, token_hash, user_agent, ip, expires_at],
+            )
+        except Exception:
+            pass
+
+        try:
+            await client.execute(
+                "UPDATE users SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ? WHERE id = ?",
+                [ip, user_id],
+            )
+        except Exception:
+            pass
+
+    return {
+        "access_token": session_token,
+        "user": {"id": user_id, "email": email, "mode": mode, "plan": plan},
+    }
+
+
+@app.get("/api/auth/sessions")
+async def list_sessions(user: dict = Depends(get_current_user)):
+    """List all active sessions for the current user."""
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT id, user_agent, ip_address, created_at, last_used_at, expires_at
+               FROM sessions
+               WHERE user_id = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+               ORDER BY last_used_at DESC""",
+            [user["id"]],
+        )
         return {
-            "access_token": session_token,
-            "user": {"id": rs.rows[0][0], "email": email, "mode": rs.rows[0][1], "plan": rs.rows[0][2]},
+            "sessions": [
+                {"id": r[0], "user_agent": r[1], "ip_address": r[2],
+                 "created_at": r[3], "last_used_at": r[4], "expires_at": r[5]}
+                for r in rs.rows
+            ]
         }
+
+
+@app.post("/api/auth/logout")
+async def logout(authorization: str = Header(None)):
+    """Revoke the current session."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Missing or invalid Authorization header")
+    token = authorization.replace("Bearer ", "")
+    token_hash = _hash_token(token)
+    async with db() as client:
+        await client.execute(
+            "UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP, revoke_reason = 'user_logout' WHERE session_token_hash = ?",
+            [token_hash],
+        )
+    return {"ok": True}
+
+
+@app.post("/api/auth/logout-all")
+async def logout_all(user: dict = Depends(get_current_user)):
+    """Revoke ALL sessions for the current user."""
+    async with db() as client:
+        await client.execute(
+            """UPDATE sessions
+               SET revoked_at = CURRENT_TIMESTAMP, revoke_reason = 'user_logout_all'
+               WHERE user_id = ? AND revoked_at IS NULL""",
+            [user["id"]],
+        )
+    return {"ok": True, "message": "All sessions revoked. Sign in again on every device."}
+
+
+@app.delete("/api/auth/sessions/{session_id}")
+async def revoke_session(session_id: str, user: dict = Depends(get_current_user)):
+    """Revoke a specific session by ID."""
+    async with db() as client:
+        await client.execute(
+            """UPDATE sessions
+               SET revoked_at = CURRENT_TIMESTAMP, revoke_reason = 'user_revoked'
+               WHERE id = ? AND user_id = ?""",
+            [session_id, user["id"]],
+        )
+    return {"ok": True}
 
 
 @app.get("/api/user/me")

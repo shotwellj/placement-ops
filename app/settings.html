@@ -96,6 +96,18 @@
     <h2 class="card-title">Your plan</h2>
     <div id="accountInfo" style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-dim); line-height: 2;">Loading...</div>
   </section>
+
+  <section class="card">
+    <div class="card-label">Active Sessions</div>
+    <h2 class="card-title">Where you're signed in</h2>
+    <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.25rem;">Each device or browser you've used to sign in shows up here. Revoke a session to sign that device out immediately.</p>
+    <div id="sessionsList" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">Loading...</div>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <button id="logoutBtn" class="btn" style="background: transparent; border: 1px solid var(--border-strong); color: var(--text);">Sign out (this device)</button>
+      <button id="logoutAllBtn" class="btn" style="background: transparent; border: 1px solid var(--danger); color: var(--danger);">Sign out everywhere</button>
+    </div>
+    <div id="sessionStatus" class="status" style="margin-top: 0.75rem;"></div>
+  </section>
 </main>
 
 <script>
@@ -154,6 +166,102 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 });
 
 loadAccount();
+
+// ---------- Active Sessions ----------
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const then = new Date(iso);
+  const diff = Math.floor((Date.now() - then.getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function parseUA(ua) {
+  if (!ua) return 'Unknown device';
+  let browser = 'Browser';
+  if (/chrome/i.test(ua) && !/edg/i.test(ua)) browser = 'Chrome';
+  else if (/firefox/i.test(ua)) browser = 'Firefox';
+  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari';
+  else if (/edg/i.test(ua)) browser = 'Edge';
+  let os = 'Unknown OS';
+  if (/mac os|macintosh/i.test(ua)) os = 'macOS';
+  else if (/windows/i.test(ua)) os = 'Windows';
+  else if (/linux/i.test(ua)) os = 'Linux';
+  else if (/iphone|ipad/i.test(ua)) os = 'iOS';
+  else if (/android/i.test(ua)) os = 'Android';
+  return `${browser} on ${os}`;
+}
+
+async function loadSessions() {
+  const list = document.getElementById('sessionsList');
+  try {
+    const data = await api('/auth/sessions');
+    if (!data.sessions || data.sessions.length === 0) {
+      list.innerHTML = '<div style="color: var(--text-mute); font-size: 0.9rem;">No active sessions found. (Your current login may be a legacy token from before session tracking was enabled. Sign out and back in to register it.)</div>';
+      return;
+    }
+    list.innerHTML = data.sessions.map(s => `
+      <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 500; margin-bottom: 0.25rem;">${escapeHtml(parseUA(s.user_agent))}</div>
+          <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-mute);">
+            ${s.ip_address ? escapeHtml(s.ip_address) + ' · ' : ''}Last used ${timeAgo(s.last_used_at)}
+          </div>
+        </div>
+        <button class="revoke-btn" data-session-id="${escapeHtml(s.id)}" style="padding: 0.45rem 0.9rem; background: transparent; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text-dim); font-family: var(--font-body); font-size: 0.8rem; cursor: pointer;">Revoke</button>
+      </div>
+    `).join('');
+    document.querySelectorAll('.revoke-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.sessionId;
+        if (!confirm('Revoke this session? That device will be signed out immediately.')) return;
+        try {
+          await api(`/auth/sessions/${id}`, { method: 'DELETE' });
+          loadSessions();
+        } catch (e) {
+          alert('Could not revoke: ' + e.message);
+        }
+      });
+    });
+  } catch (e) {
+    list.innerHTML = `<div style="color: var(--text-mute); font-size: 0.9rem;">Could not load sessions: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  if (!confirm('Sign out from this device?')) return;
+  try {
+    await api('/auth/logout', { method: 'POST' });
+  } catch (e) { /* ignore */ }
+  localStorage.removeItem('sn_token');
+  location.href = '/app/';
+});
+
+document.getElementById('logoutAllBtn').addEventListener('click', async () => {
+  if (!confirm('Sign out everywhere? You\'ll need to sign in again on every device, including this one.')) return;
+  try {
+    await api('/auth/logout-all', { method: 'POST' });
+    document.getElementById('sessionStatus').className = 'status ok';
+    document.getElementById('sessionStatus').textContent = '✓ All sessions revoked. Redirecting...';
+    setTimeout(() => {
+      localStorage.removeItem('sn_token');
+      location.href = '/app/';
+    }, 1500);
+  } catch (e) {
+    document.getElementById('sessionStatus').className = 'status err';
+    document.getElementById('sessionStatus').textContent = e.message;
+  }
+});
+
+loadSessions();
 </script>
 </body>
 </html>
