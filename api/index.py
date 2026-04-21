@@ -386,6 +386,12 @@ async def call_ai(user_id: str, prompt: str, max_tokens: int = 8000) -> str:
     raise HTTPException(400, f"Unknown provider: {provider}")
 
 
+def _ai_error(provider: str, status: int, body: str) -> HTTPException:
+    """Build a readable error from an AI provider's error response."""
+    snippet = body[:400] if body else "<empty body>"
+    return HTTPException(500, f"{provider} {status}: {snippet}")
+
+
 async def _call_anthropic(api_key: str, prompt: str, max_tokens: int) -> str:
     async with httpx.AsyncClient(timeout=120.0) as client:
         r = await client.post(
@@ -402,7 +408,8 @@ async def _call_anthropic(api_key: str, prompt: str, max_tokens: int) -> str:
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
-        r.raise_for_status()
+        if r.status_code >= 400:
+            raise _ai_error("anthropic", r.status_code, r.text)
         return r.json()["content"][0]["text"]
 
 
@@ -418,7 +425,8 @@ async def _call_openai(api_key: str, prompt: str, max_tokens: int) -> str:
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
-        r.raise_for_status()
+        if r.status_code >= 400:
+            raise _ai_error("openai", r.status_code, r.text)
         return r.json()["choices"][0]["message"]["content"]
 
 
@@ -428,7 +436,9 @@ async def _call_together(api_key: str, prompt: str, max_tokens: int) -> str:
             "https://api.together.xyz/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                # Together hosts the FP8-quantized variant. The non-FP8 name
+                # returns a 400 because that model isn't deployed on their endpoint.
+                "model": "Qwen/Qwen3-235B-A22B-Instruct-2507-FP8",
                 "max_tokens": max_tokens,
                 "temperature": 0.3,
                 "messages": [
@@ -437,7 +447,8 @@ async def _call_together(api_key: str, prompt: str, max_tokens: int) -> str:
                 ],
             },
         )
-        r.raise_for_status()
+        if r.status_code >= 400:
+            raise _ai_error("together", r.status_code, r.text)
         text = r.json()["choices"][0]["message"]["content"]
         if "<think>" in text and "</think>" in text:
             text = text.split("</think>")[-1].strip()
