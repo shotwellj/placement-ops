@@ -529,28 +529,64 @@ class ByokRequest(BaseModel):
 async def send_magic_link(req: MagicLinkRequest):
     if not RESEND_API_KEY:
         raise HTTPException(500, "Email service not configured")
+    if not MAGIC_LINK_SECRET:
+        raise HTTPException(500, "Magic link secret not configured")
 
-    async with db() as client:
-        rs = await client.execute("SELECT id FROM users WHERE email = ?", [req.email])
-        if not rs.rows:
-            user_id = str(uuid.uuid4())
-            await client.execute("INSERT INTO users (id, email) VALUES (?, ?)", [user_id, req.email])
+    # Step 1: ensure user exists
+    try:
+        async with db() as client:
+            rs = await client.execute("SELECT id FROM users WHERE email = ?", [req.email])
+            if not rs.rows:
+                user_id = str(uuid.uuid4())
+                await client.execute("INSERT INTO users (id, email) VALUES (?, ?)", [user_id, req.email])
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Database error: {type(e).__name__}: {str(e)[:200]}")
 
-    token = sign_token(req.email)
+    # Step 2: sign token
+    try:
+        token = sign_token(req.email)
+    except Exception as e:
+        raise HTTPException(500, f"Token signing error: {type(e).__name__}: {str(e)[:200]}")
+
     link = f"https://sourcingnav.com/app/?token={token}"
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        await client.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
-            json={
-                "from": "SourcingNav <login@sourcingnav.com>",
-                "to": req.email,
-                "subject": "Your SourcingNav login link",
-                "html": f"<p>Click to sign in to SourcingNav:</p><p><a href='{link}'>{link}</a></p><p>Expires in 15 minutes.</p>",
-            },
-        )
-    return {"ok": True, "message": "Check your email"}
+    # Step 3: send email via Resend
+    # NOTE: Using onboarding@resend.dev (Resend's sandbox sender) until sourcingnav.com
+    # is verified as a sending domain at resend.com/domains. The sandbox sender only
+    # delivers to the email address that owns the Resend account.
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+                json={
+                    "from": "SourcingNav <onboarding@resend.dev>",
+                    "to": req.email,
+                    "subject": "Your SourcingNav login link",
+                    "html": (
+                        f"<p>Click to sign in to SourcingNav:</p>"
+                        f"<p><a href='{link}'>{link}</a></p>"
+                        f"<p>This link expires in 15 minutes.</p>"
+                        f"<p style='color:#888;font-size:12px'>If you didn't request this, ignore this email.</p>"
+                    ),
+                },
+            )
+        if r.status_code >= 400:
+            # Surface Resend error details so we can debug
+            try:
+                err_body = r.json()
+                msg = err_body.get("message") or err_body.get("error") or r.text[:200]
+            except Exception:
+                msg = r.text[:200]
+            raise HTTPException(500, f"Email send failed ({r.status_code}): {msg}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Email error: {type(e).__name__}: {str(e)[:200]}")
+
+    return {"ok": True, "message": "Check your email for the login link"}
 
 
 @app.post("/api/auth/verify")
