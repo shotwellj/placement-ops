@@ -22,11 +22,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 
 # Optional deps (graceful if missing so demos still deploy)
-try:
-    import libsql_client
-    HAS_DB = True
-except ImportError:
-    HAS_DB = False
+# Turso access is via HTTP (see _TursoHTTPClient below), no native libsql dep needed
+HAS_DB = True
+HAS_DB_LEGACY = False
 
 try:
     from cryptography.fernet import Fernet
@@ -84,10 +82,108 @@ def load_seed(name: str) -> dict:
         return json.load(f)
 
 
+def _turso_http_url() -> str:
+    """Turn libsql://... into https://... for the HTTP API."""
+    if TURSO_URL.startswith("libsql://"):
+        return "https://" + TURSO_URL[len("libsql://"):]
+    return TURSO_URL
+
+
+def _to_py_value(cell: dict):
+    """Convert a Turso HTTP response cell into a plain Python value."""
+    if cell is None:
+        return None
+    t = cell.get("type")
+    v = cell.get("value")
+    if t == "null":
+        return None
+    if t == "integer":
+        return int(v) if v is not None else None
+    if t == "float":
+        return float(v) if v is not None else None
+    if t == "text":
+        return v
+    if t == "blob":
+        return v
+    return v
+
+
+class _Result:
+    """Matches the subset of libsql_client.ResultSet used by this app."""
+    def __init__(self, raw_result: dict):
+        self._raw = raw_result
+        cols = raw_result.get("cols", []) if raw_result else []
+        self.columns = tuple(c.get("name") for c in cols)
+        self.rows = []
+        for raw_row in (raw_result or {}).get("rows", []):
+            self.rows.append(tuple(_to_py_value(cell) for cell in raw_row))
+        self.rows_affected = (raw_result or {}).get("affected_row_count", 0)
+
+
+class _TursoHTTPClient:
+    """Minimal async Turso client using the HTTP /v2/pipeline endpoint.
+    Drop-in replacement for the subset of libsql_client.Client we use."""
+
+    def __init__(self, base_url: str, token: str):
+        self._base = base_url.rstrip("/")
+        self._token = token
+        self._http: Optional[httpx.AsyncClient] = None
+
+    async def __aenter__(self):
+        self._http = httpx.AsyncClient(timeout=15.0)
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if self._http is not None:
+            await self._http.aclose()
+            self._http = None
+
+    async def execute(self, sql: str, params: Optional[list] = None) -> _Result:
+        if self._http is None:
+            raise RuntimeError("Use `async with` before calling execute()")
+        # Build a positional-args SQL statement for Hrana
+        if params:
+            args = []
+            for p in params:
+                if p is None:
+                    args.append({"type": "null"})
+                elif isinstance(p, bool):
+                    args.append({"type": "integer", "value": "1" if p else "0"})
+                elif isinstance(p, int):
+                    args.append({"type": "integer", "value": str(p)})
+                elif isinstance(p, float):
+                    args.append({"type": "float", "value": p})
+                else:
+                    args.append({"type": "text", "value": str(p)})
+            stmt = {"sql": sql, "args": args}
+        else:
+            stmt = {"sql": sql}
+
+        r = await self._http.post(
+            f"{self._base}/v2/pipeline",
+            headers={"Authorization": f"Bearer {self._token}"},
+            json={"requests": [{"type": "execute", "stmt": stmt}, {"type": "close"}]},
+        )
+        if r.status_code != 200:
+            raise HTTPException(500, f"Turso HTTP error {r.status_code}: {r.text[:200]}")
+        body = r.json()
+        res = body.get("results", [])
+        if not res:
+            raise HTTPException(500, "Turso returned no results")
+        first = res[0]
+        if first.get("type") == "error":
+            err = first.get("error", {})
+            raise HTTPException(500, f"Turso query error: {err.get('message', 'unknown')}")
+        return _Result(first.get("response", {}).get("result", {}))
+
+
 def db():
-    if not HAS_DB or not TURSO_URL or not TURSO_TOKEN:
-        raise HTTPException(503, "Database not configured yet. Set TURSO_URL and TURSO_AUTH_TOKEN in Vercel.")
-    return libsql_client.create_client(url=TURSO_URL, auth_token=TURSO_TOKEN)
+    if not TURSO_URL or not TURSO_TOKEN:
+        raise HTTPException(
+            503,
+            "Database not configured. Set TURSO_URL and TURSO_AUTH_TOKEN in Vercel.",
+        )
+    return _TursoHTTPClient(_turso_http_url(), TURSO_TOKEN)
 
 
 # ---------- META ----------
