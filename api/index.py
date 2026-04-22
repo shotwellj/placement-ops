@@ -713,6 +713,59 @@ Rules:
 """
 
 
+CANDIDATE_EVAL_PROMPT = """You are an expert technical recruiter with 13+ years of experience evaluating candidates.
+
+You receive two inputs: a parsed job requisition and a raw candidate profile (could be a LinkedIn dump, resume text, or pasted notes).
+
+Your job is to produce a clear, actionable evaluation that a senior recruiter would write before submitting a candidate to a hiring manager.
+
+PARSED REQUISITION:
+{parsed_jd}
+
+CANDIDATE PROFILE:
+{candidate_text}
+
+Score the candidate honestly. Do NOT inflate scores to be polite. A candidate who fails a blocker should NOT score above 60. A candidate who matches every blocker AND most preferred skills should score 85+.
+
+Scoring rubric:
+- 90-100: Strong submit. All blockers met, most preferred met, evidence of impact at appropriate level.
+- 75-89: Submit with caveats. All blockers met but gaps in preferred or seniority signal.
+- 60-74: Borderline. One blocker is weak or unclear. Worth a screen call to verify.
+- 40-59: Pass with feedback. Multiple blockers weak or missing.
+- 0-39: Hard pass. Fundamental mismatch.
+
+Return ONLY valid JSON with this shape:
+{{
+  "fit_score": 0-100,
+  "recommendation": "SUBMIT|INTERVIEW|PASS",
+  "headline": "1-sentence summary a hiring manager would read first",
+  "summary": "2-3 sentences on why this score, what stands out, what concerns",
+  "blocker_assessment": [
+    {{"skill": "...", "status": "met|partial|missing|unclear", "evidence": "specific quote or signal from profile, or 'not found'"}}
+  ],
+  "preferred_assessment": [
+    {{"skill": "...", "status": "met|partial|missing|unclear", "evidence": "..."}}
+  ],
+  "strengths": ["specific strength 1", "specific strength 2", "..."],
+  "risks_to_probe": ["question or concern 1", "question or concern 2", "..."],
+  "interview_questions": [
+    {{"question": "...", "what_to_listen_for": "..."}},
+    {{"question": "...", "what_to_listen_for": "..."}}
+  ],
+  "comp_check": "1 sentence on whether candidate's likely current/expected comp fits the role's range, or 'unknown' if no signal"
+}}
+
+Rules:
+- No em dashes anywhere
+- "evidence" must be specific. Quote from profile when possible. "not found" is honest if the signal isn't there.
+- 3-5 blocker_assessment entries, 2-4 preferred_assessment entries
+- 3-5 strengths, 2-4 risks_to_probe, 3-5 interview_questions
+- Interview questions should be specific to this candidate's gaps and strengths, not generic
+- recommendation must align with fit_score (90+ = SUBMIT, 60-89 = INTERVIEW, <60 = PASS)
+- No code fences, no preamble. Just JSON.
+"""
+
+
 # ---------- MODELS ----------
 
 class IntakeRequest(BaseModel):
@@ -724,6 +777,18 @@ class IntakeRequest(BaseModel):
 class ByokRequest(BaseModel):
     provider: str = Field(..., pattern="^(anthropic|openai|together)$")
     api_key: str = Field(..., min_length=10)
+
+
+class CandidateEvalRequest(BaseModel):
+    req_id: str = Field(..., min_length=1)
+    candidate_text: str = Field(..., min_length=50, description="Raw candidate profile: LinkedIn dump, resume, or notes")
+    candidate_name: Optional[str] = None
+    candidate_email: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
+    current_title: Optional[str] = None
+    current_company: Optional[str] = None
+    source: Optional[str] = None  # where you found them: "linkedin", "github", "referral", etc.
 
 
 # ---------- PRODUCTION ROUTES ----------
@@ -1081,8 +1146,172 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     }
 
 
-@app.get("/api/reqs")
-async def list_reqs(user: dict = Depends(get_current_user), status: Optional[str] = None):
+@app.post("/api/source/evaluate")
+async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get_current_user)):
+    """Score a candidate against a requisition.
+
+    Pattern matches /api/intake: cap check upfront, AI call, JSON parse, DB save,
+    then increment usage at the end. Failed AI calls don't burn quota.
+    """
+    # Step 0: cap check (does NOT increment) — uses 'eval' bucket (10/mo on free)
+    try:
+        await check_cap(user["id"], "eval")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[cap] {type(e).__name__}: {str(e)[:200]}")
+
+    # Step 1: load the requisition (verify ownership AND get parsed JD)
+    try:
+        async with db() as client:
+            rs = await client.execute(
+                "SELECT id, title, parsed_json FROM requisitions WHERE id = ? AND user_id = ?",
+                [req.req_id, user["id"]],
+            )
+            if not rs.rows:
+                raise HTTPException(404, "Requisition not found")
+            req_row = rs.rows[0]
+            if not req_row[2]:
+                raise HTTPException(400, "Requisition has no parsed data — re-run the intake first")
+            parsed_jd = req_row[2]  # JSON string, pass directly to prompt
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[db-req-load] {type(e).__name__}: {str(e)[:200]}")
+
+    # Step 2: AI evaluation
+    try:
+        eval_text = await call_ai(
+            user["id"],
+            CANDIDATE_EVAL_PROMPT.format(parsed_jd=parsed_jd, candidate_text=req.candidate_text),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[ai-eval] {type(e).__name__}: {str(e)[:300]}")
+
+    # Step 3: parse the AI response as JSON
+    try:
+        # AI may wrap in code fences or add preamble; strip defensively
+        cleaned = eval_text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("```", 2)[1]
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:]
+            cleaned = cleaned.rsplit("```", 1)[0].strip()
+        evaluation = json.loads(cleaned)
+    except Exception as e:
+        raise HTTPException(500, f"[ai-parse] {type(e).__name__}: {str(e)[:300]} | raw start: {eval_text[:200]}")
+
+    # Step 4: save the candidate (idempotent on email if provided)
+    try:
+        candidate_id = str(uuid.uuid4())
+        candidate_name = req.candidate_name or "Unnamed candidate"
+        async with db() as client:
+            # If email provided, check for an existing candidate to avoid duplicates
+            if req.candidate_email:
+                rs = await client.execute(
+                    "SELECT id FROM candidates WHERE user_id = ? AND email = ?",
+                    [user["id"], req.candidate_email],
+                )
+                if rs.rows:
+                    candidate_id = rs.rows[0][0]
+                else:
+                    await _insert_candidate(client, candidate_id, user["id"], req)
+            else:
+                await _insert_candidate(client, candidate_id, user["id"], req)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[db-cand-save] {type(e).__name__}: {str(e)[:300]}")
+
+    # Step 5: save the submission (links candidate to req with the score)
+    try:
+        submission_id = str(uuid.uuid4())
+        async with db() as client:
+            await client.execute(
+                """INSERT INTO submissions
+                   (id, req_id, candidate_id, ai_fit_score, recommendation, fit_analysis_json, stage)
+                   VALUES (?, ?, ?, ?, ?, ?, 'evaluated')""",
+                [
+                    submission_id,
+                    req.req_id,
+                    candidate_id,
+                    int(evaluation.get("fit_score", 0)),
+                    evaluation.get("recommendation", "PASS"),
+                    json.dumps(evaluation),
+                ],
+            )
+    except Exception as e:
+        raise HTTPException(500, f"[db-sub-save] {type(e).__name__}: {str(e)[:300]}")
+
+    # Step 6: increment usage (best effort, don't break the response)
+    try:
+        await increment_cap(user["id"], "eval")
+    except Exception:
+        pass
+
+    return {
+        "submission_id": submission_id,
+        "candidate_id": candidate_id,
+        "req_id": req.req_id,
+        "evaluation": evaluation,
+    }
+
+
+async def _insert_candidate(client, candidate_id: str, user_id: str, req: CandidateEvalRequest):
+    """Helper to insert a candidate row. Used by /api/source/evaluate."""
+    await client.execute(
+        """INSERT INTO candidates
+           (id, user_id, name, email, linkedin_url, github_url, current_title, current_company, resume_text, source)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            candidate_id,
+            user_id,
+            req.candidate_name or "Unnamed candidate",
+            req.candidate_email,
+            req.linkedin_url,
+            req.github_url,
+            req.current_title,
+            req.current_company,
+            req.candidate_text,
+            req.source,
+        ],
+    )
+
+
+@app.get("/api/reqs/{req_id}/submissions")
+async def list_submissions(req_id: str, user: dict = Depends(get_current_user)):
+    """List all candidate submissions for a given requisition."""
+    async with db() as client:
+        # Verify the req belongs to the user first
+        rs = await client.execute(
+            "SELECT id FROM requisitions WHERE id = ? AND user_id = ?",
+            [req_id, user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Requisition not found")
+        rs = await client.execute(
+            """SELECT s.id, s.candidate_id, s.ai_fit_score, s.recommendation, s.stage,
+                      s.fit_analysis_json, s.created_at,
+                      c.name, c.current_title, c.current_company
+               FROM submissions s JOIN candidates c ON s.candidate_id = c.id
+               WHERE s.req_id = ?
+               ORDER BY s.ai_fit_score DESC, s.created_at DESC""",
+            [req_id],
+        )
+        return {
+            "submissions": [
+                {
+                    "id": r[0], "candidate_id": r[1], "fit_score": r[2],
+                    "recommendation": r[3], "stage": r[4],
+                    "evaluation": json.loads(r[5]) if r[5] else None,
+                    "created_at": r[6],
+                    "candidate_name": r[7], "current_title": r[8], "current_company": r[9],
+                }
+                for r in rs.rows
+            ]
+        }
     async with db() as client:
         query = """
             SELECT r.id, r.title, r.status, r.fee_estimate, r.opened_at, o.name
