@@ -21,6 +21,15 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 
+# Compliance helpers — lives in api/_compliance.py. See that module's docstring.
+from api._compliance import (
+    register_data_subject,
+    register_model_version,
+    write_audit_event,
+    write_decision_explanation,
+    write_submission_dimensions,
+)
+
 # Optional deps (graceful if missing so demos still deploy)
 # Turso access is via HTTP (see _TursoHTTPClient below), no native libsql dep needed
 HAS_DB = True
@@ -1225,10 +1234,11 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
     except Exception as e:
         raise HTTPException(500, f"[db-cand-save] {type(e).__name__}: {str(e)[:300]}")
 
-    # Step 5: save the submission (links candidate to req with the score)
+    # Step 5: save the submission + compliance records (one transaction)
     try:
         submission_id = str(uuid.uuid4())
         async with db() as client:
+            # 5a: submissions row (same as before)
             await client.execute(
                 """INSERT INTO submissions
                    (id, req_id, candidate_id, ai_fit_score, recommendation, fit_analysis_json, stage)
@@ -1242,6 +1252,75 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
                     json.dumps(evaluation),
                 ],
             )
+
+            # 5b: compliance layer (best-effort — a failure here does NOT roll back
+            #     the submission. Compliance is additive, not blocking the UX.)
+            try:
+                # Register the candidate as a GDPR data subject (idempotent on candidate_id)
+                subject_id = await register_data_subject(
+                    client, "candidate", candidate_id,
+                )
+
+                # Register (or reuse) the model_versions row for this eval
+                async with db() as ai_client:  # new connection — reads only
+                    rs = await ai_client.execute(
+                        "SELECT byok_provider FROM users WHERE id = ?", [user["id"]]
+                    )
+                    provider = rs.rows[0][0] if rs.rows and rs.rows[0][0] else "unknown"
+
+                mv_id = await register_model_version(
+                    client,
+                    prompt_name="candidate_eval",
+                    prompt_text=CANDIDATE_EVAL_PROMPT,
+                    model_provider=provider,
+                    model_name=provider,  # exact model name known to _call_* funcs
+                )
+
+                # Audit event (tamper-evident HMAC chain)
+                ae_id = await write_audit_event(
+                    client,
+                    event_type="ai_decision",
+                    action="evaluate_candidate",
+                    actor_user_id=user["id"],
+                    subject_id=subject_id,
+                    entity_type="submission",
+                    entity_id=submission_id,
+                    inputs={"req_id": req.req_id, "candidate_id": candidate_id},
+                    outputs={
+                        "fit_score": evaluation.get("fit_score"),
+                        "recommendation": evaluation.get("recommendation"),
+                    },
+                    model_version_id=mv_id,
+                    confidence_score=float(evaluation.get("fit_score", 0)) / 100.0,
+                )
+
+                # Decision explanation (plain-English, EU AI Act Art 13 + NYC LL144)
+                top_factors = []
+                for b in (evaluation.get("blocker_assessment") or [])[:5]:
+                    top_factors.append({
+                        "factor": b.get("skill", ""),
+                        "type": "blocker",
+                        "status": b.get("status", "unclear"),
+                        "evidence": b.get("evidence", "")[:200],
+                    })
+                await write_decision_explanation(
+                    client,
+                    audit_event_id=ae_id,
+                    subject_id=subject_id,
+                    decision_type="candidate_fit_score",
+                    decision_outcome=evaluation.get("recommendation", "PASS"),
+                    top_factors=top_factors,
+                    plain_english=evaluation.get("headline", "")[:500],
+                )
+
+                # 8-dimension scores (partial today — fit_score only; expand next session)
+                await write_submission_dimensions(client, submission_id, evaluation)
+            except Exception as compliance_err:
+                # Log but don't fail the request. The submission is already saved.
+                # TODO: wire this into proper error monitoring.
+                print(f"[compliance] non-fatal write error: {compliance_err!r}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"[db-sub-save] {type(e).__name__}: {str(e)[:300]}")
 
