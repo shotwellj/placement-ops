@@ -95,6 +95,38 @@
   .note-block { padding: 1rem; background: var(--bg-elev); border-left: 3px solid var(--accent); border-radius: 4px; margin-bottom: 0.75rem; }
   .note-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.4rem; }
   .note-text { font-size: 0.9rem; color: var(--text); }
+  /* Candidate evaluation */
+  .eval-textarea { width: 100%; min-height: 200px; padding: 1rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.5; resize: vertical; }
+  .eval-textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  .eval-input-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+  .eval-input { padding: 0.7rem 0.9rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 0.88rem; }
+  .eval-input:focus { outline: none; border-color: var(--accent); }
+  .sub-row { padding: 1.25rem; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.15s; }
+  .sub-row:hover { border-color: var(--accent); }
+  .sub-row.expanded { border-color: var(--accent); }
+  .sub-header { display: grid; grid-template-columns: auto 1fr auto auto; gap: 1rem; align-items: center; }
+  .sub-score { font-family: var(--font-mono); font-weight: 700; font-size: 1.5rem; min-width: 60px; }
+  .sub-score.high { color: var(--good); }
+  .sub-score.mid { color: var(--warn); }
+  .sub-score.low { color: var(--danger); }
+  .sub-name { font-weight: 600; }
+  .sub-meta { color: var(--text-mute); font-size: 0.8rem; font-family: var(--font-mono); margin-top: 0.25rem; }
+  .sub-rec { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.3rem 0.7rem; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .sub-rec.SUBMIT { background: rgba(74, 222, 128, 0.15); color: var(--good); }
+  .sub-rec.INTERVIEW { background: rgba(255, 183, 77, 0.15); color: var(--warn); }
+  .sub-rec.PASS { background: rgba(139, 155, 179, 0.15); color: var(--text-dim); }
+  .sub-detail { display: none; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+  .sub-row.expanded .sub-detail { display: block; }
+  .sub-section { margin-bottom: 1.25rem; }
+  .sub-section-title { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .assess-list { list-style: none; }
+  .assess-item { display: flex; gap: 0.75rem; padding: 0.5rem 0; align-items: flex-start; }
+  .assess-status { font-family: var(--font-mono); font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 4px; flex-shrink: 0; text-transform: uppercase; }
+  .assess-status.met { background: rgba(74,222,128,0.15); color: var(--good); }
+  .assess-status.partial { background: rgba(255,183,77,0.15); color: var(--warn); }
+  .assess-status.missing, .assess-status.unclear { background: rgba(255,107,107,0.15); color: var(--danger); }
+  .assess-text { font-size: 0.88rem; }
+  .assess-evidence { color: var(--text-dim); font-size: 0.8rem; margin-top: 0.2rem; }
 </style>
 </head>
 <body>
@@ -259,6 +291,8 @@ function renderDetail(d) {
     ${renderCompCard(comp, p)}
     ${renderSkillsCard(mustHaves, niceToHaves)}
     ${renderBooleanCard(b)}
+    ${renderSubmissionsCard(d.id)}
+    ${renderEvaluateCard(d.id)}
     ${renderNotesCard(b.mentor_notes)}
     ${renderRawJDCard(d.jd_raw)}
   `;
@@ -272,6 +306,8 @@ function renderDetail(d) {
       });
     });
   });
+  wireEvalForm();
+  loadSubmissions(d.id);
 }
 function renderCompCard(comp, p) {
   // Handle both shapes the model returns: numeric (base_min/base_max) OR pre-formatted string (base_range)
@@ -398,7 +434,156 @@ function renderRawJDCard(jd) {
   `;
 }
 
-const params = new URLSearchParams(location.search);
+function renderEvaluateCard(reqId) {
+  return `
+    <section class="card">
+      <div class="card-label">Add Candidate</div>
+      <h2 class="card-title">Evaluate a candidate against this role</h2>
+      <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1rem;">Paste a LinkedIn profile, resume, or notes. Add optional details for cleaner records.</p>
+      <textarea class="eval-textarea" id="evalText" placeholder="Paste candidate profile here (LinkedIn dump, resume, notes)..."></textarea>
+      <div class="eval-input-row">
+        <input class="eval-input" id="evalName" placeholder="Name (optional)">
+        <input class="eval-input" id="evalEmail" placeholder="Email (optional, for dedup)">
+        <input class="eval-input" id="evalLinkedin" placeholder="LinkedIn URL (optional)">
+        <input class="eval-input" id="evalGithub" placeholder="GitHub URL (optional)">
+      </div>
+      <div class="eval-input-row">
+        <input class="eval-input" id="evalTitle" placeholder="Current title (optional)">
+        <input class="eval-input" id="evalCompany" placeholder="Current company (optional)">
+        <input class="eval-input" id="evalSource" placeholder="Source: linkedin, github, referral...">
+      </div>
+      <div style="margin-top: 1.25rem; display: flex; gap: 0.75rem; align-items: center;">
+        <button class="btn btn-primary" id="evalSubmit" data-req-id="${escapeHtml(reqId)}">Evaluate</button>
+        <span id="evalStatus" style="font-size: 0.85rem; color: var(--text-dim);"></span>
+      </div>
+    </section>
+  `;
+}
+
+function renderSubmissionsCard(reqId) {
+  return `
+    <section class="card">
+      <div class="card-label">Submissions</div>
+      <h2 class="card-title">Evaluated candidates</h2>
+      <div id="submissionsList" data-req-id="${escapeHtml(reqId)}">Loading...</div>
+    </section>
+  `;
+}
+
+function wireEvalForm() {
+  const btn = document.getElementById('evalSubmit');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const reqId = btn.dataset.reqId;
+    const text = document.getElementById('evalText').value.trim();
+    const status = document.getElementById('evalStatus');
+    if (text.length < 50) {
+      status.style.color = 'var(--danger)';
+      status.textContent = 'Need at least 50 chars of profile text.';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Evaluating...';
+    status.style.color = 'var(--text-dim)';
+    status.textContent = 'AI is scoring the candidate. This takes 15-30 seconds.';
+    try {
+      const payload = {
+        req_id: reqId,
+        candidate_text: text,
+        candidate_name: document.getElementById('evalName').value.trim() || null,
+        candidate_email: document.getElementById('evalEmail').value.trim() || null,
+        linkedin_url: document.getElementById('evalLinkedin').value.trim() || null,
+        github_url: document.getElementById('evalGithub').value.trim() || null,
+        current_title: document.getElementById('evalTitle').value.trim() || null,
+        current_company: document.getElementById('evalCompany').value.trim() || null,
+        source: document.getElementById('evalSource').value.trim() || null,
+      };
+      await api('/source/evaluate', { method: 'POST', body: JSON.stringify(payload) });
+      status.style.color = 'var(--good)';
+      status.textContent = '✓ Candidate evaluated. Refreshing list...';
+      document.getElementById('evalText').value = '';
+      ['evalName','evalEmail','evalLinkedin','evalGithub','evalTitle','evalCompany','evalSource'].forEach(id => document.getElementById(id).value = '');
+      await loadSubmissions(reqId);
+      setTimeout(() => { status.textContent = ''; }, 3000);
+    } catch (e) {
+      status.style.color = 'var(--danger)';
+      status.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Evaluate';
+    }
+  });
+}
+
+async function loadSubmissions(reqId) {
+  const container = document.getElementById('submissionsList');
+  if (!container) return;
+  try {
+    const data = await api(`/reqs/${encodeURIComponent(reqId)}/submissions`);
+    if (!data.submissions || data.submissions.length === 0) {
+      container.innerHTML = '<div style="color: var(--text-mute); font-size: 0.9rem; padding: 1rem 0;">No candidates evaluated yet. Use the form below to add one.</div>';
+      return;
+    }
+    container.innerHTML = data.submissions.map(s => renderSubmissionRow(s)).join('');
+    container.querySelectorAll('.sub-row').forEach(row => {
+      row.addEventListener('click', () => row.classList.toggle('expanded'));
+    });
+  } catch (e) {
+    container.innerHTML = `<div class="err-box">Could not load submissions: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function scoreClass(s) {
+  if (s >= 80) return 'high';
+  if (s >= 60) return 'mid';
+  return 'low';
+}
+
+function renderSubmissionRow(s) {
+  const e = s.evaluation || {};
+  const renderAssess = (list) => (list || []).map(b => `
+    <li class="assess-item">
+      <span class="assess-status ${escapeHtml(b.status || 'unclear')}">${escapeHtml(b.status || 'unclear')}</span>
+      <div>
+        <div class="assess-text">${escapeHtml(b.skill || '')}</div>
+        <div class="assess-evidence">${escapeHtml(b.evidence || '')}</div>
+      </div>
+    </li>
+  `).join('');
+  const blockerList = renderAssess(e.blocker_assessment);
+  const preferredList = renderAssess(e.preferred_assessment);
+  const strengths = (e.strengths || []).map(x => `<li style="padding: 0.3rem 0; font-size: 0.88rem;">✓ ${escapeHtml(x)}</li>`).join('');
+  const risks = (e.risks_to_probe || []).map(x => `<li style="padding: 0.3rem 0; font-size: 0.88rem;">⚠ ${escapeHtml(x)}</li>`).join('');
+  const questions = (e.interview_questions || []).map(q => `
+    <div style="padding: 0.6rem 0; border-bottom: 1px solid var(--border);">
+      <div style="font-weight: 500; margin-bottom: 0.25rem;">${escapeHtml(q.question || '')}</div>
+      <div style="color: var(--text-dim); font-size: 0.82rem;">Listen for: ${escapeHtml(q.what_to_listen_for || '')}</div>
+    </div>
+  `).join('');
+  return `
+    <div class="sub-row">
+      <div class="sub-header">
+        <div class="sub-score ${scoreClass(s.fit_score)}">${s.fit_score}</div>
+        <div>
+          <div class="sub-name">${escapeHtml(s.candidate_name || 'Unnamed')}</div>
+          <div class="sub-meta">${escapeHtml(s.current_title || '')} ${s.current_company ? '· ' + escapeHtml(s.current_company) : ''} · ${timeAgo(s.created_at)}</div>
+        </div>
+        <div class="sub-rec ${escapeHtml(s.recommendation || 'PASS')}">${escapeHtml(s.recommendation || 'PASS')}</div>
+        <div style="color: var(--text-mute);">▾</div>
+      </div>
+      <div class="sub-detail">
+        ${e.headline ? `<div class="sub-section"><div class="sub-section-title">Headline</div><div style="font-size: 0.95rem;">${escapeHtml(e.headline)}</div></div>` : ''}
+        ${e.summary ? `<div class="sub-section"><div class="sub-section-title">Summary</div><div style="font-size: 0.9rem; color: var(--text-dim);">${escapeHtml(e.summary)}</div></div>` : ''}
+        ${blockerList ? `<div class="sub-section"><div class="sub-section-title">Blocker assessment</div><ul class="assess-list">${blockerList}</ul></div>` : ''}
+        ${preferredList ? `<div class="sub-section"><div class="sub-section-title">Preferred assessment</div><ul class="assess-list">${preferredList}</ul></div>` : ''}
+        ${strengths ? `<div class="sub-section"><div class="sub-section-title">Strengths</div><ul style="list-style: none;">${strengths}</ul></div>` : ''}
+        ${risks ? `<div class="sub-section"><div class="sub-section-title">Risks to probe</div><ul style="list-style: none;">${risks}</ul></div>` : ''}
+        ${questions ? `<div class="sub-section"><div class="sub-section-title">Suggested interview questions</div>${questions}</div>` : ''}
+        ${e.comp_check ? `<div class="sub-section"><div class="sub-section-title">Comp check</div><div style="font-size: 0.88rem;">${escapeHtml(e.comp_check)}</div></div>` : ''}
+      </div>
+    </div>
+  `;
+}
 const reqParam = params.get('req');
 if (reqParam) {
   loadDetail(reqParam);
