@@ -2,6 +2,15 @@
 
 **Talent engineering platform for third-party recruiters, built on Claude Code.**
 
+> **Compliance classification:** SourcingNav (the live product at
+> sourcingnav.com, built on this codebase) is a high-risk AI system
+> under EU AI Act Article 6 and Annex III Category 4 (recruitment and
+> employment decisions). See
+> [`RISK_ASSESSMENT.md`](./RISK_ASSESSMENT.md) for the Article 9 risk
+> management framework and [`DATA_GOVERNANCE.md`](./DATA_GOVERNANCE.md)
+> for Article 10 data governance. Compliance scanning via `air-blackbox
+> comply --scan .`
+
 Stop keyword-matching resumes to JDs. Start running a data-driven recruiting desk with taxonomy-driven skill matching, weighted scoring algorithms, and calibration that learns from your placements.
 
 Scan company portals for open reqs → evaluate candidates with structured scoring → generate tailored submission packages → track your pipeline → calibrate from outcomes. The whole desk, engineered.
