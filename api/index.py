@@ -28,6 +28,8 @@ from api._compliance import (
     write_audit_event,
     write_decision_explanation,
     write_submission_dimensions,
+    write_req_skills,
+    write_candidate_skills,
 )
 
 # Optional deps (graceful if missing so demos still deploy)
@@ -749,6 +751,9 @@ Return ONLY valid JSON with this shape:
   "recommendation": "SUBMIT|INTERVIEW|PASS",
   "headline": "1-sentence summary a hiring manager would read first",
   "summary": "2-3 sentences on why this score, what stands out, what concerns",
+  "extracted_skills": [
+    {{"name": "PyTorch", "evidence": "3yr building recommendation models at Pinterest", "recency": "current", "depth": "production", "confidence": 0.9}}
+  ],
   "blocker_assessment": [
     {{"skill": "...", "status": "met|partial|missing|unclear", "evidence": "specific quote or signal from profile, or 'not found'"}}
   ],
@@ -771,6 +776,11 @@ Rules:
 - 3-5 strengths, 2-4 risks_to_probe, 3-5 interview_questions
 - Interview questions should be specific to this candidate's gaps and strengths, not generic
 - recommendation must align with fit_score (90+ = SUBMIT, 60-89 = INTERVIEW, <60 = PASS)
+- extracted_skills: list ALL technical skills the candidate demonstrates, 5-15 entries, one per skill.
+  Use canonical names when possible (e.g. "PyTorch" not "Torch", "Apache Spark" not "Spark").
+  recency: "current" (at current job) | "recent" (1-3yr ago) | "dated" (3+ yr ago)
+  depth: "expert" (taught/designed/deep) | "production" (shipped) | "project" (side work) | "mentioned" (listed only)
+  confidence: 0.0-1.0 (how sure you are based on the evidence)
 - No code fences, no preamble. Just JSON.
 """
 
@@ -1102,7 +1112,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(500, f"[ai-bool] {type(e).__name__}: {str(e)[:300]}")
 
-    # Step 4: save to DB
+    # Step 4: save to DB + compliance records
     try:
         org_name = req.org_name or parsed.get("core", {}).get("company") or "Unspecified"
         req_title = req.req_title or parsed.get("core", {}).get("role_title") or "Untitled Role"
@@ -1135,6 +1145,63 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                 "INSERT INTO activity_log (id, user_id, entity_type, entity_id, action, metadata_json) VALUES (?, ?, ?, ?, ?, ?)",
                 [str(uuid.uuid4()), user["id"], "req", req_id, "created", json.dumps({"source": "intake"})],
             )
+
+            # ----- Compliance layer (non-blocking) -----
+            # Note: an intake is NOT about a natural person's data, so we don't
+            # register a data_subject here. We DO log the automated decision
+            # (AI-parsed JD) and the structured req_skills for calibration.
+            try:
+                # Register the JD parser prompt+model as a model_version
+                rs = await client.execute(
+                    "SELECT byok_provider FROM users WHERE id = ?", [user["id"]]
+                )
+                provider = rs.rows[0][0] if rs.rows and rs.rows[0][0] else "unknown"
+                mv_id = await register_model_version(
+                    client,
+                    prompt_name="jd_parser",
+                    prompt_text=JD_PARSER_PROMPT,
+                    model_provider=provider,
+                    model_name=provider,
+                )
+
+                # Audit event — the JD was parsed by AI, this is the record
+                ae_id = await write_audit_event(
+                    client,
+                    event_type="ai_decision",
+                    action="parse_jd",
+                    actor_user_id=user["id"],
+                    entity_type="requisition",
+                    entity_id=req_id,
+                    inputs={"jd_length": len(req.jd_text), "org": org_name},
+                    outputs={
+                        "role_title": parsed.get("core", {}).get("role_title"),
+                        "must_have_count": len(parsed.get("must_have_skills") or []),
+                    },
+                    model_version_id=mv_id,
+                )
+
+                # Decision explanation — the "why this was parsed this way" record
+                must_have = parsed.get("must_have_skills") or []
+                top_factors = [
+                    {"factor": s.get("skill", ""), "severity": s.get("severity", "preferred"),
+                     "rationale": (s.get("rationale") or "")[:200]}
+                    for s in must_have[:5]
+                ]
+                plain_english = parsed.get("executive_brief", {}).get("summary") or ""
+                await write_decision_explanation(
+                    client,
+                    audit_event_id=ae_id,
+                    subject_id=None,  # no natural person subject for a JD parse
+                    decision_type="jd_parse",
+                    decision_outcome="parsed",
+                    top_factors=top_factors,
+                    plain_english=plain_english[:500],
+                )
+
+                # Structured req_skills — THIS populates the brain's demand signal
+                await write_req_skills(client, req_id, parsed)
+            except Exception as compliance_err:
+                print(f"[compliance-intake] non-fatal write error: {compliance_err!r}")
     except HTTPException:
         raise
     except Exception as e:
@@ -1315,6 +1382,11 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
 
                 # 8-dimension scores (partial today — fit_score only; expand next session)
                 await write_submission_dimensions(client, submission_id, evaluation)
+
+                # Structured candidate skills (new — populates the taxonomy)
+                # Reads evaluation['extracted_skills'] if present, else falls back
+                # to blocker_assessment + preferred_assessment with status='met'/'partial'
+                await write_candidate_skills(client, candidate_id, evaluation)
             except Exception as compliance_err:
                 # Log but don't fail the request. The submission is already saved.
                 # TODO: wire this into proper error monitoring.

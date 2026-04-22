@@ -252,3 +252,156 @@ async def write_submission_dimensions(
            VALUES (?, ?, ?, ?, ?)""",
         [sd_id, submission_id, composite, blocker_count, json.dumps(evaluation)],
     )
+
+
+# ============================================================
+# Taxonomy resolution + skill writes
+# ============================================================
+
+async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
+    """Match a raw skill name from AI output against the canonical taxonomy.
+
+    Strategy (fail-soft):
+      1. Exact match on skills.canonical_name (case-insensitive)
+      2. Match any alias in skills.aliases_json (case-insensitive)
+      3. Return None if no match — caller should still insert the row with
+         skill_id=NULL and raw_skill_text populated, so we don't lose the data.
+
+    The AI is instructed to use canonical names but will sometimes emit
+    variations. Unresolved names accumulate in req_skills.raw_skill_text
+    and candidate_skills.raw_skill_text and become candidates to add to
+    taxonomy/skills.yml on the next update.
+    """
+    if not raw_name or not raw_name.strip():
+        return None
+    norm = " ".join(raw_name.strip().lower().split())
+
+    # 1) Exact canonical match
+    rs = await client.execute(
+        "SELECT id FROM skills WHERE LOWER(canonical_name) = ?",
+        [norm],
+    )
+    if rs.rows:
+        return rs.rows[0][0]
+
+    # 2) Alias match — aliases_json is a JSON array stored as TEXT.
+    #    We fetch every skill's aliases and check in Python (taxonomy is
+    #    only ~70 skills so this stays cheap; if it grows large we move
+    #    to a dedicated skill_aliases table indexed by name).
+    rs = await client.execute(
+        "SELECT id, aliases_json FROM skills WHERE aliases_json IS NOT NULL"
+    )
+    for row in rs.rows:
+        sid, aj = row[0], row[1]
+        if not aj:
+            continue
+        try:
+            aliases = json.loads(aj)
+            for a in aliases:
+                if " ".join(str(a).strip().lower().split()) == norm:
+                    return sid
+        except Exception:
+            continue
+    return None
+
+
+async def write_req_skills(client, req_id: str, parsed: dict) -> int:
+    """Extract structured skills from parsed JD output and write req_skills rows.
+
+    Reads from parsed['must_have_skills'] and parsed['nice_to_have_skills'].
+    The AI already tags severity as 'blocker' or 'preferred' in must_have_skills.
+    Nice-to-haves get importance='nice_to_have'.
+
+    Returns the number of rows inserted.
+    """
+    def _candidates():
+        for s in (parsed.get("must_have_skills") or []):
+            if isinstance(s, dict) and s.get("skill"):
+                sev = s.get("severity", "preferred")
+                importance = "blocker" if sev == "blocker" else "preferred"
+                yield (s["skill"], importance, s.get("rationale"))
+        for s in (parsed.get("nice_to_have_skills") or []):
+            if isinstance(s, dict) and s.get("skill"):
+                yield (s["skill"], "nice_to_have", s.get("rationale"))
+
+    inserted = 0
+    for skill_name, importance, rationale in _candidates():
+        skill_id = await resolve_skill_id(client, skill_name)
+        row_id = "rs_" + uuid.uuid4().hex[:16]
+        await client.execute(
+            """INSERT INTO req_skills
+               (id, req_id, skill_id, raw_skill_text, importance, rationale)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            [row_id, req_id, skill_id, skill_name, importance, rationale],
+        )
+        inserted += 1
+    return inserted
+
+
+async def write_candidate_skills(client, candidate_id: str, evaluation: dict) -> int:
+    """Extract structured skills from candidate evaluation output and write rows.
+
+    The CANDIDATE_EVAL_PROMPT is being updated to emit an 'extracted_skills'
+    array with {name, evidence, recency, depth, confidence}. If that field is
+    missing (old-format eval), we fall back to extracting skill names from
+    blocker_assessment[].skill and preferred_assessment[].skill with status='met'
+    or 'partial' — those are skills we have evidence the candidate has.
+
+    Returns the number of rows inserted.
+    """
+    # New format path: explicit extracted_skills
+    explicit = evaluation.get("extracted_skills")
+    if isinstance(explicit, list) and explicit:
+        inserted = 0
+        for s in explicit:
+            if not isinstance(s, dict) or not s.get("name"):
+                continue
+            sid = await resolve_skill_id(client, s["name"])
+            row_id = "cs_" + uuid.uuid4().hex[:16]
+            await client.execute(
+                """INSERT INTO candidate_skills
+                   (id, candidate_id, skill_id, raw_skill_text, evidence,
+                    recency, depth, confidence)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    row_id, candidate_id, sid, s["name"],
+                    (s.get("evidence") or "")[:500],
+                    s.get("recency", "current"),
+                    s.get("depth", "mentioned"),
+                    float(s.get("confidence", 0.5)),
+                ],
+            )
+            inserted += 1
+        return inserted
+
+
+    # Fallback path: pull confirmed skills out of blocker/preferred assessments
+    inserted = 0
+    for source_field in ("blocker_assessment", "preferred_assessment"):
+        for s in (evaluation.get(source_field) or []):
+            if not isinstance(s, dict) or not s.get("skill"):
+                continue
+            status = s.get("status")
+            # Only insert skills with at least partial evidence. A "missing"
+            # blocker is not a candidate skill — it's a gap.
+            if status not in ("met", "partial"):
+                continue
+            sid = await resolve_skill_id(client, s["skill"])
+            row_id = "cs_" + uuid.uuid4().hex[:16]
+            # Without explicit recency/depth, set conservative defaults
+            depth = "production" if status == "met" else "project"
+            await client.execute(
+                """INSERT INTO candidate_skills
+                   (id, candidate_id, skill_id, raw_skill_text, evidence,
+                    recency, depth, confidence)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    row_id, candidate_id, sid, s["skill"],
+                    (s.get("evidence") or "")[:500],
+                    "current",  # fallback assumption
+                    depth,
+                    0.7 if status == "met" else 0.5,
+                ],
+            )
+            inserted += 1
+    return inserted
