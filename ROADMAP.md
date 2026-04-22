@@ -114,18 +114,27 @@ it. Without Layer 7, we have no enterprise revenue.
 - ❌ DEI Jamboard (designed, not built)
 - ❌ Competitive Intelligence (designed, not built)
 
-**Layer 2 (Taxonomy + Matching Engine):** 0%
-- ❌ Skills table (currently freeform strings inside JSON blobs)
-- ❌ Competencies table
-- ❌ Adjacency edges
-- ❌ Formal matching algorithm in code (currently AI-only via prompt)
-- ✅ All design lives in `taxonomy/skills.yml`, `taxonomy/competencies.yml`,
-  `modes/_matching-engine.md` — needs porting to DB
+**Layer 2 (Taxonomy + Matching Engine):** ~75% (Phase A mostly complete)
+- ✅ Schema migration: 13 tables live (brain + compliance layer)
+- ✅ Seed script with glob-driven auto-discovery of `taxonomy/skills_*.yml`
+- ✅ 117 skills (data/ML + hardware semiconductor), 348 adjacency edges,
+  15 competencies, all in Turso
+- ✅ JD_PARSER_PROMPT emits `canonical_skills` for clean taxonomy matching
+- ✅ CANDIDATE_EVAL_PROMPT emits `extracted_skills` with recency/depth
+- ✅ Every intake writes `req_skills` + compliance records
+- ✅ Every eval writes `candidate_skills` + compliance records
+- ❌ Formal matching engine math in code (currently AI does the scoring)
+- ❌ Medical device / automotive / aerospace taxonomy domains
+- ❌ Backfill script not yet run on existing 6 legacy reqs
 
-**Layer 3 (Calibration Loop):** 0%
-- ❌ Outcome tracking events
-- ❌ Adjacency weight adjustments
-- ❌ Company-specific rule learning
+**Layer 3 (Taxonomy Evolution Loop):** 10% (scaffolding only)
+- ✅ `calibration_events` table exists
+- ✅ `audit_events` tamper-evident HMAC chain writing on every AI decision
+- ✅ `decision_explanations` table populated for EU AI Act Article 13
+- ❌ B1: adjacency weight adjustments from outcomes (Phase B)
+- ❌ B2: unresolved skill promotion workflow (Phase B)
+- ❌ B3: role archetype discovery (Phase B)
+- ❌ B4: skill mesh co-occurrence analysis (Phase B)
 
 **Layer 4 (Lifecycle Modes):** ~10%
 - ✅ Match (basic — candidate evaluation endpoint)
@@ -195,30 +204,96 @@ tables, and every operation writes structured data to them.
 **Why this is first:** Nothing else compounds without it. Every intake we
 run today without the taxonomy is data we cannot aggregate later.
 
-### Phase B: Calibration + Outcomes — Make the brain learn
-**Goal:** Add the feedback loop. Every placement, rejection, and retention
-event adjusts the brain's weights.
+### Phase B: Taxonomy Evolution Loop — Make the brain learn AND grow
+**Goal:** The taxonomy stops being static. The brain learns from placement
+outcomes AND discovers new skills, new roles, and hybrid archetypes that
+nobody defined up front.
 
-**Estimated effort:** 8-12 hours across 2 sessions.
+**Why this is expanded:** Static taxonomies are obsolete on arrival in the
+AI era. New roles emerge faster than vendors can update their dropdowns
+(Talent Engineer, Prompt Engineer, AI Engineer). Traditional roles
+hybridize (Data Engineer → Full-Stack, Product Engineer combining
+TypeScript + prompts + evals + Vercel deploys). Skill combinations matter
+more than individual skills. A taxonomy that can't evolve can't serve the
+market it claims to map.
 
-**Tasks:**
-1. Status mutations: mark req as Open/Placed/Closed; mark candidate as
-   Submitted/Interviewed/Placed/Rejected with rejection reason
-2. Outcome event log: every status change writes to `calibration_events`
-3. Calibration job (cron or on-demand): aggregate outcomes, adjust
-   adjacency scores, identify company-specific patterns
-4. Calibrate UI on /app/: recruiter sees "Stripe rejected 3 candidates
-   citing Spark — should we treat it as required for Stripe?"
-5. Adjacency adjustments persist back to the `skill_adjacencies` table
+Phase B is our answer. Four sub-phases, each a self-contained slice:
+
+**B1: Skill adjacency calibration** (the original plan)
+
+Every placement or rejection adjusts adjacency weights. Company-specific
+patterns surface ("Stripe rejected 3 candidates citing Spark — should we
+treat it as required for Stripe?"). Adjacency weights in
+`skill_adjacencies` update from their taxonomy defaults based on outcome
+data.
+
+Data sources: `calibration_events`, `submissions.stage` mutations,
+`submission_dimensions.composite_score` over time.
+
+**B2: Unresolved skill promotion**
+
+Detect skills the AI keeps emitting in `req_skills.raw_skill_text` or
+`candidate_skills.raw_skill_text` that have `skill_id=NULL`. When the
+same raw name appears N+ times across multiple users, surface it as a
+candidate for taxonomy promotion. Recruiter or admin approves and the
+system adds it to the right YAML file (or a new `skills_emerging.yml`),
+re-runs seed, and backfills existing rows to link them to the new
+canonical ID.
+
+Output: a steady stream of "new skill candidates" that keeps the
+taxonomy fresh without anyone having to guess.
+
+**B3: Role archetype discovery**
+
+Every parsed JD is a bag of (canonical_skills, seniority, location,
+comp_band, industry). Cluster similar JDs. When a new cluster appears
+that doesn't match any existing archetype (IC-DS, IC-MLE, MGR, etc.),
+flag it. After 10+ JDs in the cluster, propose a new archetype name
+and the signals that define it.
+
+Concrete examples that would come out of this today:
+- "AI Engineer": LLM + prompt eng + RAG + TypeScript + eval frameworks,
+  mid/senior level, $250-400k
+- "Talent Engineer": skill taxonomy + SQL + LLM integration + recruiting
+  domain, senior level, emerging at AI-first companies
+- "Product Engineer": TypeScript + prompts + Vercel + evals + UX, mid
+  level, common at Series A-B startups
+
+These aren't in `competencies.yml` today. B3 is how they get there.
+
+**B4: Skill mesh co-occurrence**
+
+Static adjacency (PyTorch ↔ TensorFlow = 0.6) is only one dimension.
+The other dimension is which skills appear TOGETHER. PyTorch + RLHF +
+distributed training is a different signal than PyTorch + Jupyter +
+scikit-learn. Build a co-occurrence matrix from `req_skills` and
+`candidate_skills`. Use it to:
+- Improve matching: a candidate with the full mesh scores higher than
+  one with only the individual skills
+- Surface "rare combinations" that command premium comp
+- Detect "emerging combos" that are becoming common (RLHF is new; in
+  2025 it was rare, now it's expected for LLM roles)
+
+**Estimated effort:** 25-35 hours across 4-6 sessions (more than the
+original B estimate because scope expanded — this is correct, not scope
+creep).
+
+**Sub-phase order:** B1 → B2 → B3 → B4. B1 unlocks the calibration UX.
+B2 unlocks taxonomy freshness. B3 and B4 are layered analytics on the
+data B1 and B2 generate.
 
 **Acceptance criteria:**
 - Recruiter can log a placement outcome in <30 seconds
-- After 5+ outcomes, the system surfaces calibration insights
-- Adjacency weights visibly change based on data, not guesses
+- After 10+ outcomes, adjacency weights visibly change
+- Unresolved skill promotion surfaces new taxonomy candidates weekly
+- Role archetype discovery flags at least one emerging archetype per
+  quarter in active markets
+- Skill mesh influences the matching engine's output measurably
 
-**Why this is next:** This is the moat. Without it, SourcingNav is a
-wrapper around an LLM. With it, the system gets sharper than any
-competitor every week.
+**Why this is next after A:** Phase A builds the tables. Phase B makes
+them learn. Without B, the tables fill with data that never gets smarter.
+With B, every week the system is sharper than the week before. This is
+the moat that compounds.
 
 ### Phase C: Agency Mode Buildout — Make /ui/dashboard.html real
 **Goal:** The 9 missing agency modes from the dashboard demo become
@@ -331,8 +406,12 @@ Stages still needing modes after Phases A-D:
 A → B → C and D in parallel → E → F
 
 - **A first** because nothing compounds without the brain
-- **B second** because the calibration loop is the moat and needs data
-  flowing through it as early as possible
+- **B second** because the taxonomy must evolve alongside the market it
+  maps. B1 (calibration) unlocks the feedback loop. B2 (unresolved
+  promotion) keeps the taxonomy fresh without manual work. B3 (archetype
+  discovery) surfaces emerging roles like Talent Engineer and Prompt
+  Engineer before competitors notice them. B4 (skill mesh) moves scoring
+  from single-skill matching to combination matching.
 - **C and D in parallel** after A+B. The agency side drives data volume
   (recruiters using it daily). The company side drives revenue per
   customer (higher-ticket subscriptions). Both feed Layer 7 data.
