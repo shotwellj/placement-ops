@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline · SourcingNav Talent Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a; --bg-elev: #111827; --bg-card: #151d2e;
+    --border: #1f2a3f; --border-strong: #2d3a54;
+    --text: #e8ecf4; --text-dim: #8b9bb3; --text-mute: #5a6c85;
+    --accent: #3dd9d6; --accent-deep: #2eb8b5; --blue: #4a9eff;
+    --accent-glow: rgba(61, 217, 214, 0.15);
+    --gradient: linear-gradient(135deg, #3dd9d6 0%, #4a9eff 100%);
+    --danger: #ff6b6b; --warn: #ffb74d; --good: #4ade80;
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased; background-image: radial-gradient(ellipse at top right, rgba(61,217,214,0.06) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(74,158,255,0.04) 0%, transparent 50%); background-attachment: fixed; }
+</style>
+<style>
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
+  .nav-inner { max-width: 1400px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; letter-spacing: 0.08em; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+  .brand-sub { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); margin-left: 0.75rem; padding-left: 0.75rem; border-left: 1px solid var(--border-strong); }
+  .nav-right { display: flex; align-items: center; gap: 1.5rem; font-size: 0.85rem; }
+  .nav-link { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+  .nav-link:hover { color: var(--accent); }
+  .nav-link.active { color: var(--text); }
+  .page { max-width: 1400px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+  .page-header { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-end; gap: 2rem; flex-wrap: wrap; }
+  .page-kicker { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.75rem; }
+  .page-title { font-size: 2.25rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05; }
+  .page-title em { font-style: italic; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .page-desc { color: var(--text-dim); font-size: 1rem; max-width: 640px; margin-top: 0.5rem; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; }
+  .card-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .card-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.25rem; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-family: var(--font-body); font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: transform 0.1s, box-shadow 0.2s; text-decoration: none; }
+  .btn-primary { background: var(--gradient); color: #0a0e1a; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(61, 217, 214, 0.3); }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border-strong); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+</style>
+<style>
+  .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+  .filter-chip { padding: 0.5rem 1rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 999px; color: var(--text-dim); font-size: 0.85rem; cursor: pointer; transition: all 0.15s; font-family: var(--font-body); }
+  .filter-chip:hover { color: var(--text); border-color: var(--accent); }
+  .filter-chip.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+  .req-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 1.5rem; padding: 1.25rem 1.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 0.75rem; cursor: pointer; transition: all 0.15s; align-items: center; text-decoration: none; color: inherit; }
+  .req-row:hover { border-color: var(--accent); transform: translateX(2px); }
+  .req-title { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }
+  .req-meta { color: var(--text-mute); font-size: 0.8rem; font-family: var(--font-mono); }
+  .req-fee { font-family: var(--font-mono); color: var(--accent); font-weight: 600; font-size: 0.95rem; }
+  .req-status { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.3rem 0.7rem; border-radius: 999px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .req-status.open { background: rgba(74, 222, 128, 0.15); color: var(--good); }
+  .req-status.placed { background: rgba(61, 217, 214, 0.15); color: var(--accent); }
+  .req-status.closed { background: rgba(139, 155, 179, 0.15); color: var(--text-dim); }
+  .req-arrow { color: var(--text-mute); font-size: 1.2rem; }
+  .empty-state { padding: 4rem 2rem; text-align: center; background: var(--bg-card); border: 1px dashed var(--border-strong); border-radius: 12px; }
+  .empty-state h3 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+  .empty-state p { color: var(--text-dim); margin-bottom: 1.5rem; }
+  .back-link { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-dim); text-decoration: none; font-size: 0.85rem; margin-bottom: 1rem; transition: color 0.15s; font-family: var(--font-mono); }
+  .back-link:hover { color: var(--accent); }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi { padding: 1.25rem; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; }
+  .kpi-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .kpi-value { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+  .kpi-value.text { font-size: 1rem; color: var(--text); }
+</style>
+<style>
+  .skill-list { list-style: none; }
+  .skill-item { padding: 0.7rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+  .skill-item:last-child { border-bottom: none; }
+  .skill-name { font-weight: 500; }
+  .skill-rationale { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.25rem; }
+  .severity { font-family: var(--font-mono); font-size: 0.65rem; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.05em; text-transform: uppercase; flex-shrink: 0; }
+  .severity.blocker { background: rgba(255, 107, 107, 0.15); color: var(--danger); }
+  .severity.preferred { background: rgba(255, 183, 77, 0.15); color: var(--warn); }
+  .bool-section { margin-bottom: 2rem; }
+  .bool-section-title { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  .bool-string { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; }
+  .bool-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+  .bool-copy { background: transparent; border: 1px solid var(--border-strong); color: var(--text-dim); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; font-family: var(--font-mono); }
+  .bool-copy:hover { color: var(--accent); border-color: var(--accent); }
+  .bool-copy.copied { color: var(--good); border-color: var(--good); }
+  .bool-text { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text); word-break: break-all; line-height: 1.5; }
+  .loading { padding: 4rem 2rem; text-align: center; color: var(--text-dim); font-family: var(--font-mono); }
+  .err-box { background: rgba(255, 107, 107, 0.08); border: 1px solid var(--danger); border-radius: 8px; padding: 1rem; color: var(--danger); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 1.5rem; color: var(--text-dim); font-family: var(--font-mono); font-size: 0.85rem; margin-bottom: 1rem; }
+  .note-block { padding: 1rem; background: var(--bg-elev); border-left: 3px solid var(--accent); border-radius: 4px; margin-bottom: 0.75rem; }
+  .note-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.4rem; }
+  .note-text { font-size: 0.9rem; color: var(--text); }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <div>
+      <a href="/" class="brand">SOURCINGNAV</a>
+      <span class="brand-sub">TALENT ENGINE</span>
+    </div>
+    <div class="nav-right">
+      <a href="/app/" class="nav-link">Intake</a>
+      <a href="/app/pipeline.html" class="nav-link active">Pipeline</a>
+      <a href="/app/settings.html" class="nav-link">Settings</a>
+    </div>
+  </div>
+</nav>
+<main class="page">
+  <div id="listView"></div>
+  <div id="detailView" style="display: none;"></div>
+</main>
+<script>
+const API = '/api';
+const token = localStorage.getItem('sn_token');
+if (!token) location.href = '/app/';
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) };
+  const res = await fetch(`${API}${path}`, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function timeAgo(iso) {
+  if (!iso) return 'unknown';
+  const then = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
+  const diff = Math.floor((Date.now() - then.getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function fmtFee(n) {
+  if (n === null || n === undefined) return 'TBD';
+  if (typeof n !== 'number') return escapeHtml(String(n));
+  return '$' + Math.round(n).toLocaleString();
+}
+
+let allReqs = [];
+let currentFilter = 'all';
+async function loadList() {
+  document.getElementById('listView').style.display = 'block';
+  document.getElementById('detailView').style.display = 'none';
+  document.getElementById('listView').innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-kicker">Pipeline</div>
+        <h1 class="page-title">Your <em>requisitions</em></h1>
+        <p class="page-desc">Every JD you've intaked, ready to source against.</p>
+      </div>
+      <a href="/app/" class="btn btn-primary">+ New Intake</a>
+    </div>
+    <div class="filter-bar" id="filterBar"></div>
+    <div id="reqsList" class="loading">Loading your pipeline...</div>
+  `;
+  try {
+    const data = await api('/reqs');
+    allReqs = data.reqs || [];
+    renderFilters();
+    renderList();
+  } catch (e) {
+    document.getElementById('reqsList').innerHTML = `<div class="err-box">Could not load pipeline: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderFilters() {
+  const counts = { all: allReqs.length };
+  for (const r of allReqs) counts[r.status] = (counts[r.status] || 0) + 1;
+  const statuses = ['all', 'open', 'placed', 'closed'];
+  document.getElementById('filterBar').innerHTML = statuses
+    .filter(s => s === 'all' || counts[s])
+    .map(s => `<button class="filter-chip ${s === currentFilter ? 'active' : ''}" data-filter="${s}">${s.charAt(0).toUpperCase() + s.slice(1)} (${counts[s] || 0})</button>`)
+    .join('');
+  document.querySelectorAll('.filter-chip').forEach(b => {
+    b.addEventListener('click', () => {
+      currentFilter = b.dataset.filter;
+      renderFilters();
+      renderList();
+    });
+  });
+}
+function renderList() {
+  const list = document.getElementById('reqsList');
+  list.classList.remove('loading');
+  const filtered = currentFilter === 'all' ? allReqs : allReqs.filter(r => r.status === currentFilter);
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <h3>${allReqs.length === 0 ? 'No requisitions yet' : `No ${currentFilter} requisitions`}</h3>
+        <p>${allReqs.length === 0 ? 'Run your first JD intake to get started.' : 'Switch filters or run a new intake.'}</p>
+        <a href="/app/" class="btn btn-primary">+ Run Intake</a>
+      </div>
+    `;
+    return;
+  }
+  list.innerHTML = filtered.map(r => `
+    <a class="req-row" href="/app/pipeline.html?req=${encodeURIComponent(r.id)}">
+      <div>
+        <div class="req-title">${escapeHtml(r.title)}</div>
+        <div class="req-meta">${escapeHtml(r.org_name || 'Unknown org')} · Opened ${timeAgo(r.opened_at)}</div>
+      </div>
+      <div class="req-fee">${fmtFee(r.fee_estimate)}</div>
+      <div class="req-status ${escapeHtml(r.status || 'open')}">${escapeHtml(r.status || 'open')}</div>
+      <div class="req-arrow">→</div>
+    </a>
+  `).join('');
+}
+
+async function loadDetail(reqId) {
+  document.getElementById('listView').style.display = 'none';
+  document.getElementById('detailView').style.display = 'block';
+  document.getElementById('detailView').innerHTML = `<div class="loading">Loading requisition...</div>`;
+  try {
+    const data = await api(`/reqs/${encodeURIComponent(reqId)}`);
+    renderDetail(data);
+  } catch (e) {
+    document.getElementById('detailView').innerHTML = `
+      <a href="/app/pipeline.html" class="back-link">← Back to pipeline</a>
+      <div class="err-box">Could not load requisition: ${escapeHtml(e.message)}</div>
+    `;
+  }
+}
+function renderDetail(d) {
+  const p = d.parsed || {};
+  const b = d.boolean_strings || {};
+  const comp = p.comp_snapshot || {};
+  const mustHaves = (p.must_have_skills || []).slice().sort((a, b) => {
+    const order = { blocker: 0, preferred: 1 };
+    return (order[a.severity] ?? 2) - (order[b.severity] ?? 2);
+  });
+  const niceToHaves = p.nice_to_have_skills || [];
+  document.getElementById('detailView').innerHTML = `
+    <a href="/app/pipeline.html" class="back-link">← Back to pipeline</a>
+    <div class="page-header">
+      <div style="flex: 1;">
+        <div class="page-kicker">${escapeHtml(d.org_name || 'Requisition')}</div>
+        <h1 class="page-title">${escapeHtml(d.title)}</h1>
+        <div class="meta-row" style="margin-top: 1rem;">
+          <span>Status: ${escapeHtml(d.status || 'open')}</span>
+          <span>Opened ${timeAgo(d.opened_at)}</span>
+        </div>
+      </div>
+    </div>
+    ${renderCompCard(comp, p)}
+    ${renderSkillsCard(mustHaves, niceToHaves)}
+    ${renderBooleanCard(b)}
+    ${renderNotesCard(b.mentor_notes)}
+    ${renderRawJDCard(d.jd_raw)}
+  `;
+  document.querySelectorAll('.bool-copy').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.copy;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+      });
+    });
+  });
+}
+function renderCompCard(comp, p) {
+  if (!comp.base_min && !comp.base_max && !p.fee_estimate) return '';
+  const base = comp.base_min && comp.base_max ? `$${comp.base_min.toLocaleString()}–$${comp.base_max.toLocaleString()}` : 'TBD';
+  const total = comp.total_comp_min && comp.total_comp_max ? `$${comp.total_comp_min.toLocaleString()}–$${comp.total_comp_max.toLocaleString()}` : 'TBD';
+  return `
+    <section class="card">
+      <div class="card-label">Compensation Snapshot</div>
+      <h2 class="card-title">Market range</h2>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">Base</div><div class="kpi-value">${base}</div></div>
+        <div class="kpi"><div class="kpi-label">Total Comp</div><div class="kpi-value">${total}</div></div>
+        ${p.fee_estimate ? `<div class="kpi"><div class="kpi-label">Est. Fee</div><div class="kpi-value">${fmtFee(p.fee_estimate)}</div></div>` : ''}
+      </div>
+      ${comp.equity_notes ? `<div class="note-block"><div class="note-label">Equity</div><div class="note-text">${escapeHtml(comp.equity_notes)}</div></div>` : ''}
+      ${comp.negotiation_notes ? `<div class="note-block"><div class="note-label">Negotiation</div><div class="note-text">${escapeHtml(comp.negotiation_notes)}</div></div>` : ''}
+    </section>
+  `;
+}
+function renderSkillsCard(mustHaves, niceToHaves) {
+  if (!mustHaves.length && !niceToHaves.length) return '';
+  return `
+    <section class="card">
+      <div class="card-label">Required Skills</div>
+      <h2 class="card-title">What matters for this role</h2>
+      <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1.25rem;">
+        <span class="severity blocker">Blocker</span> means a real auto-reject. <span class="severity preferred">Preferred</span> means listed but negotiable.
+      </p>
+      <ul class="skill-list">
+        ${mustHaves.map(s => `
+          <li class="skill-item">
+            <div>
+              <div class="skill-name">${escapeHtml(s.skill || s.name || '')}</div>
+              ${s.rationale ? `<div class="skill-rationale">${escapeHtml(s.rationale)}</div>` : ''}
+            </div>
+            <span class="severity ${escapeHtml(s.severity || 'preferred')}">${escapeHtml(s.severity || 'preferred')}</span>
+          </li>
+        `).join('')}
+      </ul>
+      ${niceToHaves.length ? `
+        <h3 style="font-size: 0.95rem; margin-top: 1.5rem; margin-bottom: 0.75rem; color: var(--text-dim);">Nice to have</h3>
+        <ul class="skill-list">
+          ${niceToHaves.map(s => `
+            <li class="skill-item">
+              <div>
+                <div class="skill-name">${escapeHtml(typeof s === 'string' ? s : (s.skill || s.name || ''))}</div>
+                ${s.rationale ? `<div class="skill-rationale">${escapeHtml(s.rationale)}</div>` : ''}
+              </div>
+            </li>
+          `).join('')}
+        </ul>
+      ` : ''}
+    </section>
+  `;
+}
+function renderBooleanCard(b) {
+  const lr = [];
+  const xray = [];
+  for (const [key, val] of Object.entries(b)) {
+    if (key === 'mentor_notes' || key === 'company_clusters') continue;
+    if (typeof val !== 'string' || !val.trim()) continue;
+    if (key.startsWith('lr_')) lr.push({ key, val });
+    else xray.push({ key, val });
+  }
+  if (!lr.length && !xray.length) return '';
+  const renderGroup = (items) => items.map(({ key, val }) => `
+    <div class="bool-string">
+      <div class="bool-label">
+        <span>${escapeHtml(key.replace(/_/g, ' '))}</span>
+        <button class="bool-copy" data-copy="${escapeHtml(val)}">Copy</button>
+      </div>
+      <div class="bool-text">${escapeHtml(val)}</div>
+    </div>
+  `).join('');
+  return `
+    <section class="card">
+      <div class="card-label">Sourcing Strings</div>
+      <h2 class="card-title">Boolean queries</h2>
+      ${lr.length ? `
+        <div class="bool-section">
+          <div class="bool-section-title">LinkedIn Recruiter (paid)</div>
+          ${renderGroup(lr)}
+        </div>
+      ` : ''}
+      ${xray.length ? `
+        <div class="bool-section">
+          <div class="bool-section-title">X-Ray Searches (free)</div>
+          ${renderGroup(xray)}
+        </div>
+      ` : ''}
+    </section>
+  `;
+}
+function renderNotesCard(notes) {
+  if (!notes || typeof notes !== 'object') return '';
+  const entries = Object.entries(notes).filter(([k, v]) => v && typeof v === 'string');
+  if (!entries.length) return '';
+  return `
+    <section class="card">
+      <div class="card-label">Sourcer's Notes</div>
+      <h2 class="card-title">Where to start</h2>
+      ${entries.map(([k, v]) => `
+        <div class="note-block">
+          <div class="note-label">${escapeHtml(k.replace(/_/g, ' '))}</div>
+          <div class="note-text">${escapeHtml(v)}</div>
+        </div>
+      `).join('')}
+    </section>
+  `;
+}
+
+function renderRawJDCard(jd) {
+  if (!jd) return '';
+  return `
+    <section class="card">
+      <div class="card-label">Original JD</div>
+      <h2 class="card-title">Source text</h2>
+      <details>
+        <summary style="cursor: pointer; color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1rem;">Expand to view the original JD text</summary>
+        <pre style="white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-dim); background: var(--bg-elev); padding: 1.25rem; border-radius: 8px; margin-top: 0.5rem;">${escapeHtml(jd)}</pre>
+      </details>
+    </section>
+  `;
+}
+
+const params = new URLSearchParams(location.search);
+const reqParam = params.get('req');
+if (reqParam) {
+  loadDetail(reqParam);
+} else {
+  loadList();
+}
+</script>
+</body>
+</html>
