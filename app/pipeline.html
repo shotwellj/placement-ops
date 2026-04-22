@@ -274,16 +274,17 @@ function renderDetail(d) {
   });
 }
 function renderCompCard(comp, p) {
-  if (!comp.base_min && !comp.base_max && !p.fee_estimate) return '';
-  const base = comp.base_min && comp.base_max ? `$${comp.base_min.toLocaleString()}–$${comp.base_max.toLocaleString()}` : 'TBD';
-  const total = comp.total_comp_min && comp.total_comp_max ? `$${comp.total_comp_min.toLocaleString()}–$${comp.total_comp_max.toLocaleString()}` : 'TBD';
+  // Handle both shapes the model returns: numeric (base_min/base_max) OR pre-formatted string (base_range)
+  const base = comp.base_range || (comp.base_min && comp.base_max ? `$${comp.base_min.toLocaleString()}–$${comp.base_max.toLocaleString()}` : null);
+  const total = comp.total_comp_range || (comp.total_comp_min && comp.total_comp_max ? `$${comp.total_comp_min.toLocaleString()}–$${comp.total_comp_max.toLocaleString()}` : null);
+  if (!base && !total && !p.fee_estimate) return '';
   return `
     <section class="card">
       <div class="card-label">Compensation Snapshot</div>
       <h2 class="card-title">Market range</h2>
       <div class="kpi-row">
-        <div class="kpi"><div class="kpi-label">Base</div><div class="kpi-value">${base}</div></div>
-        <div class="kpi"><div class="kpi-label">Total Comp</div><div class="kpi-value">${total}</div></div>
+        ${base ? `<div class="kpi"><div class="kpi-label">Base</div><div class="kpi-value text">${escapeHtml(base)}</div></div>` : ''}
+        ${total ? `<div class="kpi"><div class="kpi-label">Total Comp</div><div class="kpi-value text">${escapeHtml(total)}</div></div>` : ''}
         ${p.fee_estimate ? `<div class="kpi"><div class="kpi-label">Est. Fee</div><div class="kpi-value">${fmtFee(p.fee_estimate)}</div></div>` : ''}
       </div>
       ${comp.equity_notes ? `<div class="note-block"><div class="note-label">Equity</div><div class="note-text">${escapeHtml(comp.equity_notes)}</div></div>` : ''}
