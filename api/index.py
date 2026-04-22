@@ -607,9 +607,16 @@ preferences, not blockers, unless the role is explicitly customer/sales-facing.
 CRITICAL RULES FOR comp_snapshot:
 ALWAYS populate this with realistic ranges, even if comp is not in the JD.
 Use your knowledge of the role title, level, location, company tier, and industry.
-Format ranges as "$XXXk - $XXXk" (e.g. "$220k - $280k"). Include equity guidance for
-startups/late-stage tech companies. negotiation_notes should be 1-2 sentences on what
-levers to pull (cash vs equity, signing bonus, level matching, location adjust).
+
+SCHEMA LOCK. comp_snapshot MUST use exactly these four string fields and NO others:
+  - base_range:        STRING formatted "$XXXk - $XXXk" (e.g. "$220k - $280k")
+  - total_comp_range:  STRING formatted "$XXXk - $XXXk (incl. equity/bonus)"
+  - equity_notes:      STRING, 1-2 sentences on equity expectations
+  - negotiation_notes: STRING, 1-2 sentences on what levers to pull
+
+Do NOT use base_min, base_max, total_comp_min, total_comp_max, or any numeric fields.
+Do NOT nest objects inside comp_snapshot. All four values are flat strings.
+If you cannot estimate comp, still return strings (e.g. base_range: "Unknown - market dependent").
 
 Return ONLY valid JSON with this shape:
 {{
