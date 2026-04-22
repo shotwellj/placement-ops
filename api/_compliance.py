@@ -308,12 +308,45 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
 async def write_req_skills(client, req_id: str, parsed: dict) -> int:
     """Extract structured skills from parsed JD output and write req_skills rows.
 
-    Reads from parsed['must_have_skills'] and parsed['nice_to_have_skills'].
-    The AI already tags severity as 'blocker' or 'preferred' in must_have_skills.
-    Nice-to-haves get importance='nice_to_have'.
+    Priority:
+      1. parsed['canonical_skills']: new format — list of {name, severity}.
+         These are clean skill names AI was prompted to emit specifically for
+         taxonomy matching. Used when JD_PARSER_PROMPT includes the
+         canonical_skills instruction block.
+      2. parsed['must_have_skills'] + parsed['nice_to_have_skills']: legacy
+         fallback. These entries are prose rationale that rarely matches the
+         taxonomy cleanly, but we store them so no data is lost.
 
     Returns the number of rows inserted.
     """
+    # Preferred path: canonical_skills emitted directly by the AI
+    canonical = parsed.get("canonical_skills")
+    if isinstance(canonical, list) and canonical:
+        inserted = 0
+        for s in canonical:
+            if not isinstance(s, dict) or not s.get("name"):
+                continue
+            name = s["name"].strip()
+            if not name:
+                continue
+            sev = s.get("severity", "preferred")
+            importance = (
+                "blocker" if sev == "blocker"
+                else "nice_to_have" if sev == "nice_to_have"
+                else "preferred"
+            )
+            skill_id = await resolve_skill_id(client, name)
+            row_id = "rs_" + uuid.uuid4().hex[:16]
+            await client.execute(
+                """INSERT INTO req_skills
+                   (id, req_id, skill_id, raw_skill_text, importance, rationale)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [row_id, req_id, skill_id, name, importance, None],
+            )
+            inserted += 1
+        return inserted
+
+    # Legacy fallback: must_have_skills + nice_to_have_skills (prose rationale)
     def _candidates():
         for s in (parsed.get("must_have_skills") or []):
             if isinstance(s, dict) and s.get("skill"):

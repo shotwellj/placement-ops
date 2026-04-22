@@ -615,6 +615,34 @@ Be honest. If a JD lists "10+ years of experience" but the role is a Senior IC, 
 a preference, not a blocker. Most "team player / strong communication" requirements are
 preferences, not blockers, unless the role is explicitly customer/sales-facing.
 
+CRITICAL RULES FOR canonical_skills:
+In addition to must_have_skills (which is prose for the UI), you MUST also output
+a flat list of canonical_skills. These are CLEAN skill names suitable for database
+matching, not sentences.
+
+BAD (these are rationale, not skills):
+  - "5+ years in chip design, verification, or EDA (RTL, timing closure, co-design)"
+  - "Direct experience with RTL, simulators, or verification environments"
+  - "Production-grade coding in Python or systems languages"
+
+GOOD (clean canonical names, one per skill):
+  - "RTL Design"
+  - "SystemVerilog"
+  - "UVM"
+  - "Python"
+  - "Timing Closure"
+
+Rules:
+  - Each entry is a proper-noun skill name (2-5 words max).
+  - Split compound requirements: "RTL + timing closure" becomes TWO entries,
+    "RTL Design" and "Timing Closure".
+  - Use the most common industry name: "PyTorch" not "Torch", "Apache Spark"
+    not "Spark Core", "UVM" not "Universal Verification Methodology".
+  - Mark each with severity matching its source must_have/nice_to_have entry.
+  - 6-15 entries total. If the JD mentions a skill, extract it.
+  - Do NOT include soft skills like "communication" or "teamwork" here — those
+    belong in must_have_skills prose, not canonical_skills.
+
 CRITICAL RULES FOR comp_snapshot:
 ALWAYS populate this with realistic ranges, even if comp is not in the JD.
 Use your knowledge of the role title, level, location, company tier, and industry.
@@ -643,6 +671,11 @@ Return ONLY valid JSON with this shape:
   "must_have_skills": [
     {{"skill": "...", "rationale": "why this is a true blocker", "severity": "blocker"}},
     {{"skill": "...", "rationale": "why this is preferred but negotiable", "severity": "preferred"}}
+  ],
+  "canonical_skills": [
+    {{"name": "RTL Design", "severity": "blocker"}},
+    {{"name": "SystemVerilog", "severity": "blocker"}},
+    {{"name": "Python", "severity": "preferred"}}
   ],
   "nice_to_have_skills": [{{"skill": "...", "rationale": "..."}}],
   "transferable_skill_clusters": [{{"cluster_name": "...", "variants": [], "adjacent_skills": []}}],

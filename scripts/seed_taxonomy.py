@@ -1,5 +1,9 @@
 """
-Seed the taxonomy tables from taxonomy/skills.yml and taxonomy/competencies.yml.
+Seed the taxonomy tables from taxonomy/skills_*.yml and taxonomy/competencies_*.yml.
+
+Auto-discovers all files matching those glob patterns. Drop a new domain file
+(e.g. skills_medical_device.yml) into taxonomy/ and it gets picked up
+automatically on the next run. No code changes needed to expand.
 
 Usage:
     export TURSO_URL='libsql://sourcingnav-prod-shotwellj.aws-us-west-2.turso.io'
@@ -25,8 +29,9 @@ import httpx
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-SKILLS_YAML = ROOT / "taxonomy" / "skills.yml"
-COMP_YAML = ROOT / "taxonomy" / "competencies.yml"
+TAXONOMY_DIR = ROOT / "taxonomy"
+SKILLS_GLOB = "skills_*.yml"
+COMP_GLOB = "competencies_*.yml"
 
 
 def turso_url() -> str:
@@ -91,23 +96,45 @@ class Turso:
 # ----------------------------------------------------------------------
 
 def load_skills() -> list[dict]:
-    """Load skills.yml and return a flat list of skill dicts with category."""
-    with SKILLS_YAML.open() as f:
-        raw = yaml.safe_load(f)
+    """Load every taxonomy/skills_*.yml file and return a flat list of skill dicts.
+
+    Auto-discovers files via glob. Deduplicates by canonical skill name across
+    files (first occurrence wins, later duplicates are logged and skipped).
+    """
+    files = sorted(TAXONOMY_DIR.glob(SKILLS_GLOB))
+    if not files:
+        sys.exit(f"ERROR: no files match {TAXONOMY_DIR}/{SKILLS_GLOB}")
+
+    print(f"  skills files:")
     out: list[dict] = []
-    for category, skills in raw.items():
-        if not isinstance(skills, list):
-            continue  # skip top-level non-list keys (comments, metadata)
-        for s in skills:
-            if not isinstance(s, dict) or "name" not in s:
-                continue
-            out.append({
-                "name": s["name"],
-                "category": category,
-                "aliases": s.get("aliases") or [],
-                "adjacent": s.get("adjacent") or [],
-                "weight": s.get("weight", "medium"),
-            })
+    seen: dict[str, str] = {}  # canonical_name_lower -> source_file
+    for path in files:
+        with path.open() as f:
+            raw = yaml.safe_load(f) or {}
+        file_count = 0
+        dupe_count = 0
+        for category, skills in raw.items():
+            if not isinstance(skills, list):
+                continue  # skip top-level non-list keys (comments, metadata)
+            for s in skills:
+                if not isinstance(s, dict) or "name" not in s:
+                    continue
+                key = s["name"].strip().lower()
+                if key in seen:
+                    print(f"    WARN dup: '{s['name']}' in {path.name} (already in {seen[key]})")
+                    dupe_count += 1
+                    continue
+                seen[key] = path.name
+                out.append({
+                    "name": s["name"],
+                    "category": category,
+                    "aliases": s.get("aliases") or [],
+                    "adjacent": s.get("adjacent") or [],
+                    "weight": s.get("weight", "medium"),
+                })
+                file_count += 1
+        extra = f" ({dupe_count} dupes skipped)" if dupe_count else ""
+        print(f"    - {path.name}: {file_count} skills{extra}")
     return out
 
 
@@ -183,7 +210,7 @@ def seed_adjacencies(db: Turso, skills: list[dict], lookup: dict[str, str]) -> N
         print(f"  WARN: {len(unresolved)} adjacent names not found in taxonomy:")
         for name in sorted(unresolved):
             print(f"    - {name}")
-        print("  (These are candidates for future additions to skills.yml)")
+        print("  (These are candidates for future additions to a skills_*.yml file)")
 
 
 # ----------------------------------------------------------------------
@@ -191,23 +218,42 @@ def seed_adjacencies(db: Turso, skills: list[dict], lookup: dict[str, str]) -> N
 # ----------------------------------------------------------------------
 
 def load_competencies() -> list[dict]:
-    with COMP_YAML.open() as f:
-        raw = yaml.safe_load(f)
+    """Load every taxonomy/competencies_*.yml file."""
+    files = sorted(TAXONOMY_DIR.glob(COMP_GLOB))
+    if not files:
+        sys.exit(f"ERROR: no files match {TAXONOMY_DIR}/{COMP_GLOB}")
+
+    print(f"  competency files:")
     out: list[dict] = []
-    for category, items in raw.items():
-        if not isinstance(items, list):
-            continue
-        for c in items:
-            if not isinstance(c, dict) or "name" not in c:
+    seen: dict[str, str] = {}
+    for path in files:
+        with path.open() as f:
+            raw = yaml.safe_load(f) or {}
+        file_count = 0
+        dupe_count = 0
+        for category, items in raw.items():
+            if not isinstance(items, list):
                 continue
-            out.append({
-                "name": c["name"],
-                "category": category,
-                "archetypes": c.get("archetypes") or [],
-                "signals": c.get("signals") or [],
-                "levels": c.get("levels") or {},
-                "weight": c.get("weight", "medium"),
-            })
+            for c in items:
+                if not isinstance(c, dict) or "name" not in c:
+                    continue
+                key = c["name"].strip().lower()
+                if key in seen:
+                    print(f"    WARN dup: '{c['name']}' in {path.name} (already in {seen[key]})")
+                    dupe_count += 1
+                    continue
+                seen[key] = path.name
+                out.append({
+                    "name": c["name"],
+                    "category": category,
+                    "archetypes": c.get("archetypes") or [],
+                    "signals": c.get("signals") or [],
+                    "levels": c.get("levels") or {},
+                    "weight": c.get("weight", "medium"),
+                })
+                file_count += 1
+        extra = f" ({dupe_count} dupes skipped)" if dupe_count else ""
+        print(f"    - {path.name}: {file_count} competencies{extra}")
     return out
 
 
@@ -240,17 +286,11 @@ def seed_competencies(db: Turso, comps: list[dict]) -> None:
 
 def main() -> None:
     print("Seeding taxonomy into sourcingnav-prod...")
-    print(f"  skills.yml:       {SKILLS_YAML}")
-    print(f"  competencies.yml: {COMP_YAML}")
-
-    if not SKILLS_YAML.exists():
-        sys.exit(f"ERROR: {SKILLS_YAML} not found")
-    if not COMP_YAML.exists():
-        sys.exit(f"ERROR: {COMP_YAML} not found")
+    print(f"  taxonomy dir: {TAXONOMY_DIR}")
 
     skills = load_skills()
     comps = load_competencies()
-    print(f"  parsed: {len(skills)} skills, {len(comps)} competencies")
+    print(f"  total parsed: {len(skills)} skills, {len(comps)} competencies")
 
     db = Turso(turso_url(), turso_token())
     try:

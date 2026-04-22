@@ -1,0 +1,276 @@
+# ============================================================
+# SourcingNav — Hardware & Semiconductor Skill Taxonomy
+# ============================================================
+# Covers RTL/verification, FPGA, ASIC, embedded firmware, SoC,
+# EDA tools, chip bring-up, and hardware-software co-design.
+#
+# Adjacencies are symmetric: if A lists B, the seed script
+# automatically inserts B→A too (Option 1, see ROADMAP).
+#
+# Unresolved skills from JDs and resumes accumulate as
+# raw_skill_text on req_skills/candidate_skills and become
+# candidates to add here.
+# ============================================================
+
+# -----------------------------------------------
+# HARDWARE DESCRIPTION LANGUAGES (HDL)
+# -----------------------------------------------
+hdl:
+  - name: Verilog
+    aliases: [verilog HDL]
+    adjacent: [SystemVerilog, VHDL, RTL Design]
+    weight: high
+
+  - name: SystemVerilog
+    aliases: [sv, systemverilog hdl]
+    adjacent: [Verilog, UVM, VHDL]
+    weight: high
+
+  - name: VHDL
+    aliases: []
+    adjacent: [Verilog, SystemVerilog]
+    weight: medium
+
+  - name: Chisel
+    aliases: [chisel3]
+    adjacent: [Verilog, SystemVerilog, RISC-V]
+    weight: low
+
+# -----------------------------------------------
+# DIGITAL DESIGN & VERIFICATION
+# -----------------------------------------------
+digital_design:
+  - name: RTL Design
+    aliases: [register transfer level, rtl coding]
+    adjacent: [Verilog, SystemVerilog, ASIC Design, Timing Closure]
+    weight: high
+
+  - name: ASIC Design
+    aliases: [asic, application-specific integrated circuit]
+    adjacent: [RTL Design, Physical Design, DFT, Timing Closure]
+    weight: high
+
+  - name: FPGA Development
+    aliases: [fpga, field-programmable gate array]
+    adjacent: [Verilog, SystemVerilog, Xilinx, Intel FPGA, Synthesis]
+    weight: high
+
+  - name: Physical Design
+    aliases: [pd, place and route, backend design]
+    adjacent: [ASIC Design, Timing Closure, Synthesis, Floorplanning]
+    weight: medium
+
+  - name: Timing Closure
+    aliases: [static timing analysis, sta]
+    adjacent: [Physical Design, Synthesis, ASIC Design]
+    weight: medium
+
+  - name: Synthesis
+    aliases: [logic synthesis, rtl synthesis]
+    adjacent: [Design Compiler, Genus, RTL Design, Timing Closure]
+    weight: medium
+
+  - name: DFT
+    aliases: [design for test, design for testability, scan insertion, atpg]
+    adjacent: [ASIC Design, Verification]
+    weight: medium
+
+  - name: Low Power Design
+    aliases: [power optimization, upf, clock gating]
+    adjacent: [ASIC Design, Physical Design]
+    weight: medium
+
+# -----------------------------------------------
+# VERIFICATION METHODOLOGIES & TOOLS
+# -----------------------------------------------
+verification:
+  - name: UVM
+    aliases: [universal verification methodology]
+    adjacent: [SystemVerilog, Verification, Formal Verification]
+    weight: high
+
+  - name: Verification
+    aliases: [design verification, dv, functional verification]
+    adjacent: [UVM, SystemVerilog, Formal Verification, Coverage Analysis]
+    weight: high
+
+  - name: Formal Verification
+    aliases: [formal methods, property verification, assertion-based verification]
+    adjacent: [UVM, Verification, SystemVerilog]
+    weight: medium
+
+  - name: Coverage Analysis
+    aliases: [functional coverage, code coverage]
+    adjacent: [UVM, Verification]
+    weight: medium
+
+  - name: VCS
+    aliases: [synopsys vcs]
+    adjacent: [Verilog, SystemVerilog, Verification, Synopsys]
+    weight: medium
+
+  - name: Verilator
+    aliases: []
+    adjacent: [Verilog, SystemVerilog, Verification]
+    weight: medium
+
+  - name: Questa
+    aliases: [modelsim, questasim]
+    adjacent: [Verification, UVM, Siemens EDA]
+    weight: low
+
+  - name: Xcelium
+    aliases: [cadence xcelium]
+    adjacent: [Verification, UVM, Cadence]
+    weight: low
+
+  - name: Emulation
+    aliases: [palladium, veloce, zebu, hardware emulation]
+    adjacent: [Verification, FPGA Development]
+    weight: low
+
+# -----------------------------------------------
+# EDA VENDORS & TOOL SUITES
+# -----------------------------------------------
+eda_vendors:
+  - name: Synopsys
+    aliases: [synopsys tools, design compiler, primetime, icc2]
+    adjacent: [VCS, Synthesis, Timing Closure, Physical Design]
+    weight: medium
+
+  - name: Cadence
+    aliases: [cadence design systems, genus, innovus, jasper]
+    adjacent: [Xcelium, Synthesis, Physical Design, Formal Verification]
+    weight: medium
+
+  - name: Siemens EDA
+    aliases: [mentor graphics, siemens, calibre]
+    adjacent: [Questa, Physical Design, Verification]
+    weight: medium
+
+  - name: Xilinx
+    aliases: [amd xilinx, vivado, vitis]
+    adjacent: [FPGA Development, Verilog]
+    weight: medium
+
+  - name: Intel FPGA
+    aliases: [altera, quartus, intel quartus]
+    adjacent: [FPGA Development, Verilog]
+    weight: medium
+
+# -----------------------------------------------
+# SOC / CHIP BRING-UP
+# -----------------------------------------------
+soc_bringup:
+  - name: SoC Bring-up
+    aliases: [chip bring-up, post-silicon validation, silicon validation]
+    adjacent: [Embedded Firmware, JTAG, Boot ROM, Debug]
+    weight: high
+
+  - name: JTAG
+    aliases: [boundary scan, ieee 1149.1]
+    adjacent: [SoC Bring-up, Debug, Embedded Firmware]
+    weight: medium
+
+  - name: Debug
+    aliases: [hardware debug, silicon debug, trace tools]
+    adjacent: [JTAG, SoC Bring-up, Embedded Firmware]
+    weight: medium
+
+  - name: Boot ROM
+    aliases: [boot loader, secure boot]
+    adjacent: [SoC Bring-up, Embedded Firmware, Firmware Security]
+    weight: low
+
+# -----------------------------------------------
+# EMBEDDED / FIRMWARE
+# -----------------------------------------------
+embedded_firmware:
+  - name: Embedded Firmware
+    aliases: [firmware, embedded software, firmware development]
+    adjacent: [Embedded C, SoC Bring-up, RTOS, Bare Metal, Device Drivers]
+    weight: high
+
+  - name: Embedded C
+    aliases: [c for embedded, embedded c programming]
+    adjacent: [Embedded Firmware, C++, Bare Metal, Device Drivers]
+    weight: high
+
+  - name: Bare Metal
+    aliases: [bare metal programming, no-os, firmware without os]
+    adjacent: [Embedded C, Embedded Firmware, RTOS]
+    weight: medium
+
+  - name: RTOS
+    aliases: [real-time operating system, freertos, zephyr, threadx]
+    adjacent: [Embedded Firmware, Bare Metal, VxWorks, Integrity OS]
+    weight: high
+
+  - name: Device Drivers
+    aliases: [driver development, linux drivers, kernel drivers]
+    adjacent: [Embedded Firmware, Linux Kernel, Embedded C]
+    weight: medium
+
+  - name: Linux Kernel
+    aliases: [kernel development, embedded linux]
+    adjacent: [Device Drivers, Embedded Firmware, Yocto]
+    weight: medium
+
+  - name: Yocto
+    aliases: [yocto project, bitbake, openembedded]
+    adjacent: [Linux Kernel, Embedded Firmware]
+    weight: low
+
+  - name: Firmware Security
+    aliases: [secure boot, firmware hardening, tpm]
+    adjacent: [Boot ROM, Embedded Firmware]
+    weight: medium
+
+  - name: OpenBMC
+    aliases: [bmc, baseboard management controller, ipmi, redfish]
+    adjacent: [Embedded Firmware, Linux Kernel]
+    weight: low
+
+# -----------------------------------------------
+# COMPUTER ARCHITECTURE & ACCELERATORS
+# -----------------------------------------------
+architecture:
+  - name: Computer Architecture
+    aliases: [cpu architecture, processor architecture, memory hierarchy]
+    adjacent: [RISC-V, ARM, ASIC Design, GPU Architecture]
+    weight: medium
+
+  - name: RISC-V
+    aliases: [riscv, risc5]
+    adjacent: [Computer Architecture, ARM, ASIC Design, Chisel]
+    weight: medium
+
+  - name: ARM
+    aliases: [arm architecture, cortex-a, cortex-m, armv8, armv9]
+    adjacent: [Computer Architecture, RISC-V, Embedded Firmware]
+    weight: medium
+
+  - name: GPU Architecture
+    aliases: [gpu design, gpu compute, warp scheduling]
+    adjacent: [Computer Architecture, CUDA, ML Accelerators]
+    weight: medium
+
+  - name: ML Accelerators
+    aliases: [ai accelerators, tpu, npu, ai asic, ml asic]
+    adjacent: [GPU Architecture, ASIC Design, CUDA, Computer Architecture]
+    weight: high
+
+  - name: CUDA
+    aliases: [nvidia cuda, gpu programming]
+    adjacent: [GPU Architecture, C++, ML Accelerators, Performance Engineering]
+    weight: medium
+
+  - name: High-Performance Interconnects
+    aliases: [nvlink, infiniband, pcie, cxl, chip-to-chip]
+    adjacent: [Computer Architecture, ML Accelerators]
+    weight: low
+
+  - name: Performance Engineering
+    aliases: [performance optimization, low-latency, high-throughput]
+    adjacent: [CUDA, Computer Architecture, C++]
+    weight: medium
