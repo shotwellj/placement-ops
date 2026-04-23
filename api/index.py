@@ -823,6 +823,28 @@ X-RAY SEARCH CONSTRAINTS (these strings must actually run on Google, not just lo
      (site:youtube.com OR site:slideshare.net) "Embedded World" "device driver"
    Three tokens max. That filters harder than six ANDed tokens.
 
+8. Stack Overflow tag searches: use MAX 2 tags ANDed together, not 3+.
+   User profile pages are sparse and 3-way tag intersections return zero.
+   Pick the 2 most-specific tags for the role. Example for embedded:
+     GOOD: site:stackoverflow.com/users "[linux-device-driver]" "[arm]"
+     BAD:  site:stackoverflow.com/users "[c]" "[arm]" "[linux-device-driver]" "[kernel]"
+
+9. Personal sites X-ray (intitle:resume OR intitle:CV) is WEAK for roles
+   whose practitioners do not self-publish online. Specifically:
+     - Embedded/firmware engineers
+     - Chip/silicon/ASIC engineers
+     - Aerospace and defense engineers (clearances discourage publishing)
+     - Senior IC roles at large companies (Qualcomm, Intel, Broadcom, etc.)
+   For these roles, DO NOT generate a personal_sites X-ray. Instead use
+   the slot for a role-appropriate alternative from this list:
+     - kernel.org mailing list: site:lore.kernel.org "device driver" "Signed-off-by:"
+     - Patent DB: site:patents.google.com "inventor:" AND domain keywords
+     - IEEE Xplore author search: site:ieeexplore.ieee.org "author:" AND keywords
+     - USENIX / LWN.net (systems/kernel practitioner writing)
+     - RFC authors: site:datatracker.ietf.org AND protocol keywords
+   Pick the alternative that matches where THIS role's talent actually
+   publishes or participates publicly.
+
 Test each string mentally: would a recruiter pasting this into Google
 actually see 20-200 relevant humans in the first page? If the answer is
 "zero" or "generic garbage," rewrite.
