@@ -596,6 +596,29 @@ Parse this job description and return a structured JSON analysis.
 JOB DESCRIPTION:
 {jd}
 
+CRITICAL RULE — NEVER RECOMMEND POACHING THE HIRING COMPANY:
+
+The company in the JD is the CLIENT. It is a non-solicit violation in most
+recruiting contracts and a legal risk to recommend sourcing candidates from
+the same company the recruiter is hiring FOR. Auto-reject any suggestion that
+points candidates back at the client.
+
+Apply this rule EVERYWHERE in your output:
+  - recommended_first_moves: never mention the hiring company by name as a
+    source. Never write "target engineers from [hiring company]" or
+    "reach out to [hiring company] employees".
+  - poaching_targets: NEVER include the hiring company. Exclude it even if
+    it is the most obvious source of this exact skillset.
+  - top_hiring_companies and talent_hotspots: the hiring company can appear
+    here as context (they are hiring, after all) but NEVER as a poaching
+    source.
+  - sourcing_strategy: tactics must target COMPETITORS and ADJACENT
+    companies, never the client.
+
+If you identify the hiring company from the JD, treat it as a filter: it is
+the one company the recruiter cannot source from. List 3+ real competitors
+instead.
+
 CRITICAL RULES FOR must_have_skills:
 You MUST stratify the must-haves by REAL hiring impact, not by what the JD claims is required.
 JDs lie. They list 15 required skills but realistically only 2-4 will get a candidate
@@ -753,6 +776,10 @@ Rules:
 - X-ray strings use Google syntax (site:, intitle:, OR, AND, quoted phrases)
 - Tier 1 = same product/market as the hiring company
 - Tier 2 = adjacent industry/skill overlap
+- NEVER include the hiring company itself in tier_1 or tier_2. The hiring company
+  is the client, and recommending sourcing from them is a non-solicit violation.
+  If the JD identifies the hiring company, exclude it from all company lists
+  and replace with real competitors.
 - Be specific. Generic strings like "engineer AND python" are useless.
 """
 
