@@ -171,6 +171,47 @@ response. Mitigated by the architecture's separation of scoring
 logic (stable) from prompt content (updateable) and taxonomy
 (updateable).
 
+### 2.7 Non-solicit violation / recommending the hiring company as source (L=3, I=5, Priority=15)
+
+**Risk:** The AI-generated JD parse or Boolean output recommends
+sourcing candidates from the hiring company itself. This is a
+non-solicit violation in most agency and retained recruiting
+agreements, a legal risk in some jurisdictions, and professional
+malpractice regardless of contract terms. A recruiter acting on the
+suggestion would expose themselves to contract termination, legal
+action, and reputation damage.
+
+**How it was discovered:** First end-to-end intake test with a real
+Qualcomm JD on 2026-04-23. The AI returned "Target engineers with
+Qualcomm, Broadcom, or MediaTek device driver experience" as the top
+recommended first move, and listed Qualcomm itself in Tier 1 Direct
+Competitors. The exact failure mode this risk category protects
+against.
+
+**Mitigations in place:**
+- `JD_PARSER_PROMPT` contains a dedicated CRITICAL RULE block named
+  "NEVER RECOMMEND POACHING THE HIRING COMPANY" that enumerates every
+  output field (recommended_first_moves, poaching_targets,
+  top_hiring_companies, talent_hotspots, sourcing_strategy) and
+  instructs the model to treat the hiring company as a filter, not
+  a source.
+- `BOOLEAN_BUILDER_PROMPT` has an explicit exclusion rule preventing
+  the hiring company from appearing in tier_1_direct_competitors or
+  tier_2_adjacent company clusters.
+- Both prompts are versioned via `model_versions`. The commit that
+  introduced the fix is 17e7731 on 2026-04-23. Every decision made
+  before that commit is traceable to the prior prompt hash.
+
+**Residual risk accepted:** The AI may still occasionally violate the
+rule on edge cases (abbreviated company names, subsidiaries, parent
+companies). Planned follow-up:
+- Phase B1 will add a code-level post-filter that strips the hiring
+  company name from all output arrays before display, as defense in
+  depth against prompt non-compliance.
+- Phase B2 will add a canonical mapping of company aliases
+  (e.g. "QCOM" → "Qualcomm", "ATVI" → "Activision Blizzard") so the
+  filter catches abbreviations.
+
 ## 3. Risks deferred to future phases
 
 | Phase | Risk addressed | Acceptance criteria |
