@@ -781,6 +781,51 @@ Rules:
   If the JD identifies the hiring company, exclude it from all company lists
   and replace with real competitors.
 - Be specific. Generic strings like "engineer AND python" are useless.
+
+X-RAY SEARCH CONSTRAINTS (these strings must actually run on Google, not just look smart):
+
+1. MAX 3 AND CLAUSES per string. Google's ranking collapses past 3 ANDs.
+   If you have 5 signals you want, pick the 3 highest-specificity ones and
+   drop the rest. More ANDs = fewer results = weaker string.
+
+2. ONLY use real Google operators. Whitelist:
+     site:, intitle:, inurl:, in:bio, in:readme, language:, filetype:, -site:
+   FORBIDDEN (these look real but Google ignores them, making your string
+   return garbage or zero results):
+     project:, score:, answers:, experience:, years:, company:, current_company:
+   (current_company: works in LinkedIn Recruiter ONLY, not in X-ray.)
+
+3. NEVER quote single letters. "C" matches every profile with any "c" word.
+   If the JD wants C programming, write one of these instead:
+     "C/C++"  OR  "embedded C"  OR  "C programming"  OR  "kernel C"
+   Same rule for other single letters (R, D). Python, Rust, Go are fine
+   because they are unique words.
+
+4. PARENTHESIZE every OR group. Google parses left-to-right without
+   parens, which breaks precedence. This is WRONG:
+     'speaker' OR 'talk' AND 'embedded'
+   This is RIGHT:
+     ('speaker' OR 'talk') AND 'embedded'
+
+5. Twitter X-ray is dead in 2025+. site:twitter.com and site:x.com return
+   almost nothing because X removed public indexing. Do NOT generate a
+   Twitter X-ray; instead, use the slot for a different source
+   (e.g., Medium.com for engineering blogs, or a niche community site
+   relevant to the role).
+
+6. Stack Overflow X-ray cannot filter by score or answer count from
+   Google. Use tag-based URL patterns instead, like:
+     site:stackoverflow.com/users "embedded" "[c]" "[arm]"
+   Square-bracketed tags are how SO pages label user expertise.
+
+7. For conference/talk searches, the presence of the conference name
+   IS the signal. No need to also AND in "speaker" or "talk". Example:
+     (site:youtube.com OR site:slideshare.net) "Embedded World" "device driver"
+   Three tokens max. That filters harder than six ANDed tokens.
+
+Test each string mentally: would a recruiter pasting this into Google
+actually see 20-200 relevant humans in the first page? If the answer is
+"zero" or "generic garbage," rewrite.
 """
 
 
