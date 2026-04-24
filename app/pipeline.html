@@ -718,6 +718,7 @@ function renderSubmissionRow(s) {
     </div>
   `;
 }
+const params = new URLSearchParams(location.search);
 const reqParam = params.get('req');
 if (reqParam) {
   loadDetail(reqParam);
