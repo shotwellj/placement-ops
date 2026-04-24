@@ -1679,6 +1679,26 @@ async def get_req(req_id: str, user: dict = Depends(get_current_user)):
             [req_id, user["id"]],
         )
         if not rs.rows:
+            # Diagnostic: log what we were looking for vs what exists.
+            # Temporary — will tell us whether auth resolved to wrong user,
+            # the req actually is missing, or the JOIN is failing.
+            exists_check = await client.execute(
+                "SELECT id, user_id, org_id FROM requisitions WHERE id = ?",
+                [req_id],
+            )
+            if exists_check.rows:
+                r_row = exists_check.rows[0]
+                print(f"[get_req 404] req exists but query returned 0 rows. "
+                      f"req_id={req_id!r} req.user_id={r_row[1]!r} req.org_id={r_row[2]!r} "
+                      f"auth user[id]={user['id']!r} auth user[email]={user.get('email')!r}")
+                # Check if the org exists
+                org_check = await client.execute(
+                    "SELECT id, name FROM organizations WHERE id = ?",
+                    [r_row[2]],
+                )
+                print(f"[get_req 404]   org lookup: {org_check.rows}")
+            else:
+                print(f"[get_req 404] req genuinely missing. req_id={req_id!r} auth user[id]={user['id']!r}")
             raise HTTPException(404, "Requisition not found")
         r = rs.rows[0]
         return {
