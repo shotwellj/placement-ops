@@ -261,22 +261,29 @@ async def write_submission_dimensions(
 async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
     """Match a raw skill name from AI output against the canonical taxonomy.
 
-    Strategy (fail-soft):
+    Strategy (fail-soft, four tiers, in priority order):
       1. Exact match on skills.canonical_name (case-insensitive)
       2. Match any alias in skills.aliases_json (case-insensitive)
-      3. Return None if no match — caller should still insert the row with
-         skill_id=NULL and raw_skill_text populated, so we don't lose the data.
+      3. Match a previous user decision in skill_resolution_decisions —
+         if the user aliased "c programming" -> C via Phase B2, future
+         intakes resolve "c programming" automatically. THIS IS THE LOOP.
+      4. Single-token whole-word match against canonical_name. Conservative
+         on purpose: only fires for short raw texts where we're confident.
+         "ARM Cortex" -> tokens [arm, cortex] -> "arm" matches canonical
+         "ARM" exactly. Skipped if raw_text has 4+ tokens to avoid
+         false positives like "experience with python and c++" -> Python.
+      5. Return None if no match — caller still inserts with raw_skill_text
+         populated, so we never lose data.
 
-    The AI is instructed to use canonical names but will sometimes emit
-    variations. Unresolved names accumulate in req_skills.raw_skill_text
-    and candidate_skills.raw_skill_text and become candidates to add to
-    taxonomy/skills.yml on the next update.
+    The user trains the resolver via the Phase B2 approval queue at
+    /app/taxonomy. Each alias decision becomes a permanent resolution rule
+    via tier 3.
     """
     if not raw_name or not raw_name.strip():
         return None
     norm = " ".join(raw_name.strip().lower().split())
 
-    # 1) Exact canonical match
+    # ---------- Tier 1: exact canonical match ----------
     rs = await client.execute(
         "SELECT id FROM skills WHERE LOWER(canonical_name) = ?",
         [norm],
@@ -284,10 +291,7 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
     if rs.rows:
         return rs.rows[0][0]
 
-    # 2) Alias match — aliases_json is a JSON array stored as TEXT.
-    #    We fetch every skill's aliases and check in Python (taxonomy is
-    #    only ~70 skills so this stays cheap; if it grows large we move
-    #    to a dedicated skill_aliases table indexed by name).
+    # ---------- Tier 2: alias match ----------
     rs = await client.execute(
         "SELECT id, aliases_json FROM skills WHERE aliases_json IS NOT NULL"
     )
@@ -302,6 +306,51 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
                     return sid
         except Exception:
             continue
+
+    # ---------- Tier 3: previous user decision (the learning loop) ----------
+    # If the user has previously aliased OR promoted this exact raw text,
+    # use that decision automatically. Reject decisions are also honored —
+    # if the user said this isn't a skill, we don't try to match it.
+    try:
+        rs = await client.execute(
+            """SELECT decision, resolved_skill_id
+               FROM skill_resolution_decisions
+               WHERE raw_text_normalized = ?""",
+            [norm],
+        )
+        if rs.rows and rs.rows[0]:
+            decision, resolved_id = rs.rows[0]
+            if decision in ("alias", "promote") and resolved_id:
+                return resolved_id
+            # decision == 'reject' falls through to tier 4 then None
+    except Exception:
+        # skill_resolution_decisions may not exist on very old environments
+        pass
+
+    # ---------- Tier 4: single-token whole-word fallback ----------
+    # Conservative. Only fires for raw texts of 1-3 tokens. Looks for any
+    # token that exactly matches a canonical name as a whole word. Tied
+    # matches (multiple skills match) -> bail out, return None to avoid
+    # picking the wrong one.
+    tokens = [t for t in norm.replace(",", " ").split() if t]
+    if 1 <= len(tokens) <= 3:
+        # Build a set of (token, skill_id) pairs we'll check
+        # Re-fetch canonical names — small table, in-memory filter is fine
+        rs = await client.execute("SELECT id, LOWER(canonical_name) FROM skills")
+        canonical_map = {}  # canonical_lower -> skill_id
+        for row in (rs.rows or []):
+            canonical_map[row[1]] = row[0]
+
+        # Strict whole-word match: a token must be IDENTICAL to a canonical
+        matches = set()
+        for tok in tokens:
+            if tok in canonical_map:
+                matches.add(canonical_map[tok])
+        if len(matches) == 1:
+            # Exactly one canonical matched — confident enough
+            return next(iter(matches))
+        # 0 matches OR ambiguous (2+) -> fall through to None
+
     return None
 
 

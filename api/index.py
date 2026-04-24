@@ -1689,6 +1689,69 @@ async def _insert_candidate(client, candidate_id: str, user_id: str, req: Candid
     )
 
 
+@app.get("/api/reqs")
+async def list_reqs(
+    status: Optional[str] = None,
+    limit: int = 100,
+    user: dict = Depends(get_current_user),
+):
+    """List the user's requisitions ranked by recency.
+
+    Optional ?status=open|closed|placed filters by status. The pipeline
+    list view in /app/pipeline.html calls this on every page load.
+    Was silently broken (404'd) until this endpoint was added.
+
+    Returns:
+        {"reqs": [
+            {"id", "title", "status", "fee_estimate",
+             "opened_at", "org_name", "submission_count"},
+            ...
+        ]}
+    """
+    if limit < 1 or limit > 500:
+        raise HTTPException(400, "limit must be 1..500")
+    if status and status not in ("open", "closed", "placed", "on_hold"):
+        raise HTTPException(400, "status must be one of: open, closed, placed, on_hold")
+
+    async with db() as client:
+        # Single query with subselect for submission_count so the UI
+        # can show "5 submissions" per req without N+1 calls.
+        if status:
+            rs = await client.execute(
+                """SELECT r.id, r.title, r.status, r.fee_estimate, r.opened_at,
+                          o.name,
+                          (SELECT COUNT(*) FROM submissions WHERE req_id = r.id) as sub_count
+                   FROM requisitions r
+                   JOIN organizations o ON r.org_id = o.id
+                   WHERE r.user_id = ? AND r.status = ?
+                   ORDER BY r.opened_at DESC
+                   LIMIT ?""",
+                [user["id"], status, limit],
+            )
+        else:
+            rs = await client.execute(
+                """SELECT r.id, r.title, r.status, r.fee_estimate, r.opened_at,
+                          o.name,
+                          (SELECT COUNT(*) FROM submissions WHERE req_id = r.id) as sub_count
+                   FROM requisitions r
+                   JOIN organizations o ON r.org_id = o.id
+                   WHERE r.user_id = ?
+                   ORDER BY r.opened_at DESC
+                   LIMIT ?""",
+                [user["id"], limit],
+            )
+    return {
+        "reqs": [
+            {
+                "id": r[0], "title": r[1], "status": r[2],
+                "fee_estimate": r[3], "opened_at": r[4],
+                "org_name": r[5], "submission_count": int(r[6] or 0),
+            }
+            for r in (rs.rows or [])
+        ]
+    }
+
+
 @app.get("/api/reqs/{req_id}/submissions")
 async def list_submissions(req_id: str, user: dict = Depends(get_current_user)):
     """List all candidate submissions for a given requisition."""
@@ -1719,24 +1782,6 @@ async def list_submissions(req_id: str, user: dict = Depends(get_current_user)):
                     "candidate_name": r[7], "current_title": r[8], "current_company": r[9],
                 }
                 for r in rs.rows
-            ]
-        }
-    async with db() as client:
-        query = """
-            SELECT r.id, r.title, r.status, r.fee_estimate, r.opened_at, o.name
-            FROM requisitions r JOIN organizations o ON r.org_id = o.id
-            WHERE r.user_id = ?
-        """
-        params = [user["id"]]
-        if status:
-            query += " AND r.status = ?"
-            params.append(status)
-        query += " ORDER BY r.opened_at DESC"
-        rs = await client.execute(query, params)
-        return {
-            "reqs": [
-                {"id": r[0], "title": r[1], "status": r[2], "fee_estimate": r[3],
-                 "opened_at": r[4], "org_name": r[5]} for r in rs.rows
             ]
         }
 
