@@ -38,6 +38,14 @@ from api._calibration import (
     STAGE_SIGNALS,
     REJECT_SIGNALS,
 )
+from api._skill_resolution import (
+    list_unresolved_candidates,
+    get_or_generate_suggestion,
+    apply_alias,
+    apply_promote,
+    apply_reject,
+    normalize_raw_text,
+)
 
 # Optional deps (graceful if missing so demos still deploy)
 # Turso access is via HTTP (see _TursoHTTPClient below), no native libsql dep needed
@@ -1906,3 +1914,224 @@ async def trigger_calibration_run(user: dict = Depends(get_current_user)):
             notes="manual_batch_run",
         )
     return summary
+
+
+# ============================================================
+# PHASE B2 — Skill resolution (alias / promote / reject)
+# ============================================================
+# Four endpoints turn the unresolved-skill firehose into a
+# manageable approval queue. The user is in control — the LLM
+# only suggests. Every decision is audited as a taxonomy_change
+# event for EU AI Act Article 12 record-keeping.
+#
+# GET  /api/taxonomy/unresolved           — ranked queue
+# GET  /api/taxonomy/suggestion/{raw}     — LLM suggestion (cached)
+# POST /api/taxonomy/decide               — apply alias/promote/reject
+# GET  /api/taxonomy/recent-decisions     — see what's been decided
+# ============================================================
+
+
+@app.get("/api/taxonomy/unresolved")
+async def taxonomy_unresolved(
+    min_count: int = 1,
+    limit: int = 50,
+    user: dict = Depends(get_current_user),
+):
+    """List unresolved raw_skill_text strings ranked by occurrence count.
+
+    Excludes anything already decided (alias/promote/reject) so the
+    queue stays clean across reloads.
+    """
+    if limit < 1 or limit > 200:
+        raise HTTPException(400, "limit must be 1..200")
+    if min_count < 1:
+        raise HTTPException(400, "min_count must be >= 1")
+    async with db() as client:
+        candidates = await list_unresolved_candidates(client, min_count=min_count, limit=limit)
+    return {"candidates": candidates, "count": len(candidates)}
+
+
+@app.get("/api/taxonomy/suggestion/{raw_text}")
+async def taxonomy_suggestion(raw_text: str, user: dict = Depends(get_current_user)):
+    """Get an LLM-generated suggestion for what to do with a raw skill.
+    First call hits the LLM and caches the result. Subsequent calls
+    return the cached suggestion until a decision is applied.
+    """
+    norm = normalize_raw_text(raw_text)
+    if not norm:
+        raise HTTPException(400, "raw_text is empty after normalization")
+    async with db() as client:
+        try:
+            suggestion = await get_or_generate_suggestion(
+                client,
+                raw_text_normalized=norm,
+                call_ai_func=call_ai,
+                user_id=user["id"],
+                register_model_version_func=register_model_version,
+            )
+        except Exception as e:
+            etype = type(e).__name__
+            print(f"[taxonomy_suggestion FAIL] type={etype} raw={norm[:60]!r} err={str(e)[:200]}")
+            if "Timeout" in etype or "ConnectError" in etype:
+                raise HTTPException(503, "The AI provider is slow or unreachable right now. Please try again in a moment.")
+            raise HTTPException(500, f"[skill-suggest] {etype}: {str(e)[:200]}")
+    return {"raw_text_normalized": norm, "suggestion": suggestion}
+
+
+@app.post("/api/taxonomy/decide")
+async def taxonomy_decide(payload: dict, user: dict = Depends(get_current_user)):
+    """Apply a decision to an unresolved raw_skill_text.
+
+    Body:
+      {
+        "raw_text": "python",
+        "decision": "alias" | "promote" | "reject",
+        // for alias:
+        "target_skill_id": "sk_...",
+        // for promote:
+        "canonical_name": "Python",
+        "category": "programming_languages",
+        "aliases": ["python", "python3"],
+        "adjacent_skill_ids": ["sk_xxx", "sk_yyy"],
+        "weight": "high" | "medium" | "low",
+        // optional:
+        "notes": "free-text reasoning"
+      }
+
+    Returns the result dict from the underlying apply_* function.
+    """
+    raw_text = (payload or {}).get("raw_text")
+    decision = (payload or {}).get("decision", "").lower()
+    notes = (payload or {}).get("notes")
+
+    if not raw_text:
+        raise HTTPException(400, "raw_text is required")
+    if decision not in ("alias", "promote", "reject"):
+        raise HTTPException(400, "decision must be one of: alias, promote, reject")
+
+    norm = normalize_raw_text(raw_text)
+    if not norm:
+        raise HTTPException(400, "raw_text is empty after normalization")
+
+    async with db() as client:
+        # Defensive — refuse to re-decide something already in the table.
+        # The caller can call /undecide first if they want to change it.
+        existing = await client.execute(
+            "SELECT decision FROM skill_resolution_decisions WHERE raw_text_normalized = ?",
+            [norm],
+        )
+        if existing.rows:
+            raise HTTPException(
+                409,
+                f"raw_text already has decision '{existing.rows[0][0]}'. Call /api/taxonomy/undecide first to change it.",
+            )
+
+        try:
+            if decision == "alias":
+                target = (payload or {}).get("target_skill_id")
+                if not target:
+                    raise HTTPException(400, "target_skill_id required for alias decision")
+                result = await apply_alias(
+                    client, raw_text_normalized=norm,
+                    target_skill_id=target, user_id=user["id"],
+                    notes=notes, write_audit_event_func=write_audit_event,
+                )
+            elif decision == "promote":
+                canonical = (payload or {}).get("canonical_name")
+                category = (payload or {}).get("category")
+                if not canonical or not category:
+                    raise HTTPException(400, "canonical_name and category required for promote")
+                result = await apply_promote(
+                    client, raw_text_normalized=norm,
+                    canonical_name=canonical, category=category,
+                    aliases=(payload or {}).get("aliases") or [],
+                    adjacent_skill_ids=(payload or {}).get("adjacent_skill_ids") or [],
+                    weight=(payload or {}).get("weight", "medium"),
+                    user_id=user["id"], notes=notes,
+                    write_audit_event_func=write_audit_event,
+                )
+            else:  # reject
+                result = await apply_reject(
+                    client, raw_text_normalized=norm,
+                    user_id=user["id"], notes=notes,
+                    write_audit_event_func=write_audit_event,
+                )
+        except HTTPException:
+            raise
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except Exception as e:
+            etype = type(e).__name__
+            print(f"[taxonomy_decide FAIL] type={etype} decision={decision} raw={norm[:60]!r} err={str(e)[:200]}")
+            raise HTTPException(500, f"[taxonomy-decide] {etype}: {str(e)[:200]}")
+    return result
+
+
+@app.post("/api/taxonomy/undecide")
+async def taxonomy_undecide(payload: dict, user: dict = Depends(get_current_user)):
+    """Remove a decision so the raw_text reappears in the queue.
+    Does NOT undo aliasing/promotion side effects (skills still exist,
+    rows still back-populated). Just clears the decision so the user
+    can re-decide if they made a mistake.
+    """
+    raw_text = (payload or {}).get("raw_text")
+    if not raw_text:
+        raise HTTPException(400, "raw_text is required")
+    norm = normalize_raw_text(raw_text)
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT id FROM skill_resolution_decisions WHERE raw_text_normalized = ?",
+            [norm],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "No decision exists for that raw_text")
+        await client.execute(
+            "DELETE FROM skill_resolution_decisions WHERE raw_text_normalized = ?",
+            [norm],
+        )
+        # Audit
+        try:
+            await write_audit_event(
+                client,
+                event_type="taxonomy_change",
+                action="undecide",
+                actor_user_id=user["id"],
+                entity_type="raw_skill_text",
+                entity_id=norm[:64],
+                inputs={"raw_text": norm},
+                outputs={"reason": "user reverted decision"},
+                model_version_id=None,
+            )
+        except Exception:
+            pass
+    return {"ok": True, "raw_text_normalized": norm}
+
+
+@app.get("/api/taxonomy/recent-decisions")
+async def taxonomy_recent_decisions(limit: int = 20, user: dict = Depends(get_current_user)):
+    """Show the most recent decisions for visibility."""
+    if limit < 1 or limit > 100:
+        raise HTTPException(400, "limit 1..100")
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT srd.raw_text_normalized, srd.decision, srd.decided_at,
+                      srd.notes, s.canonical_name, s.category
+               FROM skill_resolution_decisions srd
+               LEFT JOIN skills s ON srd.resolved_skill_id = s.id
+               ORDER BY srd.decided_at DESC
+               LIMIT ?""",
+            [limit],
+        )
+    return {
+        "decisions": [
+            {
+                "raw_text": r[0],
+                "decision": r[1],
+                "decided_at": r[2],
+                "notes": r[3],
+                "resolved_canonical": r[4],
+                "resolved_category": r[5],
+            }
+            for r in (rs.rows or [])
+        ]
+    }

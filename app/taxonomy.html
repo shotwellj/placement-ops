@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taxonomy · SourcingNav Talent Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a; --bg-elev: #111827; --bg-card: #151d2e;
+    --border: #1f2a3f; --border-strong: #2d3a54;
+    --text: #e8ecf4; --text-dim: #8b9bb3; --text-mute: #5a6c85;
+    --accent: #3dd9d6; --accent-deep: #2eb8b5; --blue: #4a9eff;
+    --accent-glow: rgba(61, 217, 214, 0.15);
+    --gradient: linear-gradient(135deg, #3dd9d6 0%, #4a9eff 100%);
+    --danger: #ff6b6b; --warn: #ffb74d; --good: #4ade80;
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased; background-image: radial-gradient(ellipse at top right, rgba(61,217,214,0.06) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(74,158,255,0.04) 0%, transparent 50%); background-attachment: fixed; }
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
+  .nav-inner { max-width: 1400px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; letter-spacing: 0.08em; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+  .brand-sub { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); margin-left: 0.75rem; padding-left: 0.75rem; border-left: 1px solid var(--border-strong); }
+  .nav-right { display: flex; align-items: center; gap: 1.5rem; font-size: 0.85rem; }
+  .nav-link { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+  .nav-link:hover { color: var(--accent); }
+  .nav-link.active { color: var(--text); }
+  .page { max-width: 1400px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+  .page-header { margin-bottom: 2rem; }
+  .page-kicker { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.75rem; }
+  .page-title { font-size: 2.25rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05; }
+  .page-desc { color: var(--text-dim); font-size: 1rem; max-width: 720px; margin-top: 0.5rem; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.55rem 1.1rem; border: none; border-radius: 6px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.15s; text-decoration: none; }
+  .btn-primary { background: var(--gradient); color: #0a0e1a; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(61, 217, 214, 0.3); }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border-strong); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+
+  /* Queue */
+  .queue-stats { display: flex; gap: 2rem; padding: 1rem 1.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.88rem; }
+  .qstat-num { font-weight: 700; color: var(--accent); font-family: var(--font-mono); margin-right: 0.4rem; }
+  .qstat-label { color: var(--text-dim); }
+
+  .queue-row { display: grid; grid-template-columns: 60px 1fr auto; gap: 1rem; align-items: center; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.5rem; }
+  .qrow-count { font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; color: var(--text-dim); text-align: center; }
+  .qrow-text { font-size: 0.95rem; color: var(--text); }
+  .qrow-meta { font-size: 0.78rem; color: var(--text-mute); margin-top: 0.25rem; }
+  .qrow-actions { display: flex; gap: 0.4rem; }
+  .pill { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-family: var(--font-mono); margin-right: 0.3rem; }
+  .pill.blocker { background: rgba(255,107,107,0.12); color: var(--danger); }
+  .pill.preferred { background: rgba(255,183,77,0.12); color: var(--warn); }
+  .pill.nice_to_have { background: rgba(139, 155, 179, 0.12); color: var(--text-dim); }
+
+  /* Suggestion panel (expanded inline) */
+  .sugg-panel { display: none; margin-top: 0.6rem; padding: 1rem; background: rgba(61, 217, 214, 0.04); border: 1px solid var(--accent); border-radius: 6px; font-size: 0.88rem; }
+  .sugg-panel.active { display: block; }
+  .sugg-decision { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.72rem; font-family: var(--font-mono); font-weight: 700; text-transform: uppercase; margin-right: 0.5rem; }
+  .sugg-decision.alias { background: rgba(74, 158, 255, 0.15); color: var(--blue); }
+  .sugg-decision.promote { background: rgba(74, 222, 128, 0.15); color: var(--good); }
+  .sugg-decision.reject { background: rgba(255, 107, 107, 0.15); color: var(--danger); }
+  .sugg-rationale { color: var(--text-dim); margin: 0.5rem 0; font-style: italic; }
+  .sugg-fields { display: grid; grid-template-columns: max-content 1fr; gap: 0.4rem 1rem; font-size: 0.85rem; margin-top: 0.5rem; }
+  .sugg-fields .label { color: var(--text-mute); font-family: var(--font-mono); font-size: 0.78rem; }
+  .sugg-edit-input { background: var(--bg); border: 1px solid var(--border-strong); border-radius: 4px; padding: 0.35rem 0.6rem; color: var(--text); font-family: inherit; font-size: 0.85rem; width: 100%; }
+  .sugg-actions { margin-top: 0.8rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+  .feedback { padding: 0.6rem 0.8rem; border-radius: 6px; margin-top: 0.5rem; font-size: 0.85rem; display: none; }
+  .feedback.show { display: block; }
+  .feedback.ok { background: rgba(74, 222, 128, 0.08); border: 1px solid var(--good); color: var(--text); }
+  .feedback.err { background: rgba(255, 107, 107, 0.08); border: 1px solid var(--danger); color: var(--text); }
+
+  .empty-state { text-align: center; padding: 3rem 2rem; color: var(--text-dim); background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+  .loading { padding: 2rem; text-align: center; color: var(--text-mute); }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <div>
+      <a href="/app/" class="brand">SOURCINGNAV TALENT ENGINE</a>
+    </div>
+    <div class="nav-right">
+      <a href="/app/" class="nav-link">Intake</a>
+      <a href="/app/pipeline.html" class="nav-link">Pipeline</a>
+      <a href="/app/taxonomy.html" class="nav-link active">Taxonomy</a>
+      <a href="/app/settings.html" class="nav-link">Settings</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="page-header">
+    <div class="page-kicker">Phase B2 · Taxonomy Evolution</div>
+    <h1 class="page-title">Skill <em>resolution queue</em></h1>
+    <p class="page-desc">
+      Skills the AI extracted from JDs and resumes that haven't matched the taxonomy yet.
+      Decide whether each is an alias of an existing skill, a new skill worth promoting,
+      or junk text the AI should learn to ignore. Every decision back-populates existing
+      records and is logged to the audit chain.
+    </p>
+  </div>
+
+  <div class="queue-stats" id="queueStats" style="display: none;">
+    <div><span class="qstat-num" id="statTotal">—</span><span class="qstat-label">unresolved skills</span></div>
+    <div><span class="qstat-num" id="statTopCount">—</span><span class="qstat-label">most-frequent occurrences</span></div>
+    <div><span class="qstat-num" id="statResolved">—</span><span class="qstat-label">already decided</span></div>
+  </div>
+
+  <div id="queueContainer">
+    <div class="loading">Loading queue...</div>
+  </div>
+</main>
+
+<script>
+// Global error handler
+(function installGlobalErrorHandler() {
+  function showError(msg, src) {
+    const c = document.getElementById('queueContainer') || document.body;
+    c.innerHTML = `
+      <div style="max-width: 800px; margin: 2rem auto; padding: 1.5rem; background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.4); border-radius: 8px;">
+        <div style="font-weight: 700; color: #ff6b6b; margin-bottom: 0.6rem;">Page error</div>
+        <div style="font-size: 0.9rem;">${String(msg).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
+        <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 0.4rem;">Source: ${String(src).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
+      </div>
+    `;
+  }
+  window.addEventListener('error', (e) => showError(e.message, e.filename + ':' + e.lineno));
+  window.addEventListener('unhandledrejection', (e) => showError(e.reason?.message || e.reason || 'Promise rejected', 'async'));
+})();
+
+const API = '/api';
+const token = localStorage.getItem('sn_token');
+if (!token) {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('queueContainer').innerHTML = '<div class="loading">Signing you back in...</div>';
+  });
+  setTimeout(() => { location.href = '/app/'; }, 800);
+}
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) };
+  const res = await fetch(`${API}${path}`, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// ----------------- State -----------------
+let queue = [];           // current candidates
+let suggestionCache = {}; // norm -> suggestion object
+let categoriesList = [];  // populated lazily on first promote
+let allSkillsList = [];   // for alias target dropdown
+
+// ----------------- Initial load -----------------
+async function loadQueue() {
+  try {
+    const data = await api('/taxonomy/unresolved?limit=100');
+    queue = data.candidates || [];
+    renderQueue();
+    updateStats();
+  } catch (e) {
+    document.getElementById('queueContainer').innerHTML =
+      `<div class="empty-state">Could not load queue: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadSkillsCache() {
+  if (allSkillsList.length > 0) return;
+  // Lazy fetch — only when the user opens a suggestion or wants to alias
+  // We re-derive categories from the suggestion shape as backup.
+  try {
+    const r = await api('/taxonomy/recent-decisions?limit=1');
+    // recent-decisions has resolved categories; use them as a quick check
+    // but this isn't exhaustive. The real source is the LLM suggestion.
+  } catch (e) {}
+}
+
+function updateStats() {
+  if (!queue.length) {
+    document.getElementById('queueStats').style.display = 'none';
+    return;
+  }
+  document.getElementById('queueStats').style.display = 'flex';
+  document.getElementById('statTotal').textContent = queue.length;
+  document.getElementById('statTopCount').textContent = queue[0]?.total_count || 0;
+  // For 'already decided' we rely on a separate call
+  api('/taxonomy/recent-decisions?limit=100').then(d => {
+    document.getElementById('statResolved').textContent = (d.decisions || []).length;
+  }).catch(() => {});
+}
+
+// ----------------- Render queue -----------------
+function renderQueue() {
+  const container = document.getElementById('queueContainer');
+  if (!queue.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div style="font-size: 1.1rem; margin-bottom: 0.5rem;">Queue is clear</div>
+        <div style="font-size: 0.88rem;">All extracted skills are either resolved or have decisions on file.</div>
+      </div>`;
+    return;
+  }
+  container.innerHTML = queue.map(c => renderRow(c)).join('');
+}
+
+function renderRow(c) {
+  const importancePills = (c.importances || []).map(i =>
+    `<span class="pill ${escapeHtml(i)}">${escapeHtml(i)}</span>`
+  ).join('');
+  const examples = (c.raw_text_examples || []).slice(0, 3).map(escapeHtml).join(' · ');
+  return `
+    <div class="queue-row" data-norm="${escapeHtml(c.raw_text_normalized)}">
+      <div class="qrow-count">${c.total_count}</div>
+      <div>
+        <div class="qrow-text">${escapeHtml(c.raw_text_normalized)}</div>
+        <div class="qrow-meta">
+          ${importancePills}
+          ${c.req_count ? `<span>${c.req_count} req${c.req_count !== 1 ? 's' : ''}</span>` : ''}
+          ${c.candidate_count ? `<span> · ${c.candidate_count} candidate${c.candidate_count !== 1 ? 's' : ''}</span>` : ''}
+          ${examples && examples !== escapeHtml(c.raw_text_normalized) ? ` · examples: ${examples}` : ''}
+          ${c.has_suggestion ? ' · <span style="color: var(--accent);">suggestion cached</span>' : ''}
+        </div>
+        <div id="sugg-${escapeHtml(c.raw_text_normalized)}" class="sugg-panel"></div>
+        <div id="fb-${escapeHtml(c.raw_text_normalized)}" class="feedback"></div>
+      </div>
+      <div class="qrow-actions">
+        <button class="btn btn-ghost" onclick="loadSuggestion('${escapeHtml(c.raw_text_normalized)}', this)">Suggest</button>
+        <button class="btn btn-ghost" onclick="quickReject('${escapeHtml(c.raw_text_normalized)}', this)">Reject</button>
+      </div>
+    </div>
+  `;
+}
+
+// ----------------- Suggestion -----------------
+async function loadSuggestion(norm, btnEl) {
+  const panel = document.getElementById(`sugg-${norm}`);
+  if (!panel) return;
+  if (panel.classList.contains('active') && suggestionCache[norm]) {
+    panel.classList.remove('active');
+    return;
+  }
+  btnEl.disabled = true;
+  btnEl.textContent = 'Thinking...';
+  try {
+    const data = await api(`/taxonomy/suggestion/${encodeURIComponent(norm)}`);
+    suggestionCache[norm] = data.suggestion;
+    renderSuggestion(norm, data.suggestion);
+    panel.classList.add('active');
+  } catch (e) {
+    showFeedback(norm, `Could not get suggestion: ${e.message}`, 'err');
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = 'Suggest';
+  }
+}
+
+function renderSuggestion(norm, s) {
+  const panel = document.getElementById(`sugg-${norm}`);
+  if (!panel) return;
+  const decClass = s.decision || 'reject';
+  const fromCache = s.from_cache ? '<span style="color: var(--text-mute); font-size: 0.75rem; margin-left: 0.5rem;">(cached)</span>' : '';
+
+  let body = '';
+  if (s.decision === 'alias') {
+    body = `
+      <div class="sugg-fields">
+        <span class="label">aliases →</span>
+        <span><strong>${escapeHtml(s.alias_target_canonical || s.canonical_name || 'unknown')}</strong></span>
+      </div>
+      <div class="sugg-actions">
+        <button class="btn btn-primary" onclick="applyAlias('${escapeHtml(norm)}', '${escapeHtml(s.alias_target_skill_id || '')}', this)">Confirm alias</button>
+        <button class="btn btn-ghost" onclick="applyReject('${escapeHtml(norm)}', this)">Actually, reject</button>
+      </div>
+    `;
+  } else if (s.decision === 'promote') {
+    const adjList = (s.adjacent_canonicals || []).map(escapeHtml).join(', ') || '(none)';
+    body = `
+      <div class="sugg-fields">
+        <span class="label">canonical</span>
+        <input class="sugg-edit-input" id="promote-canon-${norm}" value="${escapeHtml(s.canonical_name || '')}">
+        <span class="label">category</span>
+        <input class="sugg-edit-input" id="promote-cat-${norm}" value="${escapeHtml(s.category || '')}">
+        <span class="label">aliases</span>
+        <input class="sugg-edit-input" id="promote-aliases-${norm}" value="${escapeHtml((s.aliases || []).join(', '))}">
+        <span class="label">adjacent</span>
+        <span style="color: var(--text-dim);">${adjList}</span>
+        <span class="label">weight</span>
+        <span>${escapeHtml(s.weight || 'medium')}</span>
+      </div>
+      <div class="sugg-actions">
+        <button class="btn btn-primary" onclick="applyPromote('${escapeHtml(norm)}', this)">Confirm promote</button>
+        <button class="btn btn-ghost" onclick="applyReject('${escapeHtml(norm)}', this)">Actually, reject</button>
+      </div>
+    `;
+  } else { // reject
+    body = `
+      <div class="sugg-actions">
+        <button class="btn btn-primary" onclick="applyReject('${escapeHtml(norm)}', this)">Confirm reject</button>
+      </div>
+    `;
+  }
+
+  panel.innerHTML = `
+    <div>
+      <span class="sugg-decision ${decClass}">${escapeHtml(s.decision || 'reject')}</span>
+      <span style="color: var(--text-dim); font-size: 0.8rem;">confidence ${(s.confidence || 0).toFixed(2)}</span>
+      ${fromCache}
+    </div>
+    <div class="sugg-rationale">"${escapeHtml(s.rationale || '')}"</div>
+    ${body}
+  `;
+}
+
+// ----------------- Decisions -----------------
+async function applyAlias(norm, targetId, btnEl) {
+  if (!targetId) {
+    showFeedback(norm, 'No alias target — the LLM did not identify a matching skill.', 'err');
+    return;
+  }
+  btnEl.disabled = true;
+  try {
+    const r = await api('/taxonomy/decide', {
+      method: 'POST',
+      body: JSON.stringify({ raw_text: norm, decision: 'alias', target_skill_id: targetId }),
+    });
+    showFeedback(norm, `Aliased to "${r.canonical_name}" · ${r.rows_backpopulated} existing rows back-populated`, 'ok');
+    setTimeout(() => removeRow(norm), 1500);
+  } catch (e) {
+    showFeedback(norm, e.message, 'err');
+    btnEl.disabled = false;
+  }
+}
+
+async function applyPromote(norm, btnEl) {
+  const sugg = suggestionCache[norm] || {};
+  const canonical = (document.getElementById(`promote-canon-${norm}`)?.value || sugg.canonical_name || '').trim();
+  const category = (document.getElementById(`promote-cat-${norm}`)?.value || sugg.category || '').trim();
+  const aliasesStr = document.getElementById(`promote-aliases-${norm}`)?.value || '';
+  const aliases = aliasesStr.split(',').map(a => a.trim()).filter(Boolean);
+
+  if (!canonical || !category) {
+    showFeedback(norm, 'canonical_name and category are required', 'err');
+    return;
+  }
+  btnEl.disabled = true;
+  try {
+    const r = await api('/taxonomy/decide', {
+      method: 'POST',
+      body: JSON.stringify({
+        raw_text: norm, decision: 'promote',
+        canonical_name: canonical, category: category,
+        aliases: aliases,
+        adjacent_skill_ids: sugg.adjacencies_skill_ids || [],
+        weight: sugg.weight || 'medium',
+      }),
+    });
+    showFeedback(norm, `Promoted "${r.canonical_name}" · ${r.adjacency_count} adjacencies · ${r.rows_backpopulated} rows back-populated`, 'ok');
+    setTimeout(() => removeRow(norm), 1500);
+  } catch (e) {
+    showFeedback(norm, e.message, 'err');
+    btnEl.disabled = false;
+  }
+}
+
+async function applyReject(norm, btnEl) {
+  btnEl.disabled = true;
+  try {
+    await api('/taxonomy/decide', {
+      method: 'POST',
+      body: JSON.stringify({ raw_text: norm, decision: 'reject' }),
+    });
+    showFeedback(norm, 'Rejected — will not appear in queue again', 'ok');
+    setTimeout(() => removeRow(norm), 1000);
+  } catch (e) {
+    showFeedback(norm, e.message, 'err');
+    btnEl.disabled = false;
+  }
+}
+
+async function quickReject(norm, btnEl) {
+  // Skip the suggestion step — just reject
+  if (!confirm(`Reject "${norm}"? It won't appear in the queue again.`)) return;
+  btnEl.disabled = true;
+  try {
+    await api('/taxonomy/decide', {
+      method: 'POST',
+      body: JSON.stringify({ raw_text: norm, decision: 'reject' }),
+    });
+    removeRow(norm);
+  } catch (e) {
+    showFeedback(norm, e.message, 'err');
+    btnEl.disabled = false;
+  }
+}
+
+function showFeedback(norm, msg, kind) {
+  const fb = document.getElementById(`fb-${norm}`);
+  if (!fb) return;
+  fb.className = `feedback show ${kind}`;
+  fb.textContent = msg;
+}
+
+function removeRow(norm) {
+  queue = queue.filter(c => c.raw_text_normalized !== norm);
+  renderQueue();
+  updateStats();
+}
+
+// ----------------- Boot -----------------
+loadQueue();
+</script>
+</body>
+</html>
