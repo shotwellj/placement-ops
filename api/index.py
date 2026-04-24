@@ -955,6 +955,70 @@ actually see 20-200 relevant humans in the first page? If the answer is
 """
 
 
+SKILL_ALTERNATIVES_PROMPT = """You are an expert sourcer with 13+ years of experience.
+
+Given a parsed job description's must-have skills, generate functionally equivalent
+alternatives that a grandmaster sourcer would also search for. Most recruiters search
+only for the literal skill in the JD. A grandmaster knows that the same role at peer
+companies often uses different tooling that produces the same outcome.
+
+PARSED JD CONTEXT:
+{parsed_context}
+
+MUST-HAVE SKILLS TO EXPAND:
+{skills_list}
+
+For each must-have skill, generate 2-4 functional alternatives. An alternative is:
+  - A DIFFERENT TOOL/TECHNOLOGY that produces equivalent outcomes for THIS role at
+    THIS company tier. Apache Spark and Snowpark both do distributed compute over
+    columnar data; for an analytics role they're functionally equivalent.
+  - Used by the SAME PERSON at peer companies that made different stack choices.
+  - Something the candidate's resume might list INSTEAD of the JD-listed skill,
+    where the candidate would still be qualified.
+
+For each alternative, include:
+  - alternative: the tool/technology name (proper-noun, common industry name)
+  - context: 1 sentence on WHERE/WHY this alternative gets used instead
+  - transferability: "high" (>80% skills overlap, candidate is fully qualified),
+                     "medium" (50-80% overlap, worth a phone screen),
+                     "low" (25-50% overlap, candidate could ramp but isn't ready day 1)
+
+Skip alternatives below 25% overlap. Skip generic synonyms ("PyTorch" -> "Torch"
+isn't an alternative, that's the same thing). Focus on STACK SUBSTITUTIONS.
+
+Examples of good alternatives:
+  - Apache Spark -> [Snowpark (high), Databricks DLT (high), Trino (medium), Polars (low)]
+  - Pinecone -> [pgvector (high), Weaviate (high), Milvus (medium), FAISS (low)]
+  - Kubernetes -> [ECS (medium), Nomad (medium), bare-metal w/ systemd (low)]
+  - PyTorch -> [JAX (medium), TensorFlow (medium - if model serving matters)]
+
+Examples of BAD alternatives (do not include these patterns):
+  - Generic synonyms ("AWS" -> "Amazon Web Services")
+  - Complete category swaps ("PyTorch" -> "scikit-learn" — different problem space)
+  - Overly broad ("any Python framework" — too vague to be useful)
+
+Skip skills that don't have meaningful alternatives. A skill like "U.S. Citizenship"
+or "Active Secret Clearance" has no alternative — just omit it from output.
+
+Return STRICT JSON only:
+
+{{
+  "skill_alternatives": {{
+    "Apache Spark": [
+      {{"alternative": "Snowpark", "context": "Snowflake-native shops use this for the same distributed analytics workload", "transferability": "high"}},
+      {{"alternative": "Trino", "context": "Open-source query engine over object storage, common at OSS-heavy companies", "transferability": "medium"}}
+    ]
+  }}
+}}
+
+If a skill has no good alternatives, omit it from the output entirely. Do not return
+empty arrays.
+
+No em dashes. No code fences. Just JSON.
+"""
+
+
+
 CANDIDATE_EVAL_PROMPT = """You are an expert technical recruiter with 13+ years of experience evaluating candidates.
 
 You receive two inputs: a parsed job requisition and a raw candidate profile (could be a LinkedIn dump, resume text, or pasted notes).
@@ -1378,6 +1442,38 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             )
         raise HTTPException(500, f"[ai-bool] {etype}: {str(e)[:300]}")
 
+    # Step 3.5: skill alternatives (NON-FATAL — enhances output but doesn't block)
+    # Generates functional equivalents for each must-have skill so the recruiter
+    # knows what alternative tools/stacks to also search for. Failure here just
+    # means the response lacks alternatives; parser + booleans still ship.
+    skill_alternatives = {}
+    try:
+        # Build a compact skills list — just blocker skills first, then
+        # preferred. Cap at 8 to keep the prompt small.
+        must_have = parsed.get("must_have_skills") or []
+        skills_for_alts = [s.get("skill", "") for s in must_have if s.get("skill")][:8]
+        if skills_for_alts:
+            parsed_context = json.dumps({
+                "role_title": parsed.get("core", {}).get("role_title"),
+                "level": parsed.get("core", {}).get("level"),
+                "industry": parsed.get("core", {}).get("industry"),
+                "company": parsed.get("core", {}).get("company"),
+            })
+            alts_text = await call_ai(
+                user["id"],
+                SKILL_ALTERNATIVES_PROMPT.format(
+                    parsed_context=parsed_context,
+                    skills_list="\n".join(f"- {s}" for s in skills_for_alts),
+                ),
+                max_tokens=2000,
+            )
+            alts_parsed = parse_json_strict(alts_text)
+            skill_alternatives = alts_parsed.get("skill_alternatives") or {}
+    except Exception as e:
+        # Genuinely non-fatal — log and continue with empty alternatives
+        print(f"[ai-skill-alts FAIL] type={type(e).__name__} err={str(e)[:200]}")
+        skill_alternatives = {}
+
     # Step 4: save to DB + compliance records
     try:
         # Company override rule: JD body is source of truth. If the AI
@@ -1420,6 +1516,10 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
 
             req_id = str(uuid.uuid4())
             now = datetime.now(timezone.utc).isoformat()
+            # Merge skill_alternatives into parsed so it persists alongside
+            # the rest of the parsed JD data. UI reads it from parsed.skill_alternatives.
+            if skill_alternatives:
+                parsed["skill_alternatives"] = skill_alternatives
             await client.execute(
                 """INSERT INTO requisitions
                    (id, org_id, user_id, title, jd_raw, parsed_json, boolean_strings_json, status, opened_at, updated_at)
@@ -1581,6 +1681,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         "parsed": parsed,
         "boolean_strings": booleans,
         "created_at": now,
+        "skill_alternatives": skill_alternatives,
         # When non-null, the UI should show a banner telling the user
         # their typed company was overridden by what the JD actually says.
         "company_override": company_override,
