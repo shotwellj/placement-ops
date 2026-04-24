@@ -764,6 +764,7 @@ function renderObjectionPlaybookCard(playbook) {
         <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem;">
           <span style="display: inline-block; padding: 0.22rem 0.6rem; background: ${tBg}; color: ${tFg}; border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${escapeHtml(typeLabel(o.objection_type))}</span>
           ${confidencePill(o.confidence)}
+          ${o.safe_to_paste_verbatim === false ? `<span style="display: inline-block; padding: 0.15rem 0.5rem; background: rgba(255, 183, 77, 0.18); color: var(--warn); border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border: 1px solid var(--warn);">verify before sending</span>` : ''}
         </div>
         <div style="margin-bottom: 0.9rem;">
           <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; font-weight: 700;">What they'll say</div>
@@ -775,6 +776,14 @@ function renderObjectionPlaybookCard(playbook) {
             <button class="bool-copy" data-copy="${copyEsc}" style="font-size: 0.72rem; padding: 0.2rem 0.55rem;">Copy</button>
           </div>
           <div style="font-size: 0.92rem; line-height: 1.65; color: var(--text); padding: 0.7rem 0.85rem; background: var(--bg-elev); border-radius: 6px; border-left: 3px solid var(--accent);">${escapeHtml(o.counter || '')}</div>
+          ${(o.sources_used && o.sources_used.length) ? `
+            <div style="margin-top: 0.6rem;">
+              <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; font-weight: 700;">Grounded in</div>
+              <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem;">
+                ${o.sources_used.map(s => `<li style="font-size: 0.78rem; color: var(--text-dim); padding: 0.3rem 0.6rem; background: var(--bg-elev); border-radius: 4px; border-left: 2px solid var(--border);">${escapeHtml(s)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;

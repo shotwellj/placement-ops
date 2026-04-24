@@ -1113,6 +1113,58 @@ message.
 PARSED JD CONTEXT:
 {parsed_context}
 
+CRITICAL — TRUTHFULNESS RULES (read this first, every time):
+
+A counter that contains an INVENTED fact about the company is worse than
+no counter at all. The recruiter pastes it into an InMail, the candidate
+asks a follow-up question, and now the recruiter is exposed as either
+lying or uninformed. This destroys their credibility and the placement.
+
+You may ONLY reference facts that fit one of these categories:
+
+  ALLOWED — facts visible in the parsed JD context:
+    - Role title, level, location, remote policy, industry
+    - Comp range and any explicit benefits in the JD
+    - Required and preferred skills as stated
+    - Company name (only if mentioned in the JD)
+    - The role's responsibilities as written in the JD
+    - Any explicit clearance, citizenship, or eligibility requirements
+
+  ALLOWED — universally true industry knowledge:
+    - "DoD contracts require US citizenship" (true by federal law)
+    - "Most defense roles cannot sponsor H1B visas" (regulatory fact)
+    - "FAANG L5 total comp typically exceeds $400k" (well-known market data)
+    - "ML engineers at top labs typically need PhD or equivalent
+       publication record" (industry-recognized norm)
+    - General industry trends and common career trajectories
+
+  FORBIDDEN — DO NOT INVENT any of the following, ever:
+    - Team size or headcount ("12-person team", "80 engineers")
+    - Specific leader names, titles, or career history
+       ("led by a former SpaceX avionics engineer")
+    - Internal tools or processes not stated in the JD
+       ("they use GitLab CI", "agile prototyping", "Python automation")
+    - Relocation stipends, signing bonuses, perks not in the JD
+       ("$10k relocation stipend", "free lunches")
+    - Specific customer names not mentioned in the JD
+       ("ships to Stripe and Cloudflare")
+    - Technical roadmap or future plans
+       ("they're rolling out RISC-V next quarter")
+    - Funding details, acquisition rumors, or financial projections
+    - Any specific company practice, culture detail, or workplace fact
+       not literally stated in the JD
+
+When in doubt, GENERALIZE rather than fabricate. Instead of:
+  "The 12-person team is led by a former SpaceX avionics engineer"
+write:
+  "Defense embedded teams at this scale typically offer more
+   ownership-per-engineer than larger primes. The JD emphasizes
+   hands-on design across the full lifecycle, which is rare."
+
+The second version uses only the JD's own framing ("hands-on design"
+appears in the JD) and a universally-true industry observation. It's
+defensible.
+
 For this specific role + company + comp + location combination, generate
 3-5 of the most likely candidate objections, each with a SPECIFIC counter
 that references what's actually true about THIS opportunity (not generic).
@@ -1122,63 +1174,84 @@ don't matter for this role):
 
   industry_perception — "I'd never work at [defense / FAANG / startup /
     legacy / non-mission-driven]". Counter must reference what's
-    SURPRISING and TRUE about this specific company.
+    SURPRISING and TRUE about this specific industry or role —
+    using only facts from the JD or universal industry knowledge.
 
   comp_below_market — "I just got a raise" / "I'm already at $X". Counter
     must address the comp delta gap honestly OR reframe what the role
-    offers beyond base.
+    offers beyond base. Use only the comp_snapshot from the JD.
 
   location_remote — "I want fully remote" or "I won't relocate to X".
     Counter must be honest about the requirement AND offer what's
-    actually compelling about being there.
+    actually compelling about being there. DO NOT invent stipends or
+    perks; reference only what the JD says about location/remote.
 
   brand_unknown — "I've never heard of this company". Counter is a
-    1-paragraph elevator pitch the recruiter can paste verbatim:
-    what the company does, who their customers are, the ONE
-    interesting technical fact, the team scale.
+    1-paragraph elevator pitch built ONLY from facts in the JD:
+    what the company says it does (in the JD), the industry, the
+    products mentioned by name in the JD, and any verifiable scale
+    indicators the JD provides.
 
   career_risk — "What if this doesn't work out / the company fails /
-    I get RIF'd". Counter addresses stability honestly AND points
-    to candidate-side risk-mitigation (vesting acceleration,
-    severance, career trajectory at peer companies).
+    I get RIF'd". Counter addresses general industry stability or
+    candidate-side mitigations. DO NOT invent severance terms,
+    vesting schedules, or specific company stability claims.
 
   visa_clearance_blocker — "I don't have clearance" or "I need
-    sponsorship". Counter is honest about whether the role can
-    accommodate, and if not, redirects to similar roles that can.
+    sponsorship". Counter uses only what the JD says about clearance
+    and citizenship requirements, plus universal regulatory facts.
 
   tech_stack_skepticism — "Your stack is ancient" or "I don't want
-    to work in [legacy tech]". Counter references what's actually
-    being modernized OR why the legacy matters (defense systems
-    that fly, finance systems that move billions).
+    to work in [legacy tech]". Counter references ONLY the technologies
+    the JD mentions and explains why they matter in this domain. DO NOT
+    invent additional modern tooling not stated in the JD.
 
 For each objection in your output:
   - objection_type: one of the categories above
   - likely_phrasing: how the candidate would actually say it
     (1-2 sentences, sounds like a real person, not a script)
   - counter: the recruiter's pre-emptive response.
-    HAS to be specific to THIS company/role. NO generic platitudes.
-    2-4 sentences max. Should sound like something a recruiter would
-    actually paste into an InMail.
+    Specific to THIS role using ONLY facts from the JD or universal
+    industry knowledge. 2-4 sentences max. Should sound like something
+    a recruiter would actually paste into an InMail. NO invented facts.
   - confidence: "high" if you're sure this objection will come up,
     "medium" if it might, "low" if it's a long-shot but worth
     preparing for.
+  - sources_used: an array of 1-3 short strings naming what the counter
+    is grounded in. Each entry is one of:
+      "JD: <quote or paraphrase from the JD>"
+      "industry: <general industry fact>"
+    This gives the recruiter a transparent provenance trail. If you
+    cannot fill sources_used with real grounding, you should not be
+    writing the counter — drop the objection entirely.
+  - safe_to_paste_verbatim: true if every claim in the counter is
+    directly traceable to the JD or universal industry knowledge,
+    false if the recruiter should verify any specific claim before
+    using it.
 
-Pick ONLY the 3-5 most likely objections for THIS role. Don't list
-all categories. Quality over quantity.
+Pick ONLY the 3-5 most likely objections for THIS role. Quality over
+quantity. If you cannot ground a counter in the allowed sources, omit
+the objection entirely rather than invent.
 
 Skip the elevator pitch as a separate objection — instead, work it
 INTO whichever counter benefits most (usually brand_unknown or
-industry_perception).
+industry_perception), still grounded in JD-only facts.
 
-Return STRICT JSON only:
+Return STRICT JSON only. Example showing the SAFE pattern (note how
+every claim traces to either the JD or industry knowledge):
 
 {{
   "objection_playbook": [
     {{
-      "objection_type": "industry_perception",
-      "likely_phrasing": "I'd never go work at a defense contractor — I want to build products that ship to consumers.",
-      "counter": "This isn't your dad's defense contractor. The cryptographic systems team you'd join ships into commercial cloud platforms used by companies like Stripe and Cloudflare for FedRAMP compliance. The architect leading the team came from Apple's secure enclave group. Worth a 20-min call to hear what they're actually building?",
-      "confidence": "high"
+      "objection_type": "visa_clearance_blocker",
+      "likely_phrasing": "I don't have a security clearance and I'm not sure if I'm eligible for one.",
+      "counter": "The JD allows for either an active Secret clearance OR the ability to obtain one, which means US citizenship plus a clean background is the realistic bar — not prior clearance experience. Many embedded engineers in San Diego have moved into cleared work this way; the company sponsors the clearance process. The bigger filter here is the citizenship and eligibility piece, which is non-negotiable for DoD contracts.",
+      "confidence": "high",
+      "sources_used": [
+        "JD: 'Must possess a Secret level security clearance; or the ability to obtain one will be considered'",
+        "industry: DoD contracts require US citizenship per federal contracting rules"
+      ],
+      "safe_to_paste_verbatim": true
     }}
   ]
 }}
