@@ -185,9 +185,40 @@
   <div id="detailView" style="display: none;"></div>
 </main>
 <script>
+// Global error handler — shows ANY uncaught error on screen instead of leaving
+// a blank page. Catches both synchronous errors and unhandled promise rejections.
+// Without this, a JS error during render can produce a page with no content
+// and no feedback, making the user think the site is broken.
+(function installGlobalErrorHandler() {
+  function showError(msg, src) {
+    const container = document.getElementById('detailView') || document.getElementById('listView') || document.body;
+    if (!container) return;
+    if (container.style) container.style.display = 'block';
+    container.innerHTML = `
+      <div style="max-width: 800px; margin: 2rem auto; padding: 1.5rem; background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.4); border-radius: 8px; color: #ffebee; font-family: system-ui, sans-serif;">
+        <div style="font-weight: 700; font-size: 1rem; margin-bottom: 0.6rem; color: #ff6b6b;">Page error</div>
+        <div style="font-size: 0.9rem; margin-bottom: 0.4rem;">${String(msg).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
+        <div style="font-size: 0.8rem; opacity: 0.7;">Source: ${String(src || 'unknown').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>
+        <div style="margin-top: 0.8rem;"><a href="/app/pipeline.html" style="color: #3dd9d6;">Back to pipeline list</a></div>
+      </div>
+    `;
+  }
+  window.addEventListener('error', (e) => showError(e.message, e.filename + ':' + e.lineno));
+  window.addEventListener('unhandledrejection', (e) => showError(e.reason?.message || e.reason || 'Promise rejected', 'async'));
+})();
+
 const API = '/api';
 const token = localStorage.getItem('sn_token');
-if (!token) location.href = '/app/';
+if (!token) {
+  // Was: silent redirect that looked like a blank page when localStorage
+  // was clear in a new tab. Now shows a visible message for 1 second,
+  // then redirects. Never blank.
+  document.addEventListener('DOMContentLoaded', () => {
+    const c = document.getElementById('listView') || document.body;
+    c.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-dim);">Signing you back in...</div>';
+  });
+  setTimeout(() => { location.href = '/app/'; }, 800);
+}
 
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) };
