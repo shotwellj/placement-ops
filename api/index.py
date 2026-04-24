@@ -11,6 +11,7 @@ Two tiers of endpoints in one file:
 
 import os
 import json
+import asyncio
 import uuid
 import hashlib
 import httpx
@@ -1715,114 +1716,140 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             )
         raise HTTPException(500, f"[ai-bool] {etype}: {str(e)[:300]}")
 
-    # Step 3.5: skill alternatives (NON-FATAL — enhances output but doesn't block)
-    # Generates functional equivalents for each must-have skill so the recruiter
-    # knows what alternative tools/stacks to also search for. Failure here just
-    # means the response lacks alternatives; parser + booleans still ship.
-    skill_alternatives = {}
-    try:
-        # Build a compact skills list — just blocker skills first, then
-        # preferred. Cap at 8 to keep the prompt small.
-        must_have = parsed.get("must_have_skills") or []
-        skills_for_alts = [s.get("skill", "") for s in must_have if s.get("skill")][:8]
-        if skills_for_alts:
-            parsed_context = json.dumps({
+    # Steps 3.5 / 3.6 / 3.7: enrichment LLM calls run in PARALLEL.
+    #
+    # All three calls are independent — they read from `parsed` (already
+    # populated by step 1) and don't depend on each other's output. Running
+    # them serially was costing ~25-40s of wall time on top of the parser
+    # and boolean calls; together that pushed total intake time past
+    # browser/proxy patience and triggered intermittent timeouts.
+    #
+    # Concurrency safety:
+    #   - call_ai() creates a fresh httpx.AsyncClient per call (no shared
+    #     state, no connection pool contention).
+    #   - Each call independently reads the user's BYOK key from the DB
+    #     (3x redundant reads, ~600ms total — acceptable, fix later by
+    #     caching once at intake start).
+    #   - asyncio.gather(..., return_exceptions=True) returns exception
+    #     objects in place of failed task results, so one failure cannot
+    #     poison the others. Each task's existing try/except is preserved
+    #     to keep the per-task diagnostic logging.
+    #
+    # Together.ai concurrent rate limits: at the volume we're at (single
+    # user, ~5 intakes/day), 3 concurrent requests is well within any
+    # reasonable rate limit. If we ever hit a 429 here we'll see it in
+    # the per-task error logs and can add a small jitter or fall back
+    # to serial.
+
+    async def _run_skill_alternatives():
+        """Step 3.5 body — returns dict of {skill: [alternatives]}."""
+        try:
+            must_have = parsed.get("must_have_skills") or []
+            skills_for_alts = [s.get("skill", "") for s in must_have if s.get("skill")][:8]
+            if not skills_for_alts:
+                return {}
+            ctx = json.dumps({
                 "role_title": parsed.get("core", {}).get("role_title"),
                 "level": parsed.get("core", {}).get("level"),
                 "industry": parsed.get("core", {}).get("industry"),
                 "company": parsed.get("core", {}).get("company"),
             })
-            alts_text = await call_ai(
+            text = await call_ai(
                 user["id"],
                 SKILL_ALTERNATIVES_PROMPT.format(
-                    parsed_context=parsed_context,
+                    parsed_context=ctx,
                     skills_list="\n".join(f"- {s}" for s in skills_for_alts),
                 ),
                 max_tokens=2000,
             )
-            alts_parsed = parse_json_strict(alts_text)
-            skill_alternatives = alts_parsed.get("skill_alternatives") or {}
-    except Exception as e:
-        # Genuinely non-fatal — log and continue with empty alternatives
-        print(f"[ai-skill-alts FAIL] type={type(e).__name__} err={str(e)[:200]}")
-        skill_alternatives = {}
+            return parse_json_strict(text).get("skill_alternatives") or {}
+        except Exception as e:
+            print(f"[ai-skill-alts FAIL] type={type(e).__name__} err={str(e)[:200]}")
+            return {}
 
-    # Step 3.6: objection-handling playbook (NON-FATAL)
-    # Generates pre-emptive responses to the predictable candidate objections
-    # for THIS role/company/comp combination. Recruiter pastes into outreach
-    # before the rejection lands. Failure here just means no playbook in the
-    # response; rest of intake still ships.
-    objection_playbook = []
-    try:
-        parsed_context = json.dumps({
-            "role_title": parsed.get("core", {}).get("role_title"),
-            "level": parsed.get("core", {}).get("level"),
-            "industry": parsed.get("core", {}).get("industry"),
-            "company": parsed.get("core", {}).get("company"),
-            "location": parsed.get("core", {}).get("location"),
-            "remote_policy": parsed.get("core", {}).get("remote_policy"),
-            "comp_snapshot": parsed.get("comp_snapshot"),
-            "executive_brief": parsed.get("executive_brief", {}).get("summary"),
-        })
-        playbook_text = await call_ai(
-            user["id"],
-            OBJECTION_PLAYBOOK_PROMPT.format(parsed_context=parsed_context),
-            max_tokens=2500,
-        )
-        playbook_parsed = parse_json_strict(playbook_text)
-        objection_playbook = playbook_parsed.get("objection_playbook") or []
-    except Exception as e:
-        print(f"[ai-objections FAIL] type={type(e).__name__} err={str(e)[:200]}")
-        objection_playbook = []
+    async def _run_objection_playbook():
+        """Step 3.6 body — returns list of objection entries."""
+        try:
+            ctx = json.dumps({
+                "role_title": parsed.get("core", {}).get("role_title"),
+                "level": parsed.get("core", {}).get("level"),
+                "industry": parsed.get("core", {}).get("industry"),
+                "company": parsed.get("core", {}).get("company"),
+                "location": parsed.get("core", {}).get("location"),
+                "remote_policy": parsed.get("core", {}).get("remote_policy"),
+                "comp_snapshot": parsed.get("comp_snapshot"),
+                "executive_brief": parsed.get("executive_brief", {}).get("summary"),
+            })
+            text = await call_ai(
+                user["id"],
+                OBJECTION_PLAYBOOK_PROMPT.format(parsed_context=ctx),
+                max_tokens=2500,
+            )
+            return parse_json_strict(text).get("objection_playbook") or []
+        except Exception as e:
+            print(f"[ai-objections FAIL] type={type(e).__name__} err={str(e)[:200]}")
+            return []
 
-    # Step 3.7: sequenced 21-day play (NON-FATAL)
-    # Uses the Tier 1 companies + watering holes already extracted by the
-    # parser so the phase plan references SPECIFIC companies and venues,
-    # not generic advice. If the parser didn't populate those, the prompt
-    # gets empty lists and produces more generic phases.
-    sequenced_play = []
-    try:
-        # Pull tier 1 company names from parsed.market360.poaching_targets
-        # where tier == 1, plus any in top_hiring_companies
-        market360 = parsed.get("market360") or {}
-        poaching = market360.get("poaching_targets") or []
-        tier1 = [p.get("company") for p in poaching if p.get("tier") == 1 and p.get("company")]
-        if not tier1:
-            tier1 = (market360.get("top_hiring_companies") or [])[:5]
-        tier1_str = ", ".join(tier1[:8]) if tier1 else "(not specified — use general Tier 1 targets for this industry)"
+    async def _run_sequenced_play():
+        """Step 3.7 body — returns list of phase entries.
 
-        holes = parsed.get("watering_holes") or []
-        holes_str = "\n".join(
-            f"- {h.get('venue', '')}: {h.get('signal', '')}"
-            for h in holes[:6] if h.get('venue')
-        )
-        if not holes_str:
-            holes_str = "(not specified)"
+        Reads tier 1 companies and watering_holes from `parsed` so the
+        phases reference specific venues, not generic advice."""
+        try:
+            market360 = parsed.get("market360") or {}
+            poaching = market360.get("poaching_targets") or []
+            tier1 = [p.get("company") for p in poaching if p.get("tier") == 1 and p.get("company")]
+            if not tier1:
+                tier1 = (market360.get("top_hiring_companies") or [])[:5]
+            tier1_str = ", ".join(tier1[:8]) if tier1 else "(not specified — use general Tier 1 targets for this industry)"
 
-        seq_context = json.dumps({
-            "role_title": parsed.get("core", {}).get("role_title"),
-            "level": parsed.get("core", {}).get("level"),
-            "industry": parsed.get("core", {}).get("industry"),
-            "company": parsed.get("core", {}).get("company"),
-            "location": parsed.get("core", {}).get("location"),
-            "remote_policy": parsed.get("core", {}).get("remote_policy"),
-            "difficulty": (parsed.get("market_dynamics") or {}).get("difficulty_score"),
-            "executive_brief": parsed.get("executive_brief", {}).get("summary"),
-        })
-        seq_text = await call_ai(
-            user["id"],
-            SEQUENCED_PLAY_PROMPT.format(
-                parsed_context=seq_context,
-                tier1_companies=tier1_str,
-                watering_holes=holes_str,
-            ),
-            max_tokens=3000,
-        )
-        seq_parsed = parse_json_strict(seq_text)
-        sequenced_play = seq_parsed.get("sequenced_play") or []
-    except Exception as e:
-        print(f"[ai-seq-play FAIL] type={type(e).__name__} err={str(e)[:200]}")
-        sequenced_play = []
+            holes = parsed.get("watering_holes") or []
+            holes_str = "\n".join(
+                f"- {h.get('venue', '')}: {h.get('signal', '')}"
+                for h in holes[:6] if h.get('venue')
+            )
+            if not holes_str:
+                holes_str = "(not specified)"
+
+            ctx = json.dumps({
+                "role_title": parsed.get("core", {}).get("role_title"),
+                "level": parsed.get("core", {}).get("level"),
+                "industry": parsed.get("core", {}).get("industry"),
+                "company": parsed.get("core", {}).get("company"),
+                "location": parsed.get("core", {}).get("location"),
+                "remote_policy": parsed.get("core", {}).get("remote_policy"),
+                "difficulty": (parsed.get("market_dynamics") or {}).get("difficulty_score"),
+                "executive_brief": parsed.get("executive_brief", {}).get("summary"),
+            })
+            text = await call_ai(
+                user["id"],
+                SEQUENCED_PLAY_PROMPT.format(
+                    parsed_context=ctx,
+                    tier1_companies=tier1_str,
+                    watering_holes=holes_str,
+                ),
+                max_tokens=3000,
+            )
+            return parse_json_strict(text).get("sequenced_play") or []
+        except Exception as e:
+            print(f"[ai-seq-play FAIL] type={type(e).__name__} err={str(e)[:200]}")
+            return []
+
+    # Fire all three concurrently. return_exceptions=True ensures we get a
+    # value back for each task even if one explodes — but each task already
+    # catches its own exceptions and returns a safe default ({} or []), so
+    # the gather should never actually surface an exception. Belt + suspenders.
+    enrich_t0 = datetime.now(timezone.utc)
+    skill_alternatives, objection_playbook, sequenced_play = await asyncio.gather(
+        _run_skill_alternatives(),
+        _run_objection_playbook(),
+        _run_sequenced_play(),
+        return_exceptions=False,  # tasks handle their own exceptions
+    )
+    print(f"[intake] enrichment parallel block took {(datetime.now(timezone.utc) - enrich_t0).total_seconds():.1f}s "
+          f"(skill_alts={'ok' if skill_alternatives else 'empty'}, "
+          f"objections={len(objection_playbook) if isinstance(objection_playbook, list) else 'err'}, "
+          f"seq_play={len(sequenced_play) if isinstance(sequenced_play, list) else 'err'})")
 
     # Step 4: save to DB + compliance records
     try:
