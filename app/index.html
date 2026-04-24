@@ -953,14 +953,17 @@ renderResults = function(data) {
   // Grandmaster-tier cards: alt_titles, skill_alternatives, watering_holes,
   // objection_playbook, sequenced_play. Each render function early-returns on
   // empty/undefined, so cards just don't appear if the LLM didn't generate them.
+  // Note: `p` is NOT in scope here (it's local to the inner first-pass renderResults).
+  // We re-derive it from data.parsed locally to keep the references clean.
+  const _p = data.parsed || {};
   const grand = $('grandmasterCards');
   if (grand) {
     grand.innerHTML = [
-      renderAltTitlesCard(p.alt_titles),
-      renderSkillAlternativesCard(data.skill_alternatives || p.skill_alternatives),
-      renderWateringHolesCard(p.watering_holes),
-      renderObjectionPlaybookCard(data.objection_playbook || p.objection_playbook),
-      renderSequencedPlayCard(data.sequenced_play || p.sequenced_play),
+      renderAltTitlesCard(_p.alt_titles),
+      renderSkillAlternativesCard(data.skill_alternatives || _p.skill_alternatives),
+      renderWateringHolesCard(_p.watering_holes),
+      renderObjectionPlaybookCard(data.objection_playbook || _p.objection_playbook),
+      renderSequencedPlayCard(data.sequenced_play || _p.sequenced_play),
     ].filter(Boolean).join('');
     // Wire Copy buttons on the objection playbook counter blocks
     grand.querySelectorAll('.bool-copy').forEach(btn => {
