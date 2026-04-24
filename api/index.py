@@ -310,11 +310,25 @@ def integrations_demo():
 FREE_CAPS = {"intake": 5, "eval": 10, "outreach": 10}
 
 
+# Free-tier billing period is rolling 30 days, not calendar months. Fairer
+# to users who sign up mid-month, simpler to reason about, no cron needed —
+# we reset lazily on the next cap check.
+FREE_PERIOD_DAYS = 30
+
+
 async def check_cap(user_id: str, cap_type: str):
-    """Check the cap WITHOUT incrementing. Raises 402 if the user is over."""
+    """Check the cap WITHOUT incrementing. Raises 402 if the user is over.
+
+    Lazy monthly reset: if the user's usage_reset_at is more than
+    FREE_PERIOD_DAYS old (or NULL for legacy users), reset all three
+    usage counters to zero and bump usage_reset_at to now BEFORE
+    checking the cap. No cron job required.
+    """
     async with db() as client:
         rs = await client.execute(
-            "SELECT plan, usage_intake, usage_eval, usage_outreach FROM users WHERE id = ?",
+            """SELECT plan, usage_intake, usage_eval, usage_outreach,
+                      usage_reset_at, created_at
+               FROM users WHERE id = ?""",
             [user_id],
         )
         if not rs.rows:
@@ -322,8 +336,36 @@ async def check_cap(user_id: str, cap_type: str):
         row = rs.rows[0]
         plan = row[0]
         usage_map = {"intake": row[1] or 0, "eval": row[2] or 0, "outreach": row[3] or 0}
+        reset_at = row[4]  # may be None on legacy rows
+        created_at = row[5]
+
+        # ---- Lazy rolling-30-day reset ----
+        # Use SQLite to do the date math so we don't have to parse timestamps
+        # in Python. If reset_at is NULL we treat created_at as the anchor.
+        anchor = reset_at or created_at
+        if anchor:
+            check = await client.execute(
+                "SELECT (julianday('now') - julianday(?)) >= ?",
+                [anchor, FREE_PERIOD_DAYS],
+            )
+            should_reset = bool(check.rows and check.rows[0] and check.rows[0][0])
+            if should_reset:
+                await client.execute(
+                    """UPDATE users
+                       SET usage_intake = 0, usage_eval = 0, usage_outreach = 0,
+                           usage_reset_at = CURRENT_TIMESTAMP,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ?""",
+                    [user_id],
+                )
+                # In-memory map needs to reflect the reset for this call
+                usage_map = {"intake": 0, "eval": 0, "outreach": 0}
+
         if plan == "free" and usage_map[cap_type] >= FREE_CAPS[cap_type]:
-            raise HTTPException(402, f"Free tier cap reached ({FREE_CAPS[cap_type]}/mo). Upgrade to Pro.")
+            raise HTTPException(
+                402,
+                f"Free tier cap reached ({FREE_CAPS[cap_type]}/mo, resets every {FREE_PERIOD_DAYS} days). Upgrade to Pro for unlimited.",
+            )
 
 
 async def increment_cap(user_id: str, cap_type: str):
@@ -1177,16 +1219,34 @@ async def get_me(user: dict = Depends(get_current_user)):
     try:
         async with db() as client:
             rs = await client.execute(
-                "SELECT plan, usage_intake, usage_eval, usage_outreach, byok_provider FROM users WHERE id = ?",
+                """SELECT plan, usage_intake, usage_eval, usage_outreach,
+                          byok_provider, usage_reset_at, created_at
+                   FROM users WHERE id = ?""",
                 [user["id"]],
             )
             if not rs.rows:
                 raise HTTPException(404, "User not found in DB")
             r = rs.rows[0]
+
+            # Compute days_until_reset for the UI to show "resets in N days".
+            # Mirrors the lazy reset logic in check_cap.
+            anchor = r[5] or r[6]  # usage_reset_at or created_at
+            days_until_reset = None
+            if anchor and r[0] == "free":
+                days_check = await client.execute(
+                    "SELECT MAX(0, CAST(? - (julianday('now') - julianday(?)) AS INTEGER))",
+                    [FREE_PERIOD_DAYS, anchor],
+                )
+                if days_check.rows and days_check.rows[0]:
+                    days_until_reset = int(days_check.rows[0][0] or 0)
+
             return {
                 **user, "plan": r[0],
                 "usage": {"intake": r[1] or 0, "eval": r[2] or 0, "outreach": r[3] or 0},
                 "caps": FREE_CAPS if r[0] == "free" else {"intake": 100, "eval": None, "outreach": None},
+                "usage_reset_at": r[5],
+                "days_until_reset": days_until_reset,
+                "period_days": FREE_PERIOD_DAYS,
                 "byok_provider": r[4],
                 "byok_configured": bool(r[4]),
             }
