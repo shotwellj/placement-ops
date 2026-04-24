@@ -1327,6 +1327,57 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
 
                 # Structured req_skills — THIS populates the brain's demand signal
                 await write_req_skills(client, req_id, parsed)
+
+                # Second AI decision in the intake pipeline: Boolean string generation.
+                # Separate model_version + audit_event so the chain records WHICH
+                # version of BOOLEAN_BUILDER_PROMPT produced these strings. EU AI
+                # Act Article 11 traceability: every AI decision linked to its
+                # exact prompt version, even when multiple prompts run in one request.
+                bool_mv_id = await register_model_version(
+                    client,
+                    prompt_name="boolean_builder",
+                    prompt_text=BOOLEAN_BUILDER_PROMPT,
+                    model_provider=provider,
+                    model_name=provider,
+                )
+                company_clusters = booleans.get("company_clusters") or {}
+                bool_ae_id = await write_audit_event(
+                    client,
+                    event_type="ai_decision",
+                    action="generate_booleans",
+                    actor_user_id=user["id"],
+                    entity_type="requisition",
+                    entity_id=req_id,
+                    inputs={
+                        "parsed_role_title": parsed.get("core", {}).get("role_title"),
+                        "must_have_count": len(parsed.get("must_have_skills") or []),
+                    },
+                    outputs={
+                        "xray_keys": sorted(list((booleans.get("xray") or {}).keys())),
+                        "tier1_count": len(company_clusters.get("tier_1_direct_competitors") or []),
+                        "tier2_count": len(company_clusters.get("tier_2_adjacent") or []),
+                    },
+                    model_version_id=bool_mv_id,
+                )
+                # Plain-English explanation of what the Boolean builder decided.
+                # Keeps the audit trail human-readable for dispute investigation.
+                bool_top_factors = [
+                    {"factor": "tier_1_competitors", "value": company_clusters.get("tier_1_direct_competitors") or []},
+                    {"factor": "xray_sources_used", "value": sorted(list((booleans.get("xray") or {}).keys()))},
+                ]
+                await write_decision_explanation(
+                    client,
+                    audit_event_id=bool_ae_id,
+                    subject_id=None,
+                    decision_type="boolean_generation",
+                    decision_outcome="generated",
+                    top_factors=bool_top_factors,
+                    plain_english=(
+                        f"Generated Boolean strings for {len((booleans.get('xray') or {}))} X-ray sources "
+                        f"and {len(company_clusters.get('tier_1_direct_competitors') or [])} tier-1 competitors. "
+                        f"Hiring company excluded from all company clusters per non-solicit rule."
+                    )[:500],
+                )
             except Exception as compliance_err:
                 print(f"[compliance-intake] non-fatal write error: {compliance_err!r}")
     except HTTPException:
