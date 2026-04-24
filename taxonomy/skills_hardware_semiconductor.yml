@@ -76,7 +76,7 @@ digital_design:
     weight: medium
 
   - name: Low Power Design
-    aliases: [power optimization, upf, clock gating]
+    aliases: [power optimization, upf, clock gating, power management, power management software, power management design]
     adjacent: [ASIC Design, Physical Design]
     weight: medium
 
@@ -168,7 +168,7 @@ soc_bringup:
     weight: high
 
   - name: JTAG
-    aliases: [boundary scan, ieee 1149.1]
+    aliases: [boundary scan, ieee 1149.1, jtag debugging]
     adjacent: [SoC Bring-up, Debug, Embedded Firmware]
     weight: medium
 
@@ -187,7 +187,7 @@ soc_bringup:
 # -----------------------------------------------
 embedded_firmware:
   - name: Embedded Firmware
-    aliases: [firmware, embedded software, firmware development]
+    aliases: [firmware, embedded software, firmware development, embedded software development, embedded systems, embedded systems development]
     adjacent: [Embedded C, SoC Bring-up, RTOS, Bare Metal, Device Drivers]
     weight: high
 
@@ -207,7 +207,7 @@ embedded_firmware:
     weight: high
 
   - name: Device Drivers
-    aliases: [driver development, linux drivers, kernel drivers]
+    aliases: [driver development, linux drivers, kernel drivers, device driver development, driver dev]
     adjacent: [Embedded Firmware, Linux Kernel, Embedded C]
     weight: medium
 
@@ -274,3 +274,30 @@ architecture:
     aliases: [performance optimization, low-latency, high-throughput]
     adjacent: [CUDA, Computer Architecture, C++]
     weight: medium
+
+# -----------------------------------------------
+# MOBILE / IOT PLATFORMS
+# -----------------------------------------------
+# These are domain areas rather than tools, but they appear as
+# skill requirements on mobile and IoT reqs all the time
+# (Qualcomm, Apple, Google, Samsung, etc.).
+mobile_iot:
+  - name: Mobile Development
+    aliases: [mobile platform development, smartphone development, smartphone software development, smartphone firmware, smartphone platforms, android development, ios development]
+    adjacent: [Embedded Firmware, Android, iOS]
+    weight: medium
+
+  - name: IoT Development
+    aliases: [iot, iot systems, iot devices, internet of things, iot platform development, connected devices]
+    adjacent: [Embedded Firmware, RTOS, Low Power Design]
+    weight: medium
+
+  - name: Android
+    aliases: [aosp, android platform, android os]
+    adjacent: [Mobile Development, Linux Kernel]
+    weight: low
+
+  - name: iOS
+    aliases: [apple ios, iphone development]
+    adjacent: [Mobile Development]
+    weight: low

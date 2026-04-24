@@ -1,0 +1,75 @@
+# ============================================================
+# SourcingNav — Cross-Domain Tooling Skills
+# ============================================================
+# Tools and practices that apply across every engineering domain:
+# source control, programming languages that are universally used,
+# testing frameworks, etc. These show up in data/ML reqs, hardware
+# reqs, medical reqs, automotive reqs — everywhere.
+#
+# Separate file so they're not mis-categorized as hardware-only
+# or data-only. Auto-discovered by scripts/seed_taxonomy.py via
+# the skills_*.yml glob pattern.
+# ============================================================
+
+# -----------------------------------------------
+# SOURCE CONTROL MANAGEMENT
+# -----------------------------------------------
+source_control:
+  - name: Git
+    aliases: [github, gitlab, bitbucket, source control, source code management, scm]
+    adjacent: [Perforce, Subversion]
+    weight: high
+
+  - name: Perforce
+    aliases: [p4, helix core]
+    adjacent: [Git, Subversion]
+    weight: medium
+
+  - name: Subversion
+    aliases: [svn]
+    adjacent: [Git, Perforce]
+    weight: low
+
+  - name: Mercurial
+    aliases: [hg]
+    adjacent: [Git]
+    weight: low
+
+# -----------------------------------------------
+# UNIVERSAL PROGRAMMING LANGUAGES
+# -----------------------------------------------
+# Languages that appear across many domains. Domain-specific
+# languages (Verilog for hardware, R for data science) stay
+# in their domain files.
+universal_languages:
+  - name: C
+    aliases: [c programming, c language, ansi c, c99, c11]
+    adjacent: [C++, Embedded C, Embedded Firmware]
+    weight: high
+
+  - name: Shell Scripting
+    aliases: [bash, bash scripting, shell, shell scripting, zsh scripting]
+    adjacent: [Linux, Python]
+    weight: medium
+
+  - name: Linux
+    aliases: [linux systems, unix, gnu/linux]
+    adjacent: [Linux Kernel, Shell Scripting]
+    weight: medium
+
+# -----------------------------------------------
+# DEBUGGING & DEVELOPMENT HARDWARE TOOLS
+# -----------------------------------------------
+# Physical/specialized debuggers that cross into hardware/embedded
+# work. Put here rather than hardware file because they also appear
+# in automotive and medical device work.
+debug_hardware:
+  - name: Lauterbach Trace32
+    aliases: [lauterbach, trace32, t32]
+    adjacent: [JTAG, Debug, Embedded Firmware]
+    weight: low
+
+  - name: Logic Analyzer
+    aliases: [saleae, logic analyzers]
+    adjacent: [Debug, JTAG]
+    weight: low
