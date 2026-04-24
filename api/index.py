@@ -770,6 +770,53 @@ The whole point: a recruiter searching only for "Senior Backend Engineer"
 misses 60% of qualified candidates who hold one of these alternative titles.
 Your alt_titles output is the broader search universe.
 
+CRITICAL RULES FOR watering_holes:
+This is venue-specific sourcing intelligence — the actual websites, forums,
+events, mailing lists, Discords, and communities where THIS specific
+archetype congregates. Generic ("LinkedIn", "GitHub") doesn't count.
+
+For each watering hole, give:
+  - venue: the specific name (lore.kernel.org, NeurIPS, Bootlin, HuggingFace,
+    DEFCON CTF, KX/Q forums, Embedded World speakers list — be specific)
+  - venue_type: mailing_list | conference | community | publication |
+    code_host | training_alumni | competition | discord_slack
+  - signal: what kind of candidate signal you find there in 1 sentence
+    ("Linux kernel maintainers — Signed-off-by tags = professional-grade
+    upstream contribution")
+  - how_to_use: 1 sentence on how to actually source from this venue
+    ("X-ray with 'Signed-off-by' AND 'embedded' OR 'arm'")
+
+Aim for 5-8 watering holes. Span at least 3 venue_types. Skip generic
+catch-alls like "LinkedIn" or "Indeed" — those are already in the X-ray
+strings. The point is the NICHE venues only a grandmaster would know.
+
+Examples by archetype:
+
+  Embedded firmware/kernel: lore.kernel.org (mailing_list),
+    Embedded World speakers (conference), Bootlin training alumni
+    (training_alumni), RISC-V Summit (conference), kernel.org maintainers
+    (publication), JESD204B working groups (community)
+
+  ML/AI research: NeurIPS authors (publication), HuggingFace top
+    contributors (code_host), EleutherAI Discord (discord_slack),
+    arXiv recent submissions (publication), MLSys conference (conference),
+    ICML/ICLR authors (publication)
+
+  Security: DEFCON CTF leaderboards (competition), BugCrowd top 100
+    (competition), Black Hat speakers (conference), specific Twitter
+    circles (community), CVE assignees (publication)
+
+  Finance engineering: KX/Q Code Group (community), HFT alumni networks
+    (training_alumni), QuantConnect (community), specific Slack groups
+    (discord_slack), kdb+ user forums (community)
+
+  Defense/cleared: AFCEA chapter events (conference), MORS conferences
+    (conference), specific cleared-talent meetups (community), patents
+    (publication), DARPA program alumni (training_alumni)
+
+Pick venues that match the JD's domain. If you don't know good venues
+for a niche, return fewer high-quality ones rather than guessing.
+
 Return ONLY valid JSON with this shape:
 {{
   "core": {{
@@ -823,7 +870,15 @@ Return ONLY valid JSON with this shape:
     "talent_hotspots": [],
     "poaching_targets": [{{"company": "...", "tier": 1, "rationale": "..."}}]
   }},
-  "sourcing_strategy": {{"priority_channels": [], "key_tactics": []}}
+  "sourcing_strategy": {{"priority_channels": [], "key_tactics": []}},
+  "watering_holes": [
+    {{
+      "venue": "lore.kernel.org",
+      "venue_type": "mailing_list",
+      "signal": "Linux kernel maintainers — Signed-off-by tags signal professional-grade upstream contribution",
+      "how_to_use": "X-ray with site:lore.kernel.org 'Signed-off-by:' AND 'embedded' AND 'arm'"
+    }}
+  ]
 }}
 
 No em dashes. No code fences. Just JSON.
@@ -1016,6 +1071,196 @@ empty arrays.
 
 No em dashes. No code fences. Just JSON.
 """
+
+
+OBJECTION_PLAYBOOK_PROMPT = """You are an expert sourcer with 13+ years of experience.
+
+Given a parsed job description, produce an OBJECTION-HANDLING PLAYBOOK
+that helps the recruiter craft outreach BEFORE the candidate responds
+with the predictable "no". Most recruiters get a rejection and scramble.
+A grandmaster anticipates the rejection and pre-empts it in the first
+message.
+
+PARSED JD CONTEXT:
+{parsed_context}
+
+For this specific role + company + comp + location combination, generate
+3-5 of the most likely candidate objections, each with a SPECIFIC counter
+that references what's actually true about THIS opportunity (not generic).
+
+Common objection categories (use the ones that apply, skip the ones that
+don't matter for this role):
+
+  industry_perception — "I'd never work at [defense / FAANG / startup /
+    legacy / non-mission-driven]". Counter must reference what's
+    SURPRISING and TRUE about this specific company.
+
+  comp_below_market — "I just got a raise" / "I'm already at $X". Counter
+    must address the comp delta gap honestly OR reframe what the role
+    offers beyond base.
+
+  location_remote — "I want fully remote" or "I won't relocate to X".
+    Counter must be honest about the requirement AND offer what's
+    actually compelling about being there.
+
+  brand_unknown — "I've never heard of this company". Counter is a
+    1-paragraph elevator pitch the recruiter can paste verbatim:
+    what the company does, who their customers are, the ONE
+    interesting technical fact, the team scale.
+
+  career_risk — "What if this doesn't work out / the company fails /
+    I get RIF'd". Counter addresses stability honestly AND points
+    to candidate-side risk-mitigation (vesting acceleration,
+    severance, career trajectory at peer companies).
+
+  visa_clearance_blocker — "I don't have clearance" or "I need
+    sponsorship". Counter is honest about whether the role can
+    accommodate, and if not, redirects to similar roles that can.
+
+  tech_stack_skepticism — "Your stack is ancient" or "I don't want
+    to work in [legacy tech]". Counter references what's actually
+    being modernized OR why the legacy matters (defense systems
+    that fly, finance systems that move billions).
+
+For each objection in your output:
+  - objection_type: one of the categories above
+  - likely_phrasing: how the candidate would actually say it
+    (1-2 sentences, sounds like a real person, not a script)
+  - counter: the recruiter's pre-emptive response.
+    HAS to be specific to THIS company/role. NO generic platitudes.
+    2-4 sentences max. Should sound like something a recruiter would
+    actually paste into an InMail.
+  - confidence: "high" if you're sure this objection will come up,
+    "medium" if it might, "low" if it's a long-shot but worth
+    preparing for.
+
+Pick ONLY the 3-5 most likely objections for THIS role. Don't list
+all categories. Quality over quantity.
+
+Skip the elevator pitch as a separate objection — instead, work it
+INTO whichever counter benefits most (usually brand_unknown or
+industry_perception).
+
+Return STRICT JSON only:
+
+{{
+  "objection_playbook": [
+    {{
+      "objection_type": "industry_perception",
+      "likely_phrasing": "I'd never go work at a defense contractor — I want to build products that ship to consumers.",
+      "counter": "This isn't your dad's defense contractor. The cryptographic systems team you'd join ships into commercial cloud platforms used by companies like Stripe and Cloudflare for FedRAMP compliance. The architect leading the team came from Apple's secure enclave group. Worth a 20-min call to hear what they're actually building?",
+      "confidence": "high"
+    }}
+  ]
+}}
+
+No em dashes. No code fences. Just JSON.
+"""
+
+
+SEQUENCED_PLAY_PROMPT = """You are an expert sourcer with 13+ years of experience.
+
+Given a parsed job description, produce a SEQUENCED 21-DAY SOURCING PLAY
+that a recruiter can follow day-by-day. Most recruiters do one LinkedIn
+blast on day 1, wait a week, then complain candidates aren't responding.
+A grandmaster sequences: warmest channels first, progressively broader
+outreach, then unconventional channels, then back-channels.
+
+PARSED JD CONTEXT:
+{parsed_context}
+
+TIER 1 COMPANIES (if known):
+{tier1_companies}
+
+WATERING HOLES (if known):
+{watering_holes}
+
+Produce a 5-phase sequenced play covering days 1 through 22+. Each phase
+has a different channel mix, different message style, different urgency
+level, and a different expected response rate.
+
+The 5 phases (all required, in order):
+
+  Phase 1 — Days 1-3 — Warm-channel opener
+    Channels: 1st-degree LinkedIn connections, alumni networks, referrals
+    from current employees at Tier 1 companies, past placements the
+    recruiter already knows. No cold yet.
+    Message style: personal, concise, direct ask for intro or interest.
+    Expected response rate: 30-50%. Tiny universe, high-quality signal.
+
+  Phase 2 — Days 4-7 — Tier 1 cold with hyper-personalization
+    Channels: Tier 1 target-company employees via LinkedIn Recruiter /
+    InMail, outreach via verified personal email (Hunter/Apollo).
+    Message style: references something SPECIFIC about the candidate —
+    their recent talk, OSS commit, patent, promotion, their company's
+    recent news (layoff, acquisition, IPO). First line should prove the
+    recruiter actually looked at their profile.
+    Expected response rate: 8-15%.
+
+  Phase 3 — Days 8-14 — Tier 2 broader outreach
+    Channels: Tier 2 companies, less-personalized but still role-fit
+    targeted. Template-based with 2-3 customized fields.
+    Message style: leads with the ROLE + COMP + COMPANY story since less
+    personal context exists per candidate. Volume game.
+    Expected response rate: 3-7%.
+
+  Phase 4 — Days 15-21 — Unconventional channels + watering holes
+    Channels: X-ray (personal sites, GitHub, Stack Overflow), niche
+    communities (specific Discords, mailing lists, conference speakers),
+    the watering_holes from the parsed JD.
+    Message style: venue-specific. Reach out as a peer, not a recruiter.
+    Reference the work they posted. These candidates are often NOT
+    actively job-searching and respond to curiosity, not pitches.
+    Expected response rate: 10-20% from a much smaller universe.
+
+  Phase 5 — Days 22+ — Back-channels + parallel escalation
+    Channels: recruiters' Discord groups, friend-of-friend referrals,
+    former colleagues. If the search is still open past 21 days, this
+    is where grandmasters ask their network for intros directly.
+    Also: revisit Phase 2 candidates who didn't respond with a new
+    angle (often: a news hook — their company just announced layoffs,
+    a comp change, a reorg).
+    Message style: asking for intros or advice, not pitching the role.
+    Expected response rate: varies wildly — depends on network depth.
+
+For each phase, produce:
+  - phase: 1-5
+  - name: short title ("Warm-channel opener", "Tier 1 cold")
+  - days: string ("Days 1-3", "Days 22+")
+  - channels: array of 2-4 specific channel names (use the Tier 1
+    companies and watering holes provided, don't be generic)
+  - message_style: 1-sentence description of the voice and angle
+  - first_move: the ONE specific action to take on day 1 of this phase.
+    Has to be concrete. Not "reach out to candidates" — "Send InMail to
+    the 8-12 Fluke and Keysight embedded engineers who posted on
+    lore.kernel.org in the last 90 days, leading with their Signed-off-by
+    tags on relevant drivers."
+  - expected_response_rate: string ("30-50%", "8-15%", etc.)
+
+Make it specific to THIS role, company, and watering holes. Generic
+advice fails. Reference the Tier 1 companies and watering holes that
+were passed in.
+
+Return STRICT JSON only:
+
+{{
+  "sequenced_play": [
+    {{
+      "phase": 1,
+      "name": "Warm-channel opener",
+      "days": "Days 1-3",
+      "channels": ["1st-degree LinkedIn connections at Fluke and Keysight", "UCSD alumni network", "Former colleagues from past embedded placements"],
+      "message_style": "Personal, concise, direct ask for intro or interest. Under 100 words.",
+      "first_move": "Post in UCSD embedded systems alumni Slack with a 2-sentence description of the role and ask for intros. Message the 3-5 known Fluke/Keysight 1st-degree connections asking if they know anyone open to conversations.",
+      "expected_response_rate": "30-50%"
+    }}
+  ]
+}}
+
+No em dashes. No code fences. Just JSON.
+"""
+
+
 
 
 
@@ -1474,6 +1719,83 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         print(f"[ai-skill-alts FAIL] type={type(e).__name__} err={str(e)[:200]}")
         skill_alternatives = {}
 
+    # Step 3.6: objection-handling playbook (NON-FATAL)
+    # Generates pre-emptive responses to the predictable candidate objections
+    # for THIS role/company/comp combination. Recruiter pastes into outreach
+    # before the rejection lands. Failure here just means no playbook in the
+    # response; rest of intake still ships.
+    objection_playbook = []
+    try:
+        parsed_context = json.dumps({
+            "role_title": parsed.get("core", {}).get("role_title"),
+            "level": parsed.get("core", {}).get("level"),
+            "industry": parsed.get("core", {}).get("industry"),
+            "company": parsed.get("core", {}).get("company"),
+            "location": parsed.get("core", {}).get("location"),
+            "remote_policy": parsed.get("core", {}).get("remote_policy"),
+            "comp_snapshot": parsed.get("comp_snapshot"),
+            "executive_brief": parsed.get("executive_brief", {}).get("summary"),
+        })
+        playbook_text = await call_ai(
+            user["id"],
+            OBJECTION_PLAYBOOK_PROMPT.format(parsed_context=parsed_context),
+            max_tokens=2500,
+        )
+        playbook_parsed = parse_json_strict(playbook_text)
+        objection_playbook = playbook_parsed.get("objection_playbook") or []
+    except Exception as e:
+        print(f"[ai-objections FAIL] type={type(e).__name__} err={str(e)[:200]}")
+        objection_playbook = []
+
+    # Step 3.7: sequenced 21-day play (NON-FATAL)
+    # Uses the Tier 1 companies + watering holes already extracted by the
+    # parser so the phase plan references SPECIFIC companies and venues,
+    # not generic advice. If the parser didn't populate those, the prompt
+    # gets empty lists and produces more generic phases.
+    sequenced_play = []
+    try:
+        # Pull tier 1 company names from parsed.market360.poaching_targets
+        # where tier == 1, plus any in top_hiring_companies
+        market360 = parsed.get("market360") or {}
+        poaching = market360.get("poaching_targets") or []
+        tier1 = [p.get("company") for p in poaching if p.get("tier") == 1 and p.get("company")]
+        if not tier1:
+            tier1 = (market360.get("top_hiring_companies") or [])[:5]
+        tier1_str = ", ".join(tier1[:8]) if tier1 else "(not specified — use general Tier 1 targets for this industry)"
+
+        holes = parsed.get("watering_holes") or []
+        holes_str = "\n".join(
+            f"- {h.get('venue', '')}: {h.get('signal', '')}"
+            for h in holes[:6] if h.get('venue')
+        )
+        if not holes_str:
+            holes_str = "(not specified)"
+
+        seq_context = json.dumps({
+            "role_title": parsed.get("core", {}).get("role_title"),
+            "level": parsed.get("core", {}).get("level"),
+            "industry": parsed.get("core", {}).get("industry"),
+            "company": parsed.get("core", {}).get("company"),
+            "location": parsed.get("core", {}).get("location"),
+            "remote_policy": parsed.get("core", {}).get("remote_policy"),
+            "difficulty": (parsed.get("market_dynamics") or {}).get("difficulty_score"),
+            "executive_brief": parsed.get("executive_brief", {}).get("summary"),
+        })
+        seq_text = await call_ai(
+            user["id"],
+            SEQUENCED_PLAY_PROMPT.format(
+                parsed_context=seq_context,
+                tier1_companies=tier1_str,
+                watering_holes=holes_str,
+            ),
+            max_tokens=3000,
+        )
+        seq_parsed = parse_json_strict(seq_text)
+        sequenced_play = seq_parsed.get("sequenced_play") or []
+    except Exception as e:
+        print(f"[ai-seq-play FAIL] type={type(e).__name__} err={str(e)[:200]}")
+        sequenced_play = []
+
     # Step 4: save to DB + compliance records
     try:
         # Company override rule: JD body is source of truth. If the AI
@@ -1520,6 +1842,10 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             # the rest of the parsed JD data. UI reads it from parsed.skill_alternatives.
             if skill_alternatives:
                 parsed["skill_alternatives"] = skill_alternatives
+            if objection_playbook:
+                parsed["objection_playbook"] = objection_playbook
+            if sequenced_play:
+                parsed["sequenced_play"] = sequenced_play
             await client.execute(
                 """INSERT INTO requisitions
                    (id, org_id, user_id, title, jd_raw, parsed_json, boolean_strings_json, status, opened_at, updated_at)
@@ -1682,6 +2008,8 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         "boolean_strings": booleans,
         "created_at": now,
         "skill_alternatives": skill_alternatives,
+        "objection_playbook": objection_playbook,
+        "sequenced_play": sequenced_play,
         # When non-null, the UI should show a banner telling the user
         # their typed company was overridden by what the JD actually says.
         "company_override": company_override,

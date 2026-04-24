@@ -362,8 +362,11 @@ function renderDetail(d) {
     ${renderAltTitlesCard(p.alt_titles)}
     ${renderSkillAlternativesCard(p.skill_alternatives)}
     ${renderBooleanCard(b)}
+    ${renderWateringHolesCard(p.watering_holes)}
     ${renderSubmissionsCard(d.id)}
     ${renderEvaluateCard(d.id)}
+    ${renderObjectionPlaybookCard(p.objection_playbook)}
+    ${renderSequencedPlayCard(p.sequenced_play)}
     ${renderNotesCard(b.mentor_notes)}
     ${renderRawJDCard(d.jd_raw)}
   `;
@@ -654,6 +657,207 @@ function renderBooleanCard(b) {
     </section>
   `;
 }
+function renderWateringHolesCard(holes) {
+  if (!holes || !Array.isArray(holes) || holes.length === 0) return '';
+
+  const venueIcon = (t) => {
+    const map = {
+      mailing_list:    '✉',
+      conference:      '◇',
+      community:       '◯',
+      publication:     '▤',
+      code_host:       '⌥',
+      training_alumni: '⊕',
+      competition:     '★',
+      discord_slack:   '◧',
+    };
+    return map[t] || '•';
+  };
+
+  const venueColor = (t) => {
+    const map = {
+      mailing_list:    'var(--blue)',
+      conference:      'var(--accent)',
+      community:       '#a78bfa',
+      publication:     'var(--good)',
+      code_host:       'var(--warn)',
+      training_alumni: '#f472b6',
+      competition:     'var(--danger)',
+      discord_slack:   '#94a3b8',
+    };
+    return map[t] || 'var(--text-dim)';
+  };
+
+  const rows = holes.map(h => `
+    <li class="assess-item" style="align-items: flex-start;">
+      <span style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; font-size: 1.1rem; color: ${venueColor(h.venue_type)}; flex-shrink: 0;">${venueIcon(h.venue_type)}</span>
+      <div>
+        <div class="assess-text" style="font-weight: 600;">
+          ${escapeHtml(h.venue || '')}
+          <span style="display: inline-block; padding: 0.15rem 0.5rem; background: var(--bg-elev); color: var(--text-mute); border-radius: 4px; font-size: 0.7rem; font-family: var(--font-mono); margin-left: 0.5rem; text-transform: lowercase;">${escapeHtml((h.venue_type || '').replace('_', ' '))}</span>
+        </div>
+        <div class="assess-evidence" style="margin-top: 0.3rem;">${escapeHtml(h.signal || '')}</div>
+        ${h.how_to_use ? `<div style="margin-top: 0.4rem; padding: 0.4rem 0.6rem; background: var(--bg-elev); border-left: 2px solid var(--accent); border-radius: 4px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); line-height: 1.5;">${escapeHtml(h.how_to_use)}</div>` : ''}
+      </div>
+    </li>
+  `).join('');
+
+  return `
+    <section class="card">
+      <div class="card-label">Watering holes</div>
+      <h2 class="card-title">Where this talent actually congregates</h2>
+      <p style="color: var(--text-dim); margin-bottom: 1.25rem; font-size: 0.92rem;">
+        Beyond LinkedIn and GitHub. The specific venues, mailing lists, conferences,
+        and communities where the people you want already spend their time. Most
+        recruiters never look here. The ones who do find candidates the rest of the
+        market can't see.
+      </p>
+      <ul class="assess-list">${rows}</ul>
+    </section>
+  `;
+}
+
+function renderObjectionPlaybookCard(playbook) {
+  if (!playbook || !Array.isArray(playbook) || playbook.length === 0) return '';
+
+  const typeLabel = (t) => {
+    const map = {
+      industry_perception:    'Industry perception',
+      comp_below_market:      'Comp',
+      location_remote:        'Location / remote',
+      brand_unknown:          'Brand unknown',
+      career_risk:            'Career risk',
+      visa_clearance_blocker: 'Visa / clearance',
+      tech_stack_skepticism:  'Tech stack',
+    };
+    return map[t] || (t || '').replace(/_/g, ' ');
+  };
+
+  const typeColor = (t) => {
+    const map = {
+      industry_perception:    ['rgba(251, 113, 133, 0.12)', 'var(--danger)'],
+      comp_below_market:      ['rgba(255, 183, 77, 0.12)', 'var(--warn)'],
+      location_remote:        ['rgba(74, 158, 255, 0.12)', 'var(--blue)'],
+      brand_unknown:          ['rgba(139, 92, 246, 0.12)', '#a78bfa'],
+      career_risk:            ['rgba(255, 107, 107, 0.12)', 'var(--danger)'],
+      visa_clearance_blocker: ['rgba(74, 222, 128, 0.12)', 'var(--good)'],
+      tech_stack_skepticism:  ['rgba(245, 158, 11, 0.12)', 'var(--warn)'],
+    };
+    return map[t] || ['rgba(139,155,179,0.12)', 'var(--text-dim)'];
+  };
+
+  const confidencePill = (c) => {
+    const colors = {
+      high:   ['rgba(74, 222, 128, 0.12)', 'var(--good)'],
+      medium: ['rgba(255, 183, 77, 0.12)', 'var(--warn)'],
+      low:    ['rgba(139, 155, 179, 0.12)', 'var(--text-dim)'],
+    };
+    const [bg, fg] = colors[(c || '').toLowerCase()] || colors.low;
+    return `<span style="display: inline-block; padding: 0.15rem 0.5rem; background: ${bg}; color: ${fg}; border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; margin-left: 0.4rem; text-transform: uppercase;">${escapeHtml(c || 'medium')} likelihood</span>`;
+  };
+
+  const rows = playbook.map(o => {
+    const [tBg, tFg] = typeColor(o.objection_type);
+    const copyEsc = (o.counter || '').replace(/"/g, '&quot;').replace(/\n/g, ' ');
+    return `
+      <div style="border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.15rem; margin-bottom: 1rem; background: var(--bg-card);">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem;">
+          <span style="display: inline-block; padding: 0.22rem 0.6rem; background: ${tBg}; color: ${tFg}; border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${escapeHtml(typeLabel(o.objection_type))}</span>
+          ${confidencePill(o.confidence)}
+        </div>
+        <div style="margin-bottom: 0.9rem;">
+          <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; font-weight: 700;">What they'll say</div>
+          <div style="font-style: italic; color: var(--text-dim); font-size: 0.92rem; padding-left: 0.8rem; border-left: 2px solid var(--border);">"${escapeHtml(o.likely_phrasing || '')}"</div>
+        </div>
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+            <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;">Your pre-empt</div>
+            <button class="bool-copy" data-copy="${copyEsc}" style="font-size: 0.72rem; padding: 0.2rem 0.55rem;">Copy</button>
+          </div>
+          <div style="font-size: 0.92rem; line-height: 1.65; color: var(--text); padding: 0.7rem 0.85rem; background: var(--bg-elev); border-radius: 6px; border-left: 3px solid var(--accent);">${escapeHtml(o.counter || '')}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <section class="card">
+      <div class="card-label">Objection playbook</div>
+      <h2 class="card-title">What they'll say no to, and what you'll say back</h2>
+      <p style="color: var(--text-dim); margin-bottom: 1.25rem; font-size: 0.92rem;">
+        The predictable rejections for this specific role + company + comp combo,
+        with pre-written counters you can paste into your first outreach before
+        the objection lands. Most recruiters scramble when they hear "no." A
+        grandmaster pre-empts it in the InMail.
+      </p>
+      ${rows}
+    </section>
+  `;
+}
+
+function renderSequencedPlayCard(plays) {
+  if (!plays || !Array.isArray(plays) || plays.length === 0) return '';
+
+  const phaseColor = (n) => {
+    // Warm -> cool progression: phase 1 is warmest (green), phase 5 is coolest (blue/purple)
+    const colors = {
+      1: ['rgba(74, 222, 128, 0.15)', 'var(--good)'],
+      2: ['rgba(74, 158, 255, 0.15)', 'var(--blue)'],
+      3: ['rgba(255, 183, 77, 0.15)', 'var(--warn)'],
+      4: ['rgba(139, 92, 246, 0.15)', '#a78bfa'],
+      5: ['rgba(148, 163, 184, 0.15)', '#94a3b8'],
+    };
+    return colors[n] || ['rgba(139,155,179,0.12)', 'var(--text-dim)'];
+  };
+
+  const phases = plays.map((p, i) => {
+    const [bg, fg] = phaseColor(p.phase);
+    const isLast = i === plays.length - 1;
+    return `
+      <div style="position: relative; padding-left: 3rem; padding-bottom: ${isLast ? '0' : '1.75rem'};">
+        ${!isLast ? `<div style="position: absolute; left: 1.05rem; top: 2.6rem; bottom: 0; width: 2px; background: var(--border);"></div>` : ''}
+        <div style="position: absolute; left: 0; top: 0.25rem; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: ${bg}; color: ${fg}; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; border: 2px solid var(--border);">${p.phase || '•'}</div>
+        <div style="margin-bottom: 0.5rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="font-weight: 700; font-size: 1.02rem; color: var(--text);">${escapeHtml(p.name || `Phase ${p.phase}`)}</div>
+          <span style="display: inline-block; padding: 0.18rem 0.5rem; background: var(--bg-elev); color: var(--text-mute); border-radius: 4px; font-size: 0.72rem; font-family: var(--font-mono); font-weight: 600;">${escapeHtml(p.days || '')}</span>
+          ${p.expected_response_rate ? `<span style="display: inline-block; padding: 0.18rem 0.5rem; background: ${bg}; color: ${fg}; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">${escapeHtml(p.expected_response_rate)} response</span>` : ''}
+        </div>
+        ${(p.channels || []).length ? `
+          <div style="margin: 0.5rem 0 0.6rem 0; display: flex; flex-wrap: wrap; gap: 0.35rem;">
+            ${(p.channels || []).map(c => `<span style="display: inline-block; padding: 0.22rem 0.55rem; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; font-size: 0.78rem; color: var(--text-dim);">${escapeHtml(c)}</span>`).join('')}
+          </div>
+        ` : ''}
+        ${p.message_style ? `
+          <div style="margin-top: 0.55rem;">
+            <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; font-weight: 700;">Voice & angle</div>
+            <div style="color: var(--text-dim); font-size: 0.9rem; line-height: 1.55;">${escapeHtml(p.message_style)}</div>
+          </div>
+        ` : ''}
+        ${p.first_move ? `
+          <div style="margin-top: 0.7rem;">
+            <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; font-weight: 700;">Day 1 of this phase</div>
+            <div style="padding: 0.6rem 0.8rem; background: var(--bg-elev); border-left: 3px solid ${fg}; border-radius: 4px; color: var(--text); font-size: 0.9rem; line-height: 1.6;">${escapeHtml(p.first_move)}</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <section class="card">
+      <div class="card-label">Sequenced play</div>
+      <h2 class="card-title">How a grandmaster runs this over 21 days</h2>
+      <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.92rem;">
+        Most searches fail because recruiters blast LinkedIn on day 1 and hope.
+        A grandmaster sequences: warmest channels first, broader cold outreach
+        mid-week, unconventional venues next, back-channels last. Each phase
+        has different expected response rates and a different message voice.
+      </p>
+      ${phases}
+    </section>
+  `;
+}
+
 function renderNotesCard(notes) {
   if (!notes || typeof notes !== 'object') return '';
   const entries = Object.entries(notes).filter(([k, v]) => v && typeof v === 'string');
