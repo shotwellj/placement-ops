@@ -1223,7 +1223,17 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"[ai-parse] {type(e).__name__}: {str(e)[:300]}")
+        # ReadTimeout, ConnectError, etc. — the AI provider didn't respond in time.
+        # Surface a user-friendly message instead of the raw exception class name.
+        etype = type(e).__name__
+        prompt_len = len(JD_PARSER_PROMPT.format(jd=req.jd_text))
+        print(f"[ai-parse FAIL] type={etype} prompt_len={prompt_len} jd_len={len(req.jd_text)} err={str(e)[:200]}")
+        if "Timeout" in etype or "ConnectError" in etype:
+            raise HTTPException(
+                503,
+                "The AI provider is slow or unreachable right now. Please try again in a moment.",
+            )
+        raise HTTPException(500, f"[ai-parse] {etype}: {str(e)[:300]}")
 
     # Step 2: JSON-parse the AI response
     try:
@@ -1244,7 +1254,14 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"[ai-bool] {type(e).__name__}: {str(e)[:300]}")
+        etype = type(e).__name__
+        print(f"[ai-bool FAIL] type={etype} parsed_keys={list(parsed.keys())[:5]} err={str(e)[:200]}")
+        if "Timeout" in etype or "ConnectError" in etype:
+            raise HTTPException(
+                503,
+                "The AI provider is slow or unreachable right now. Please try again in a moment.",
+            )
+        raise HTTPException(500, f"[ai-bool] {etype}: {str(e)[:300]}")
 
     # Step 4: save to DB + compliance records
     try:
