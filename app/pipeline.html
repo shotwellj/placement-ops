@@ -127,6 +127,43 @@
   .assess-status.missing, .assess-status.unclear { background: rgba(255,107,107,0.15); color: var(--danger); }
   .assess-text { font-size: 0.88rem; }
   .assess-evidence { color: var(--text-dim); font-size: 0.8rem; margin-top: 0.2rem; }
+
+  /* Stage transition controls (Phase B1 calibration UI) */
+  .stage-bar {
+    display: flex; gap: 0.4rem; flex-wrap: wrap;
+    padding: 0.75rem; background: rgba(61, 217, 214, 0.05);
+    border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+  .stage-bar-label {
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-mute); font-weight: 600; align-self: center;
+    margin-right: 0.4rem;
+  }
+  .stage-btn {
+    padding: 0.35rem 0.7rem; font-size: 0.82rem; font-weight: 500;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-dim); border-radius: 6px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .stage-btn:hover:not(:disabled) {
+    border-color: var(--accent); color: var(--text);
+  }
+  .stage-btn.active {
+    background: var(--accent); color: #0b1220;
+    border-color: var(--accent); font-weight: 600;
+  }
+  .stage-btn.placed { background: rgba(74,222,128,0.15); color: var(--good); border-color: var(--good); }
+  .stage-btn.placed.active { background: var(--good); color: #0b1220; }
+  .stage-btn.rejected { background: rgba(255,107,107,0.08); color: var(--danger); border-color: var(--danger); }
+  .stage-btn.rejected.active { background: var(--danger); color: white; }
+  .stage-btn:disabled { opacity: 0.5; cursor: wait; }
+  .stage-feedback {
+    padding: 0.6rem 0.75rem; margin-top: 0.5rem; border-radius: 6px;
+    font-size: 0.85rem; background: rgba(61, 217, 214, 0.08);
+    border: 1px solid var(--border);
+  }
+  .stage-feedback.err { background: rgba(255,107,107,0.08); color: var(--danger); }
 </style>
 </head>
 <body>
@@ -539,6 +576,71 @@ function scoreClass(s) {
   return 'low';
 }
 
+const STAGES = [
+  {key: 'submitted',    label: 'Submitted'},
+  {key: 'phone_screen', label: 'Phone'},
+  {key: 'onsite',       label: 'Onsite'},
+  {key: 'offer',        label: 'Offer'},
+  {key: 'placed',       label: 'Placed',   cls: 'placed'},
+  {key: 'rejected',     label: 'Rejected', cls: 'rejected'},
+];
+
+function renderStageBar(submissionId, currentStage) {
+  const cur = currentStage || 'submitted';
+  const buttons = STAGES.map(st => {
+    const isActive = st.key === cur;
+    const clsParts = ['stage-btn'];
+    if (st.cls) clsParts.push(st.cls);
+    if (isActive) clsParts.push('active');
+    return `<button class="${clsParts.join(' ')}" data-stage="${st.key}" data-sub="${escapeHtml(submissionId)}" onclick="event.stopPropagation(); changeStage('${escapeHtml(submissionId)}', '${st.key}', this)">${escapeHtml(st.label)}</button>`;
+  }).join('');
+  return `
+    <div class="stage-bar">
+      <span class="stage-bar-label">Stage</span>
+      ${buttons}
+      <div id="stage-feedback-${escapeHtml(submissionId)}" style="width: 100%; display: none;"></div>
+    </div>
+  `;
+}
+
+async function changeStage(submissionId, newStage, btnEl) {
+  const bar = btnEl.parentElement;
+  const feedbackEl = document.getElementById(`stage-feedback-${submissionId}`);
+  // Disable all buttons while in flight
+  bar.querySelectorAll('.stage-btn').forEach(b => b.disabled = true);
+  feedbackEl.style.display = 'none';
+
+  try {
+    const result = await api(`/submissions/${encodeURIComponent(submissionId)}/stage`, {
+      method: 'POST',
+      body: JSON.stringify({stage: newStage}),
+    });
+    // Update button highlighting
+    bar.querySelectorAll('.stage-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.stage === newStage);
+    });
+    // Show feedback
+    const msg = [];
+    msg.push(`Stage updated: ${result.from_stage} -> ${result.to_stage}`);
+    if (result.calibration_signal !== 0) {
+      const sign = result.calibration_signal > 0 ? '+' : '';
+      msg.push(`Signal ${sign}${result.calibration_signal}`);
+    }
+    if (result.calibration_run) {
+      msg.push(`${result.calibration_run.pairs_updated} adjacency pair(s) updated`);
+    }
+    feedbackEl.className = 'stage-feedback';
+    feedbackEl.textContent = msg.join(' · ');
+    feedbackEl.style.display = 'block';
+  } catch (e) {
+    feedbackEl.className = 'stage-feedback err';
+    feedbackEl.textContent = `Could not update stage: ${e.message}`;
+    feedbackEl.style.display = 'block';
+  } finally {
+    bar.querySelectorAll('.stage-btn').forEach(b => b.disabled = false);
+  }
+}
+
 function renderSubmissionRow(s) {
   const e = s.evaluation || {};
   const renderAssess = (list) => (list || []).map(b => `
@@ -572,6 +674,7 @@ function renderSubmissionRow(s) {
         <div style="color: var(--text-mute);">▾</div>
       </div>
       <div class="sub-detail">
+        ${renderStageBar(s.id, s.stage)}
         ${e.headline ? `<div class="sub-section"><div class="sub-section-title">Headline</div><div style="font-size: 0.95rem;">${escapeHtml(e.headline)}</div></div>` : ''}
         ${e.summary ? `<div class="sub-section"><div class="sub-section-title">Summary</div><div style="font-size: 0.9rem; color: var(--text-dim);">${escapeHtml(e.summary)}</div></div>` : ''}
         ${blockerList ? `<div class="sub-section"><div class="sub-section-title">Blocker assessment</div><ul class="assess-list">${blockerList}</ul></div>` : ''}

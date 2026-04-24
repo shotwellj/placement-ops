@@ -153,15 +153,14 @@ async def _load_pair_sample_count(client, skill_a: str, skill_b: str) -> int:
     We read from adjacency_history. If no history exists, count is 0 and the
     weight came from the taxonomy seed.
     """
-    rows = await client.execute(
+    rs = await client.execute(
         """SELECT COUNT(*) FROM adjacency_history
            WHERE (skill_id = ? AND adjacent_id = ?)
               OR (skill_id = ? AND adjacent_id = ?)""",
         [skill_a, skill_b, skill_b, skill_a],
     )
-    # rows is [[count]] — unwrap
-    if rows and rows[0]:
-        return int(rows[0][0] or 0)
+    if rs.rows and rs.rows[0]:
+        return int(rs.rows[0][0] or 0)
     return 0
 
 
@@ -171,13 +170,13 @@ async def _load_current_weight(client, skill_a: str, skill_b: str) -> tuple[floa
     If no row exists in skill_adjacencies, returns (0.0, 'taxonomy') which
     is the starting point for a previously-unrelated pair.
     """
-    rows = await client.execute(
+    rs = await client.execute(
         """SELECT weight, source FROM skill_adjacencies
            WHERE skill_id = ? AND adjacent_id = ?""",
         [skill_a, skill_b],
     )
-    if rows and rows[0]:
-        return (float(rows[0][0]), str(rows[0][1]))
+    if rs.rows and rs.rows[0]:
+        return (float(rs.rows[0][0]), str(rs.rows[0][1]))
     return (0.0, "taxonomy")
 
 
@@ -199,7 +198,7 @@ async def _write_adjacency(
             "SELECT id FROM skill_adjacencies WHERE skill_id = ? AND adjacent_id = ?",
             [a, b],
         )
-        if existing and existing[0]:
+        if existing.rows and existing.rows[0]:
             await client.execute(
                 f"UPDATE skill_adjacencies SET weight = ?, source = ?, "
                 f"updated_at = {now_sql} WHERE skill_id = ? AND adjacent_id = ?",
@@ -253,7 +252,7 @@ async def run_calibration(
         [run_id, triggered_by_user_id, BASE_LEARNING_RATE, notes],
     )
 
-    events = await client.execute(
+    events_rs = await client.execute(
         """SELECT id, submission_id, req_id, from_stage, to_stage, event_weight
            FROM calibration_events
            WHERE processed = 0 AND event_weight != 0.0
@@ -263,7 +262,7 @@ async def run_calibration(
     pairs_updated = 0
     events_processed = 0
 
-    for ev in (events or []):
+    for ev in (events_rs.rows or []):
         event_id, submission_id, req_id, from_stage, to_stage, signal = ev
         signal = float(signal or 0.0)
         if signal == 0.0:
@@ -271,33 +270,33 @@ async def run_calibration(
             continue
 
         # Resolve candidate_id from submission
-        sub_row = await client.execute(
+        sub_rs = await client.execute(
             "SELECT candidate_id, req_id FROM submissions WHERE id = ?",
             [submission_id],
         )
-        if not sub_row or not sub_row[0]:
+        if not sub_rs.rows or not sub_rs.rows[0]:
             continue
-        candidate_id = sub_row[0][0]
+        candidate_id = sub_rs.rows[0][0]
         # Prefer denormalized req_id from the event; fall back to submission's
-        effective_req_id = req_id or sub_row[0][1]
+        effective_req_id = req_id or sub_rs.rows[0][1]
         if not effective_req_id:
             continue
 
         # Load candidate's resolved skills
-        cand_rows = await client.execute(
+        cand_rs = await client.execute(
             """SELECT DISTINCT skill_id FROM candidate_skills
                WHERE candidate_id = ? AND skill_id IS NOT NULL""",
             [candidate_id],
         )
-        cand_skills = [r[0] for r in (cand_rows or []) if r and r[0]]
+        cand_skills = [r[0] for r in (cand_rs.rows or []) if r and r[0]]
 
         # Load req's resolved skills
-        req_rows = await client.execute(
+        req_rs = await client.execute(
             """SELECT DISTINCT skill_id FROM req_skills
                WHERE req_id = ? AND skill_id IS NOT NULL""",
             [effective_req_id],
         )
-        req_skills = [r[0] for r in (req_rows or []) if r and r[0]]
+        req_skills = [r[0] for r in (req_rs.rows or []) if r and r[0]]
 
         # Update every (candidate_skill, req_skill) pair where they differ
         for cs in cand_skills:

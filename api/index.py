@@ -31,6 +31,13 @@ from api._compliance import (
     write_req_skills,
     write_candidate_skills,
 )
+from api._calibration import (
+    record_calibration_event,
+    run_calibration,
+    signal_for_transition,
+    STAGE_SIGNALS,
+    REJECT_SIGNALS,
+)
 
 # Optional deps (graceful if missing so demos still deploy)
 # Turso access is via HTTP (see _TursoHTTPClient below), no native libsql dep needed
@@ -1680,3 +1687,157 @@ async def get_req(req_id: str, user: dict = Depends(get_current_user)):
             "boolean_strings": json.loads(r[4]) if r[4] else None,
             "status": r[5], "opened_at": r[6], "org_name": r[7],
         }
+
+
+# ============================================================
+# PHASE B1 — Pipeline stage transitions + calibration
+# ============================================================
+# POST /api/submissions/{id}/stage
+#   Recruiter updates a submission's stage. Side effects:
+#     1. submissions.stage (+ placed_at / rejected_at if applicable)
+#     2. calibration_events row (processed=0)
+#     3. audit_events row (extends HMAC chain)
+#     4. Auto-trigger run_calibration if there are unprocessed events
+#        (this means a single click will process THIS event AND any
+#         prior unprocessed events, keeping the math fresh without
+#         requiring a separate admin batch run)
+#
+# POST /api/calibration/run
+#   Admin-triggered batch replay. Useful for backfilling events
+#   that were recorded but not calibrated (e.g. if auto-trigger
+#   was ever disabled), and for dev/debugging.
+# ============================================================
+
+ALLOWED_STAGES = {
+    "submitted", "phone_screen", "onsite", "offer",
+    "placed", "rejected", "withdrew",
+}
+
+
+@app.post("/api/submissions/{submission_id}/stage")
+async def update_submission_stage(
+    submission_id: str,
+    payload: dict,
+    user: dict = Depends(get_current_user),
+):
+    """Update the stage of a candidate submission and record the
+    calibration signal. The recruiter's one-click action is the
+    whole ground truth for Phase B1 learning.
+    """
+    new_stage = (payload or {}).get("stage")
+    reason = (payload or {}).get("reason")  # optional free-text
+
+    if not new_stage or new_stage not in ALLOWED_STAGES:
+        raise HTTPException(
+            400,
+            f"stage must be one of: {sorted(ALLOWED_STAGES)}",
+        )
+
+    async with db() as client:
+        # 1. Load the submission + ownership check via req.user_id
+        rs = await client.execute(
+            """SELECT s.id, s.stage, s.req_id, s.candidate_id, r.user_id
+               FROM submissions s
+               JOIN requisitions r ON s.req_id = r.id
+               WHERE s.id = ?""",
+            [submission_id],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Submission not found")
+        _, current_stage, req_id, candidate_id, owner_id = rs.rows[0]
+        if owner_id != user["id"]:
+            raise HTTPException(403, "Not your submission")
+
+        from_stage = current_stage or "submitted"
+
+        # 2. Update the submission — set placed_at/rejected_at appropriately
+        if new_stage == "placed":
+            await client.execute(
+                "UPDATE submissions SET stage = ?, placed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                [new_stage, submission_id],
+            )
+        elif new_stage == "rejected":
+            await client.execute(
+                "UPDATE submissions SET stage = ?, rejected_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                [new_stage, submission_id],
+            )
+        else:
+            await client.execute(
+                "UPDATE submissions SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                [new_stage, submission_id],
+            )
+
+        # 3. Compliance — every stage change is a decision that will
+        #    feed the learning loop. Must be audited.
+        signal = signal_for_transition(from_stage, new_stage)
+        try:
+            ae_id = await write_audit_event(
+                client,
+                event_type="recruiter_action",
+                action="submission_stage_change",
+                actor_user_id=user["id"],
+                entity_type="submission",
+                entity_id=submission_id,
+                inputs={"from_stage": from_stage, "to_stage": new_stage},
+                outputs={"calibration_signal": signal},
+                model_version_id=None,
+            )
+        except Exception as audit_err:
+            # Non-fatal — the state change already committed. Log and continue.
+            print(f"[calibration] audit write failed: {audit_err!r}")
+            ae_id = None
+
+        # 4. Record calibration event (processed=0)
+        event_id = None
+        if signal != 0.0:
+            try:
+                event_id = await record_calibration_event(
+                    client,
+                    user_id=user["id"],
+                    submission_id=submission_id,
+                    req_id=req_id,
+                    from_stage=from_stage,
+                    to_stage=new_stage,
+                    reason=reason,
+                    audit_event_id=ae_id,
+                )
+            except Exception as calib_err:
+                print(f"[calibration] event insert failed: {calib_err!r}")
+
+        # 5. Auto-run calibration to keep weights fresh.
+        #    Processes THIS event + any prior unprocessed ones atomically.
+        run_summary = None
+        if event_id:
+            try:
+                run_summary = await run_calibration(
+                    client,
+                    triggered_by_user_id=user["id"],
+                    notes=f"auto-trigger from stage change {submission_id[:8]}",
+                )
+            except Exception as run_err:
+                print(f"[calibration] auto-run failed: {run_err!r}")
+
+    return {
+        "submission_id": submission_id,
+        "from_stage": from_stage,
+        "to_stage": new_stage,
+        "calibration_signal": signal,
+        "calibration_event_id": event_id,
+        "calibration_run": run_summary,
+    }
+
+
+@app.post("/api/calibration/run")
+async def trigger_calibration_run(user: dict = Depends(get_current_user)):
+    """Admin/dev-triggered batch. Processes every unprocessed
+    calibration_event in chronological order. Returns the run
+    summary (run_id, events_processed, pairs_updated).
+    Safe to call when nothing is pending — returns a no-op run.
+    """
+    async with db() as client:
+        summary = await run_calibration(
+            client,
+            triggered_by_user_id=user["id"],
+            notes="manual_batch_run",
+        )
+    return summary
