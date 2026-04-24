@@ -783,8 +783,9 @@ For each watering hole, give:
   - signal: what kind of candidate signal you find there in 1 sentence
     ("Linux kernel maintainers — Signed-off-by tags = professional-grade
     upstream contribution")
-  - how_to_use: 1 sentence on how to actually source from this venue
-    ("X-ray with 'Signed-off-by' AND 'embedded' OR 'arm'")
+  - how_to_use: 1 sentence on how to actually source from this venue.
+    Use Google X-ray syntax with DOUBLE quotes and no literal AND:
+    ("X-ray: site:lore.kernel.org \"Signed-off-by:\" \"embedded\" (\"arm\" OR \"aarch64\")")
 
 Aim for 5-8 watering holes. Span at least 3 venue_types. Skip generic
 catch-alls like "LinkedIn" or "Indeed" — those are already in the X-ray
@@ -876,7 +877,7 @@ Return ONLY valid JSON with this shape:
       "venue": "lore.kernel.org",
       "venue_type": "mailing_list",
       "signal": "Linux kernel maintainers — Signed-off-by tags signal professional-grade upstream contribution",
-      "how_to_use": "X-ray with site:lore.kernel.org 'Signed-off-by:' AND 'embedded' AND 'arm'"
+      "how_to_use": "X-ray: site:lore.kernel.org \"Signed-off-by:\" \"embedded\" \"arm\""
     }}
   ]
 }}
@@ -902,7 +903,18 @@ X-ray searches are the universal sourcer's weapon. They find candidates who:
 Use REAL technology names from the parsed JD (Verilog not "HDL", PyTorch not "ML framework").
 Use proper Google syntax for X-ray: site:, intitle:, in:bio, in:readme, OR, AND, quoted phrases.
 
-Return ONLY valid JSON:
+Return ONLY valid JSON. CRITICAL SYNTAX NOTES before the schema:
+  - Every phrase in an X-ray string MUST be wrapped in escaped double quotes (\"...\")
+    not single quotes. Single quotes are treated as apostrophes by Google and
+    return garbage. JSON requires double quotes to be escaped: \"embedded linux\".
+  - Do NOT write the word AND between terms in X-ray strings. Google treats a
+    SPACE as AND implicitly. Writing the literal word "AND" makes Google search
+    for pages containing the word AND itself, which kills your results.
+  - DO write OR (uppercase) between alternatives, always inside parentheses:
+    (\"BSP\" OR \"board support package\")
+  - LinkedIn Recruiter strings are the exception — they use single quotes and
+    accept the AND keyword. Keep LR and X-ray syntax strictly separated.
+
 {{
   "linkedin_recruiter": {{
     "sniper": "tightest possible, 3-5 must-have terms, expect <100 results",
@@ -910,13 +922,13 @@ Return ONLY valid JSON:
     "expanded": "broader recall with adjacent skills, ~200-1000 results"
   }},
   "xray": {{
-    "linkedin": "site:linkedin.com/in/ ... — find LinkedIn profiles via Google",
-    "github": "site:github.com ... — use in:bio, in:readme, language: where useful",
-    "twitter": "(site:twitter.com OR site:x.com) ... — find practitioners talking publicly",
-    "stackoverflow": "site:stackoverflow.com/users ... — active answerers in [tags]",
-    "conferences": "(site:youtube.com OR site:slideshare.net) ... 'speaker' OR 'talk' — speakers/presenters",
-    "personal_sites": "(intitle:resume OR intitle:CV OR intitle:portfolio) ... -site:linkedin.com -site:indeed.com",
-    "specialty": "site:huggingface.co OR site:kaggle.com OR site:devpost.com ... — domain-specific platforms"
+    "linkedin": "site:linkedin.com/in/ \"Senior Embedded Linux Engineer\" (\"BSP\" OR \"device driver\") \"San Diego\"",
+    "github": "site:github.com (\"Yocto\" OR \"meta-layer\") \"embedded linux\" \"device driver\"",
+    "medium": "site:medium.com (\"embedded linux\" OR \"kernel driver\") (\"tutorial\" OR \"deep dive\")",
+    "stackoverflow": "site:stackoverflow.com/users \"embedded\" \"[linux-kernel]\" \"[device-driver]\"",
+    "conferences": "(site:youtube.com OR site:slideshare.net) \"Embedded World\" \"device driver\"",
+    "personal_sites": "(intitle:resume OR intitle:CV) \"embedded linux\" \"C++\" -site:linkedin.com -site:indeed.com",
+    "specialty": "site:lore.kernel.org \"Signed-off-by:\" \"embedded\" \"driver\""
   }},
   "company_clusters": {{
     "tier_1_direct_competitors": ["Company1", "Company2", "Company3"],
@@ -932,7 +944,7 @@ Return ONLY valid JSON:
 Rules:
 - No em dashes anywhere
 - LR strings use LR syntax (title:, location:, current_company:)
-- X-ray strings use Google syntax (site:, intitle:, OR, AND, quoted phrases)
+- X-ray strings use Google syntax: site:, intitle:, -site: (exclusion), OR (uppercase), double-quoted phrases. DO NOT write the literal word AND — a space is already an implicit AND on Google and writing AND makes Google search for the word "AND" itself.
 - Tier 1 = same product/market as the hiring company
 - Tier 2 = adjacent industry/skill overlap
 - NEVER include the hiring company itself in tier_1 or tier_2. The hiring company
@@ -943,16 +955,32 @@ Rules:
 
 X-RAY SEARCH CONSTRAINTS (these strings must actually run on Google, not just look smart):
 
-1. MAX 3 AND CLAUSES per string. Google's ranking collapses past 3 ANDs.
+0. DOUBLE QUOTES ONLY AROUND PHRASES. Single quotes (apostrophes) are IGNORED
+   by Google — they do nothing. Every multi-word phrase in an X-ray MUST be
+   wrapped in double quotes. Because these strings are going into a JSON string
+   field, escape them as \"...\". Example of the WRONG pattern:
+     site:linkedin.com/in/ 'Senior Embedded Linux Engineer' AND 'BSP'
+   Example of the RIGHT pattern:
+     site:linkedin.com/in/ \"Senior Embedded Linux Engineer\" \"BSP\"
+
+0a. NO LITERAL AND BETWEEN TERMS. A space is already an implicit AND on
+    Google. Writing the word AND makes Google search for pages containing
+    the literal word "AND" — killing your string. OR (uppercase) IS required
+    between alternatives, always inside parentheses.
+
+1. MAX 3 SPACE-SEPARATED SIGNALS per string. Google's ranking collapses past 3.
    If you have 5 signals you want, pick the 3 highest-specificity ones and
    drop the rest. More ANDs = fewer results = weaker string.
 
-2. ONLY use real Google operators. Whitelist:
-     site:, intitle:, inurl:, in:bio, in:readme, language:, filetype:, -site:
-   FORBIDDEN (these look real but Google ignores them, making your string
+2. ONLY use real Google X-ray operators. Whitelist:
+     site:, intitle:, inurl:, filetype:, -site:, OR (uppercase), \"...\" (quoted phrase)
+   FORBIDDEN in X-ray (these look real but Google ignores them, making your string
    return garbage or zero results):
-     project:, score:, answers:, experience:, years:, company:, current_company:
-   (current_company: works in LinkedIn Recruiter ONLY, not in X-ray.)
+     project:, score:, answers:, experience:, years:, company:, current_company:,
+     language:, in:bio, in:readme, in:name
+   The last four (language:, in:bio, in:readme, in:name) work inside GitHub's
+   native search at github.com/search but NOT through a Google site: query.
+   current_company: works in LinkedIn Recruiter ONLY, not in X-ray.
 
 3. NEVER quote single letters. "C" matches every profile with any "c" word.
    If the JD wants C programming, write one of these instead:
