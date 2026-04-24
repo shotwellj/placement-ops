@@ -737,6 +737,39 @@ Do NOT use base_min, base_max, total_comp_min, total_comp_max, or any numeric fi
 Do NOT nest objects inside comp_snapshot. All four values are flat strings.
 If you cannot estimate comp, still return strings (e.g. base_range: "Unknown - market dependent").
 
+CRITICAL RULES FOR alt_titles:
+This is what separates a junior sourcer from a senior one. Your job is to
+expand the searchable surface beyond the literal job title.
+
+Three dimensions, all required:
+
+  level_progression — same role at different IC levels. If the JD is for
+    a "Senior Backend Engineer", give the actual titles peer companies use
+    at junior, mid, senior, and staff_plus levels. Real titles, not generic
+    ones. "L4 Software Engineer" is fine if that's what FAANG uses. Aim for
+    2-4 titles per level. Reflect title inflation — "Staff Engineer" at a
+    50-person Series B is doing what "Senior" does at FAANG; capture both.
+
+  functional_aliases — what the SAME PERSON is called at peer companies
+    that name the role differently. A Backend Engineer at a startup is a
+    Platform Engineer at infra-heavy shops, a Distributed Systems Engineer
+    at scale companies, an Infrastructure Engineer at cloud-native shops.
+    Give 3-6 functional aliases with one-line rationale per alias. These
+    are pure title-naming differences for the same skill profile.
+
+  adjacent_crossover — DIFFERENT roles where the same person could shift.
+    A Site Reliability Engineer with strong systems chops can take a
+    Backend Engineer role; a senior Data Engineer can often shift to
+    Platform Engineer; etc. Give 3-5 adjacent titles with rationale on
+    why the crossover works AND a transition_difficulty rating
+    ("easy" if 70%+ of skills overlap, "moderate" if 40-70%, "hard" if
+    25-40%). Skip anything below 25% overlap. These are POACHING
+    candidates the recruiter wouldn't have searched for.
+
+The whole point: a recruiter searching only for "Senior Backend Engineer"
+misses 60% of qualified candidates who hold one of these alternative titles.
+Your alt_titles output is the broader search universe.
+
 Return ONLY valid JSON with this shape:
 {{
   "core": {{
@@ -759,7 +792,21 @@ Return ONLY valid JSON with this shape:
   ],
   "nice_to_have_skills": [{{"skill": "...", "rationale": "..."}}],
   "transferable_skill_clusters": [{{"cluster_name": "...", "variants": [], "adjacent_skills": []}}],
-  "alt_titles": {{"ic_junior": [], "ic_mid": [], "ic_senior": [], "ic_staff_plus": []}},
+  "alt_titles": {{
+    "level_progression": {{
+      "ic_junior": ["title at junior level"],
+      "ic_mid": ["title at mid level"],
+      "ic_senior": ["title at senior level"],
+      "ic_staff_plus": ["title at staff/principal level"]
+    }},
+    "functional_aliases": [
+      {{"title": "Platform Engineer", "rationale": "what infra-heavy shops call backend engineers"}},
+      {{"title": "Distributed Systems Engineer", "rationale": "what scale-focused companies call this same person"}}
+    ],
+    "adjacent_crossover": [
+      {{"title": "Site Reliability Engineer", "rationale": "SREs at scale companies often have the systems chops to make this jump", "transition_difficulty": "easy|moderate|hard"}}
+    ]
+  }},
   "comp_snapshot": {{
     "base_range": "$XXXk - $XXXk",
     "total_comp_range": "$XXXk - $XXXk (incl. equity/bonus)",
