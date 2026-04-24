@@ -1,0 +1,141 @@
+# ============================================================
+# SourcingNav — Automotive & Mobility Software
+# ============================================================
+# Covers functional safety, automotive software architecture,
+# vehicle networking, and ADAS/autonomous driving stacks.
+# Applies to Tier 1 suppliers (Bosch, Continental, ZF),
+# OEMs (Ford, GM, Toyota, Volkswagen, Stellantis, Rivian,
+# Lucid, Tesla), and autonomous driving companies (Waymo,
+# Cruise, Aurora, Motional, Zoox, Mobileye).
+# ============================================================
+
+# -----------------------------------------------
+# FUNCTIONAL SAFETY & AUTOMOTIVE STANDARDS
+# -----------------------------------------------
+functional_safety:
+  - name: ISO 26262
+    aliases: [iso26262, automotive functional safety, road vehicle functional safety]
+    adjacent: [ASIL, ASPICE, MISRA C]
+    weight: high
+
+  - name: ASIL
+    aliases: [asil a, asil b, asil c, asil d, automotive safety integrity level]
+    adjacent: [ISO 26262, ASPICE]
+    weight: medium
+
+  - name: ASPICE
+    aliases: [automotive spice, automotive software process improvement]
+    adjacent: [ISO 26262, AUTOSAR]
+    weight: medium
+
+  - name: MISRA C
+    aliases: [misra c++, misra, misra-c]
+    adjacent: [ISO 26262, Embedded C]
+    weight: medium
+
+  - name: ISO 21434
+    aliases: [iso21434, automotive cybersecurity, road vehicle cybersecurity]
+    adjacent: [ISO 26262, Automotive Cybersecurity]
+    weight: medium
+
+# -----------------------------------------------
+# AUTOMOTIVE SOFTWARE ARCHITECTURE
+# -----------------------------------------------
+autosar:
+  - name: AUTOSAR
+    aliases: [autosar classic, autosar adaptive, autosar architecture]
+    adjacent: [ISO 26262, Vehicle OS, Embedded Firmware]
+    weight: high
+
+  - name: AUTOSAR Classic
+    aliases: [autosar classic platform, classic autosar]
+    adjacent: [AUTOSAR, CAN bus, ISO 26262]
+    weight: medium
+
+  - name: AUTOSAR Adaptive
+    aliases: [autosar adaptive platform, adaptive autosar]
+    adjacent: [AUTOSAR, Vehicle OS, C++]
+    weight: medium
+
+  - name: Vehicle OS
+    aliases: [vehicle operating system, software-defined vehicle, sdv, automotive os]
+    adjacent: [AUTOSAR Adaptive, OTA Updates]
+    weight: medium
+
+  - name: OTA Updates
+    aliases: [over-the-air updates, firmware ota, vehicle software updates]
+    adjacent: [Vehicle OS, Embedded Firmware]
+    weight: medium
+
+# -----------------------------------------------
+# VEHICLE NETWORKING
+# -----------------------------------------------
+vehicle_networking:
+  - name: CAN bus
+    aliases: [can, controller area network, can fd, canfd]
+    adjacent: [LIN bus, FlexRay, AUTOSAR]
+    weight: high
+
+  - name: LIN bus
+    aliases: [lin, local interconnect network]
+    adjacent: [CAN bus, FlexRay]
+    weight: low
+
+  - name: FlexRay
+    aliases: [flex ray, flexray protocol]
+    adjacent: [CAN bus, AUTOSAR]
+    weight: low
+
+  - name: Automotive Ethernet
+    aliases: [automotive ethernet avb, automotive ethernet tsn, 100base-t1, 1000base-t1]
+    adjacent: [CAN bus, V2X, AUTOSAR Adaptive]
+    weight: medium
+
+  - name: V2X
+    aliases: [v2x communication, c-v2x, dsrc, vehicle to everything]
+    adjacent: [Automotive Ethernet, 5G]
+    weight: low
+
+# -----------------------------------------------
+# ADAS & AUTONOMOUS DRIVING
+# -----------------------------------------------
+adas_av:
+  - name: ADAS
+    aliases: [advanced driver assistance systems, adas software, driver assist]
+    adjacent: [Sensor Fusion, LiDAR, Computer Vision]
+    weight: high
+
+  - name: Autonomous Driving
+    aliases: [self-driving, av software, autonomous vehicles, l4 av, l5 av]
+    adjacent: [ADAS, Sensor Fusion, Motion Planning, Perception]
+    weight: high
+
+  - name: Sensor Fusion
+    aliases: [sensor integration, multi-sensor fusion, kalman filter]
+    adjacent: [ADAS, Autonomous Driving, LiDAR, Radar]
+    weight: high
+
+  - name: LiDAR
+    aliases: [lidar processing, lidar point cloud, 3d lidar]
+    adjacent: [Sensor Fusion, Perception, Autonomous Driving]
+    weight: medium
+
+  - name: Radar
+    aliases: [automotive radar, mmwave radar, imaging radar]
+    adjacent: [Sensor Fusion, ADAS]
+    weight: low
+
+  - name: Perception
+    aliases: [perception stack, perception software, 3d perception, object detection]
+    adjacent: [Computer Vision, Sensor Fusion, Autonomous Driving]
+    weight: medium
+
+  - name: Motion Planning
+    aliases: [path planning, trajectory planning, behavioral planning]
+    adjacent: [Autonomous Driving, Control Systems]
+    weight: medium
+
+  - name: Automotive Cybersecurity
+    aliases: [vehicle cybersecurity, automotive security, can bus security]
+    adjacent: [ISO 21434, OTA Updates]
+    weight: low

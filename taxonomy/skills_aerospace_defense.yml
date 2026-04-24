@@ -1,0 +1,140 @@
+# ============================================================
+# SourcingNav — Aerospace & Defense Software
+# ============================================================
+# Covers flight-certified software, avionics, defense systems,
+# space systems, and safety-critical aerospace development.
+# Applies to primes (Lockheed, Boeing, Raytheon, Northrop,
+# L3Harris, BAE), commercial space (SpaceX, Blue Origin,
+# Relativity, Anduril for defense-tech), and Tier 1 suppliers
+# (Honeywell, Collins, GE Aerospace, Rolls-Royce).
+#
+# Many of these roles require US citizenship and/or active
+# security clearance. That's not a "skill" — it's an
+# eligibility filter captured elsewhere on the req.
+# ============================================================
+
+# -----------------------------------------------
+# AEROSPACE SAFETY STANDARDS
+# -----------------------------------------------
+aerospace_standards:
+  - name: DO-178C
+    aliases: [do178c, do 178c, software considerations in airborne systems, rtca do-178c]
+    adjacent: [DAL, DO-254, ARP4754A]
+    weight: high
+
+  - name: DO-254
+    aliases: [do254, do 254, airborne electronic hardware, rtca do-254]
+    adjacent: [DO-178C, DAL, FPGA Development]
+    weight: medium
+
+  - name: ARP4754A
+    aliases: [arp 4754a, arp4754, aircraft systems development]
+    adjacent: [DO-178C, DO-254, Systems Engineering]
+    weight: medium
+
+  - name: DAL
+    aliases: [design assurance level, dal a, dal b, dal c, dal d, level a software]
+    adjacent: [DO-178C, DO-254]
+    weight: medium
+
+  - name: AS9100
+    aliases: [as 9100, aerospace quality management, as9100 certification]
+    adjacent: [DO-178C, ISO 9001]
+    weight: low
+
+  - name: ITAR
+    aliases: [itar compliance, international traffic in arms regulations, export control]
+    adjacent: [EAR, Security Clearance]
+    weight: medium
+
+  - name: EAR
+    aliases: [export administration regulations, ear compliance]
+    adjacent: [ITAR]
+    weight: low
+
+# -----------------------------------------------
+# AVIONICS & FLIGHT SYSTEMS
+# -----------------------------------------------
+avionics:
+  - name: Avionics
+    aliases: [avionics software, avionics systems, flight electronics]
+    adjacent: [DO-178C, ARINC, Flight Control Systems]
+    weight: high
+
+  - name: Flight Control Systems
+    aliases: [fcs, flight control software, fly-by-wire, autopilot software]
+    adjacent: [Avionics, GNC, DO-178C]
+    weight: high
+
+  - name: GNC
+    aliases: [guidance navigation control, gnc software, guidance and control, navigation software]
+    adjacent: [Flight Control Systems, Avionics, Control Systems]
+    weight: high
+
+  - name: ARINC
+    aliases: [arinc 429, arinc 653, arinc 664, arinc standards]
+    adjacent: [Avionics, FACE]
+    weight: medium
+
+  - name: FACE
+    aliases: [future airborne capability environment, face conformance]
+    adjacent: [ARINC, Avionics]
+    weight: low
+
+  - name: MIL-STD-1553
+    aliases: [mil-std 1553, 1553 bus, military standard 1553]
+    adjacent: [Avionics, Defense Systems]
+    weight: low
+
+  - name: IMA
+    aliases: [integrated modular avionics, ima architecture]
+    adjacent: [ARINC, Avionics]
+    weight: low
+
+# -----------------------------------------------
+# REAL-TIME OS FOR AEROSPACE/DEFENSE
+# -----------------------------------------------
+aerospace_rtos:
+  - name: VxWorks
+    aliases: [wind river vxworks, vxworks 653, vxworks rtos]
+    adjacent: [RTOS, DO-178C, Avionics]
+    weight: medium
+
+  - name: Integrity OS
+    aliases: [green hills integrity, integrity rtos, ghs integrity]
+    adjacent: [RTOS, DO-178C]
+    weight: medium
+
+  - name: LynxOS
+    aliases: [lynxos-178, lynx os, lynx software]
+    adjacent: [RTOS, DO-178C]
+    weight: low
+
+  - name: DEOS
+    aliases: [ddc-i deos, deos rtos]
+    adjacent: [RTOS, DO-178C]
+    weight: low
+
+# -----------------------------------------------
+# SPACE SYSTEMS & DEFENSE
+# -----------------------------------------------
+space_defense:
+  - name: Space Systems
+    aliases: [space flight software, spacecraft software, satellite software]
+    adjacent: [GNC, Radiation-Hardened, Avionics]
+    weight: medium
+
+  - name: Radiation-Hardened
+    aliases: [rad-hard, radiation tolerant, rad hardened]
+    adjacent: [Space Systems, ASIC Design]
+    weight: low
+
+  - name: Defense Systems
+    aliases: [defense software, weapons systems software, military systems]
+    adjacent: [MIL-STD-1553, ITAR, Security Clearance]
+    weight: medium
+
+  - name: Security Clearance
+    aliases: [secret clearance, top secret clearance, ts/sci, dod clearance]
+    adjacent: [ITAR, Defense Systems]
+    weight: medium

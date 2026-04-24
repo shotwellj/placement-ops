@@ -1,0 +1,144 @@
+# ============================================================
+# SourcingNav — Medical Device & Regulated Healthcare Software
+# ============================================================
+# Covers FDA-regulated software development, quality management,
+# validation/verification, healthcare data standards, and clinical
+# systems. Applies to medical device software (SaMD), connected
+# medical devices, EMR/EHR software, medical imaging, and any
+# healthcare tech that touches patient data or clinical decisions.
+#
+# Regulatory knowledge is modeled as "skills" here because JDs
+# conflate technical skills and regulatory knowledge. If we later
+# split these out, these entries map cleanly to a compliance
+# knowledge taxonomy.
+# ============================================================
+
+# -----------------------------------------------
+# FDA REGULATORY
+# -----------------------------------------------
+fda_regulatory:
+  - name: FDA 510(k)
+    aliases: [fda 510k, 510(k) submission, premarket notification]
+    adjacent: [FDA PMA, ISO 13485, Medical Device Software]
+    weight: high
+
+  - name: FDA PMA
+    aliases: [premarket approval, fda premarket approval]
+    adjacent: [FDA 510(k), ISO 13485, Clinical Trials Software]
+    weight: medium
+
+  - name: Design Controls
+    aliases: [21 cfr 820.30, fda design controls, design history file, dhf]
+    adjacent: [V&V, Risk Management, FDA 510(k)]
+    weight: high
+
+  - name: Medical Device Software
+    aliases: [samd, software as a medical device, saimd, regulated medical software]
+    adjacent: [FDA 510(k), IEC 62304, ISO 13485]
+    weight: high
+
+# -----------------------------------------------
+# QUALITY MANAGEMENT & STANDARDS
+# -----------------------------------------------
+quality_standards:
+  - name: ISO 13485
+    aliases: [iso13485, qms, quality management system medical]
+    adjacent: [FDA 510(k), Design Controls, IEC 62304]
+    weight: high
+
+  - name: IEC 62304
+    aliases: [iec62304, medical device software lifecycle, medical software safety classification]
+    adjacent: [ISO 13485, Medical Device Software, V&V]
+    weight: high
+
+  - name: ISO 14971
+    aliases: [iso14971, medical device risk management, risk management medical]
+    adjacent: [Risk Management, ISO 13485, Design Controls]
+    weight: medium
+
+  - name: IEC 60601
+    aliases: [iec60601, medical electrical equipment, medical electrical safety]
+    adjacent: [Medical Device Software, ISO 13485]
+    weight: low
+
+# -----------------------------------------------
+# VALIDATION & VERIFICATION
+# -----------------------------------------------
+validation:
+  - name: V&V
+    aliases: [validation and verification, verification and validation, design verification, design validation]
+    adjacent: [IEC 62304, Design Controls, IQ/OQ/PQ]
+    weight: high
+
+  - name: IQ/OQ/PQ
+    aliases: [iq oq pq, installation qualification, operational qualification, performance qualification]
+    adjacent: [V&V, GxP]
+    weight: medium
+
+  - name: GxP
+    aliases: [glp, gcp, gmp, good practice, gxp compliance]
+    adjacent: [HIPAA, 21 CFR Part 11]
+    weight: medium
+
+  - name: 21 CFR Part 11
+    aliases: [part 11, cfr part 11, electronic records electronic signatures]
+    adjacent: [GxP, HIPAA]
+    weight: medium
+
+  - name: Risk Management
+    aliases: [clinical risk management, fmea, failure mode effects analysis]
+    adjacent: [ISO 14971, V&V]
+    weight: medium
+
+# -----------------------------------------------
+# HEALTHCARE DATA STANDARDS
+# -----------------------------------------------
+data_standards:
+  - name: HL7
+    aliases: [hl7v2, health level 7]
+    adjacent: [FHIR, EMR/EHR, Clinical Data]
+    weight: medium
+
+  - name: FHIR
+    aliases: [fast healthcare interoperability resources, hl7 fhir]
+    adjacent: [HL7, EMR/EHR, Clinical Data]
+    weight: high
+
+  - name: DICOM
+    aliases: [digital imaging and communications in medicine, dicom networking]
+    adjacent: [Medical Imaging, PACS]
+    weight: medium
+
+  - name: HIPAA
+    aliases: [hipaa compliance, phi handling, protected health information]
+    adjacent: [GxP, 21 CFR Part 11]
+    weight: high
+
+# -----------------------------------------------
+# CLINICAL SYSTEMS
+# -----------------------------------------------
+clinical_systems:
+  - name: EMR/EHR
+    aliases: [emr, ehr, epic, cerner, electronic health record, electronic medical record, meditech, allscripts]
+    adjacent: [HL7, FHIR, Clinical Data]
+    weight: high
+
+  - name: PACS
+    aliases: [picture archiving and communication system, radiology information system]
+    adjacent: [DICOM, Medical Imaging]
+    weight: low
+
+  - name: Medical Imaging
+    aliases: [medical image processing, radiology software, ct reconstruction, mri reconstruction]
+    adjacent: [DICOM, PACS, AI for Healthcare]
+    weight: medium
+
+  - name: Clinical Trials Software
+    aliases: [edc, electronic data capture, ctms, clinical trial management]
+    adjacent: [GxP, FDA PMA]
+    weight: low
+
+  - name: Clinical Data
+    aliases: [clinical data management, clinical informatics, real world data]
+    adjacent: [EMR/EHR, HL7, FHIR]
+    weight: medium
