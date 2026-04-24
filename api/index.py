@@ -1248,7 +1248,28 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
 
     # Step 4: save to DB + compliance records
     try:
-        org_name = req.org_name or parsed.get("core", {}).get("company") or "Unspecified"
+        # Company override rule: JD body is source of truth. If the AI
+        # extracted a company from the JD, use it — even if the user typed
+        # something different. Users mistype. JDs don't lie about who is
+        # hiring. The override is surfaced back to the client in the
+        # response payload as `company_override` so the UI can banner it.
+        user_entered = (req.org_name or "").strip() or None
+        parsed_company = (parsed.get("core", {}).get("company") or "").strip() or None
+        company_override = None
+        if parsed_company and user_entered and parsed_company.lower() != user_entered.lower():
+            # Mismatch — the AI found a company in the JD that differs
+            # from what the user typed. Use the parsed one.
+            org_name = parsed_company
+            company_override = {
+                "user_entered": user_entered,
+                "detected_from_jd": parsed_company,
+                "reason": "JD body is the source of truth for the hiring company. "
+                          "We've used the name detected in the JD instead of what was typed.",
+            }
+        else:
+            # Priority when no conflict: parsed JD > user input > fallback
+            org_name = parsed_company or user_entered or "Unspecified"
+
         req_title = req.req_title or parsed.get("core", {}).get("role_title") or "Untitled Role"
 
         async with db() as client:
@@ -1335,6 +1356,30 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                 # Structured req_skills — THIS populates the brain's demand signal
                 await write_req_skills(client, req_id, parsed)
 
+                # Company override audit event — fires only when the AI extracted
+                # a different company from the JD than what the user typed in.
+                # Per RISK_ASSESSMENT.md §2.3, automated overrides of user input
+                # must be recorded. This lets an auditor trace why the DB org
+                # differs from what appeared in the intake form.
+                if company_override:
+                    await write_audit_event(
+                        client,
+                        event_type="system_override",
+                        action="override_user_company",
+                        actor_user_id=user["id"],
+                        entity_type="requisition",
+                        entity_id=req_id,
+                        inputs={
+                            "user_entered_company": company_override["user_entered"],
+                            "jd_length": len(req.jd_text),
+                        },
+                        outputs={
+                            "final_company": company_override["detected_from_jd"],
+                            "reason": "JD body named a different hiring company",
+                        },
+                        model_version_id=mv_id,  # same prompt that extracted the name
+                    )
+
                 # Second AI decision in the intake pipeline: Boolean string generation.
                 # Separate model_version + audit_event so the chain records WHICH
                 # version of BOOLEAN_BUILDER_PROMPT produced these strings. EU AI
@@ -1404,6 +1449,9 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         "parsed": parsed,
         "boolean_strings": booleans,
         "created_at": now,
+        # When non-null, the UI should show a banner telling the user
+        # their typed company was overridden by what the JD actually says.
+        "company_override": company_override,
     }
 
 
@@ -1679,26 +1727,6 @@ async def get_req(req_id: str, user: dict = Depends(get_current_user)):
             [req_id, user["id"]],
         )
         if not rs.rows:
-            # Diagnostic: log what we were looking for vs what exists.
-            # Temporary — will tell us whether auth resolved to wrong user,
-            # the req actually is missing, or the JOIN is failing.
-            exists_check = await client.execute(
-                "SELECT id, user_id, org_id FROM requisitions WHERE id = ?",
-                [req_id],
-            )
-            if exists_check.rows:
-                r_row = exists_check.rows[0]
-                print(f"[get_req 404] req exists but query returned 0 rows. "
-                      f"req_id={req_id!r} req.user_id={r_row[1]!r} req.org_id={r_row[2]!r} "
-                      f"auth user[id]={user['id']!r} auth user[email]={user.get('email')!r}")
-                # Check if the org exists
-                org_check = await client.execute(
-                    "SELECT id, name FROM organizations WHERE id = ?",
-                    [r_row[2]],
-                )
-                print(f"[get_req 404]   org lookup: {org_check.rows}")
-            else:
-                print(f"[get_req 404] req genuinely missing. req_id={req_id!r} auth user[id]={user['id']!r}")
             raise HTTPException(404, "Requisition not found")
         r = rs.rows[0]
         return {

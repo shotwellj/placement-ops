@@ -160,6 +160,10 @@
   </div>
 
   <div id="results" class="results">
+    <div id="companyOverrideBanner" style="display: none; background: rgba(255, 183, 77, 0.08); border: 1px solid rgba(255, 183, 77, 0.4); border-radius: 8px; padding: 0.9rem 1.1rem; margin-bottom: 1rem; font-size: 0.9rem;">
+      <div style="font-weight: 600; color: var(--warn); margin-bottom: 0.25rem;">Company updated</div>
+      <div id="companyOverrideText" style="color: var(--text-dim);"></div>
+    </div>
     <section class="card">
       <div class="card-label">Core Analysis</div>
       <h2 class="card-title" id="resultTitle">Role Summary</h2>
@@ -398,6 +402,19 @@ function renderResults(data) {
   const p = data.parsed;
   const b = data.boolean_strings;
   const core = p.core || {};
+
+  // Company override banner — shows when JD body named a different company
+  // than what the user typed in the form. Silent override with visible notice.
+  const ov = data.company_override;
+  const banner = $('companyOverrideBanner');
+  if (ov && banner) {
+    $('companyOverrideText').textContent =
+      `You entered "${ov.user_entered}" but the JD refers to "${ov.detected_from_jd}". ` +
+      `We've used "${ov.detected_from_jd}" since the JD is the source of truth for who's hiring.`;
+    banner.style.display = 'block';
+  } else if (banner) {
+    banner.style.display = 'none';
+  }
 
   $('resultTitle').textContent = `${core.role_title || 'Role'} at ${core.company || 'Unspecified'}`;
   $('coreKpis').innerHTML = `
