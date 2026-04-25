@@ -1507,17 +1507,18 @@ async def send_magic_link(
     await log_login_attempt(req.email, ip, success=False)
 
     # Step 3b: send email via Resend
-    # Sending domain send.sourcingnav.com is verified at resend.com/domains.
-    # DKIM and SPF are published on the send subdomain to keep transactional
-    # email isolated from the root domain's reputation. The from-address
-    # MUST live on the verified subdomain or Resend rejects the send.
+    # sourcingnav.com is verified at resend.com/domains. DKIM is published
+    # at resend._domainkey.sourcingnav.com (root). Resend's Improved
+    # Deliverability also installs SPF + bounce handling on the send.
+    # subdomain, but the FROM address must be on the registered root,
+    # not the send subdomain — that's internal Resend infrastructure.
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post(
                 "https://api.resend.com/emails",
                 headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
                 json={
-                    "from": "SourcingNav <hello@send.sourcingnav.com>",
+                    "from": "SourcingNav <hello@sourcingnav.com>",
                     "to": req.email,
                     "subject": "Your SourcingNav login link",
                     "html": (
