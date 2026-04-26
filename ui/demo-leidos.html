@@ -183,6 +183,10 @@
   </div>
 </div>
 
+<!-- Hidden stubs so pipeline.html script's getElementById calls don't return null -->
+<div id="listView" style="display:none"></div>
+<div id="detailView" style="display:none"></div>
+
 <main class="demo-container">
   <div id="detail" class="detail">
     <!-- renderDetail() injects here on load -->
@@ -248,6 +252,83 @@
   /* Hide list-view sidebar etc that we copied from pipeline.html */
   .pipeline-layout, .req-list, .filters { display: none !important; }
 </style>
+
+<script>
+// ============================================================
+// DEMO SETUP — runs BEFORE pipeline.html's main script
+// ============================================================
+// Pipeline.html expects: a localStorage token, an API to fetch /reqs/{id} from,
+// and #listView / #detailView elements in the DOM.
+//
+// We inject a fake token to skip the redirect, intercept fetch() to return
+// our hardcoded DEMO_DATA when the page tries to load the requisition, and
+// no-op out the parts of init() that don't apply to a public read-only page.
+//
+// This is a SURGICAL fix to make the existing pipeline.html render code
+// work on a static demo page. Long-term: rebuild as a standalone renderer.
+
+(function() {
+  // Fake auth token so the pipeline.html "if (!token)" check passes
+  if (!localStorage.getItem('sn_token')) {
+    localStorage.setItem('sn_demo_token_marker', 'true');
+    localStorage.setItem('sn_token', 'demo-readonly-no-auth');
+  }
+
+  // Hardcoded demo data — same shape the API would return
+  // (Note: we redefine this AGAIN at the end of the main script for renderDetail
+  //  but we need it here too for the fetch interceptor.)
+  // Read it from a script tag we'll add to the page.
+  window.__DEMO_REQ_DATA__ = null; // populated below
+
+  // Intercept fetch calls — pipeline.html will try to fetch /api/reqs and /api/reqs/{id}
+  const origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    const u = String(url);
+    if (u.includes('/api/reqs/') && !u.includes('/submissions') && !u.includes('/evaluate')) {
+      // Single requisition fetch — return demo data
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(window.__DEMO_REQ_DATA__),
+      });
+    }
+    if (u.includes('/api/reqs')) {
+      // Pipeline list fetch — return empty list (we hide listView anyway)
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ reqs: [] }),
+      });
+    }
+    if (u.includes('/api/auth/me') || u.includes('/api/user/me')) {
+      // Auth check — pretend we're a logged-in demo viewer
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          id: 'demo-viewer',
+          email: 'demo@viewer',
+          plan: 'free',
+          byok_configured: false,
+        }),
+      });
+    }
+    if (u.includes('/api/')) {
+      // Anything else under /api — silently return empty success
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+    }
+    // Non-API fetches go through normally
+    return origFetch.apply(this, arguments);
+  };
+
+  // Make sure URL has ?id=demo-leidos so any URL-routing logic finds an id
+  if (!window.location.search.includes('id=')) {
+    const u = new URL(window.location);
+    u.searchParams.set('id', 'demo-leidos');
+    window.history.replaceState({}, '', u.toString());
+  }
+})();
+</script>
 
 <script>
 // Global error handler — shows ANY uncaught error on screen instead of leaving
@@ -1217,6 +1298,9 @@ const DEMO_DATA = {
   "company_override": null
 };
 
+// Make demo data available to the fetch interceptor (defined in setup block above)
+window.__DEMO_REQ_DATA__ = DEMO_DATA;
+
 document.addEventListener('DOMContentLoaded', () => {
   // Suppress any auth-related code that may have already run
   const detail = document.getElementById('detail');
@@ -1229,6 +1313,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
+
+// Cleanup: if we set a demo token, remove it before navigating away
+window.addEventListener('beforeunload', () => {
+  if (localStorage.getItem('sn_demo_token_marker') === 'true') {
+    localStorage.removeItem('sn_token');
+    localStorage.removeItem('sn_demo_token_marker');
+  }
+});
+
 </script>
 </body>
 </html>
