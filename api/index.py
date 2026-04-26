@@ -67,6 +67,11 @@ TURSO_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "")
 BYOK_ENCRYPTION_KEY = os.environ.get("BYOK_ENCRYPTION_KEY", "")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 MAGIC_LINK_SECRET = os.environ.get("MAGIC_LINK_SECRET", "")
+# Shared Together.ai key for free-tier users who haven't added their own BYOK.
+# Free tier caps (5 intakes/mo) are enforced at the intake-flow level via
+# check_cap() BEFORE call_ai() ever runs, so this key cannot be abused beyond
+# the documented free quota. Pro-tier users can still bring their own key.
+SERVER_TOGETHER_KEY = os.environ.get("SERVER_TOGETHER_KEY", "")
 
 fernet = None
 if HAS_CRYPTO and BYOK_ENCRYPTION_KEY:
@@ -541,25 +546,54 @@ async def log_login_attempt(email: str, ip: Optional[str], success: bool):
 # ---------- AI ROUTER (BYOK) ----------
 
 async def call_ai(user_id: str, prompt: str, max_tokens: int = 8000) -> str:
+    """Route an LLM call to either the user's BYOK provider or the shared
+    server Together.ai key (free-tier fallback).
+
+    Decision tree:
+      1. If user has a BYOK key configured -> use it (Pro tier, unlimited).
+      2. Else if SERVER_TOGETHER_KEY is set -> use it (free tier, capped).
+      3. Else -> 400 "No AI provider configured."
+
+    Free-tier abuse is prevented one layer up: every intake/eval/outreach
+    endpoint calls check_cap() BEFORE call_ai(), so a user who's hit their
+    5 intakes/mo cannot trigger another LLM call regardless of which key
+    is used here.
+    """
     async with db() as client:
         rs = await client.execute(
             "SELECT byok_provider, byok_key_enc FROM users WHERE id = ?", [user_id]
         )
-        if not rs.rows or not rs.rows[0][0]:
-            raise HTTPException(400, "No AI provider configured. Add your API key in Settings.")
+
+    has_byok = bool(rs.rows and rs.rows[0][0] and rs.rows[0][1])
+
+    if has_byok:
+        # Path 1: BYOK (Pro tier or self-funded users)
         provider, key_enc = rs.rows[0][0], rs.rows[0][1]
+        if not fernet:
+            raise HTTPException(500, "Encryption not configured on server")
+        api_key = fernet.decrypt(key_enc.encode()).decode()
+        print(f"[ai-call] user={user_id[:8]}... provider={provider} source=byok")
 
-    if not fernet:
-        raise HTTPException(500, "Encryption not configured on server")
-    api_key = fernet.decrypt(key_enc.encode()).decode()
+        if provider == "anthropic":
+            return await _call_anthropic(api_key, prompt, max_tokens)
+        if provider == "openai":
+            return await _call_openai(api_key, prompt, max_tokens)
+        if provider == "together":
+            return await _call_together(api_key, prompt, max_tokens)
+        raise HTTPException(400, f"Unknown provider: {provider}")
 
-    if provider == "anthropic":
-        return await _call_anthropic(api_key, prompt, max_tokens)
-    if provider == "openai":
-        return await _call_openai(api_key, prompt, max_tokens)
-    if provider == "together":
-        return await _call_together(api_key, prompt, max_tokens)
-    raise HTTPException(400, f"Unknown provider: {provider}")
+    if SERVER_TOGETHER_KEY:
+        # Path 2: free-tier fallback to shared Together.ai key
+        # Caps are already enforced at the intake-flow level via check_cap()
+        print(f"[ai-call] user={user_id[:8]}... provider=together source=server-shared")
+        return await _call_together(SERVER_TOGETHER_KEY, prompt, max_tokens)
+
+    # Path 3: nothing configured
+    raise HTTPException(
+        400,
+        "No AI provider configured. Free tier is unavailable right now — "
+        "add your own API key in Settings, or contact support."
+    )
 
 
 def _ai_error(provider: str, status: int, body: str) -> HTTPException:

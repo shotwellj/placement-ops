@@ -365,10 +365,9 @@ $('runBtn').addEventListener('click', async () => {
   const jdText = $('jdInput').value.trim();
   if (jdText.length < 50) { showError('JD is too short. Paste the full job description.'); return; }
   if (!token) { $('authModal').classList.add('active'); return; }
-  if (user && !user.byok_configured) {
-    showError('Add your API key in Settings first. This app uses your own API key.');
-    return;
-  }
+  // Server decides whether the user can run an intake (BYOK key OR free-tier
+  // server fallback). No client-side BYOK gate — would falsely block free
+  // tier users who don't have a BYOK key but do have free intakes available.
 
   $('runBtn').disabled = true;
   $('results').classList.remove('active');
