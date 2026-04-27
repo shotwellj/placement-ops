@@ -72,6 +72,12 @@ MAGIC_LINK_SECRET = os.environ.get("MAGIC_LINK_SECRET", "")
 # check_cap() BEFORE call_ai() ever runs, so this key cannot be abused beyond
 # the documented free quota. Pro-tier users can still bring their own key.
 SERVER_TOGETHER_KEY = os.environ.get("SERVER_TOGETHER_KEY", "")
+# Server-side Anthropic key used as automatic FAILOVER when Together.ai is
+# slow, unreachable, or returning 5xx. Together is primary because it's
+# cheapest; Anthropic is fallback because it's the most reliable provider
+# we have. The fallback only fires on transient errors (timeouts, 5xx) —
+# never on 4xx (which would just hide bugs). See _call_with_failover().
+SERVER_ANTHROPIC_KEY = os.environ.get("SERVER_ANTHROPIC_KEY", "")
 
 fernet = None
 if HAS_CRYPTO and BYOK_ENCRYPTION_KEY:
@@ -582,11 +588,14 @@ async def call_ai(user_id: str, prompt: str, max_tokens: int = 8000) -> str:
             return await _call_together(api_key, prompt, max_tokens)
         raise HTTPException(400, f"Unknown provider: {provider}")
 
-    if SERVER_TOGETHER_KEY:
-        # Path 2: free-tier fallback to shared Together.ai key
-        # Caps are already enforced at the intake-flow level via check_cap()
-        print(f"[ai-call] user={user_id[:8]}... provider=together source=server-shared")
-        return await _call_together(SERVER_TOGETHER_KEY, prompt, max_tokens)
+    if SERVER_TOGETHER_KEY or SERVER_ANTHROPIC_KEY:
+        # Path 2: shared server keys with automatic failover.
+        # Caps are already enforced at the intake-flow level via check_cap(),
+        # so a free user who hit 5/5 cannot trigger this path. Pro users
+        # without their own BYOK also land here (they get reliability they
+        # didn't have before; their LLM cost is on us until billing is wired).
+        print(f"[ai-call] user={user_id[:8]}... source=server-shared (with failover)")
+        return await _call_with_failover(prompt, max_tokens)
 
     # Path 3: nothing configured
     raise HTTPException(
@@ -603,6 +612,10 @@ def _ai_error(provider: str, status: int, body: str) -> HTTPException:
 
 
 async def _call_anthropic(api_key: str, prompt: str, max_tokens: int) -> str:
+    """Call Anthropic Claude. Used as fallback when Together.ai fails AND as
+    a BYOK option. The system message enforces JSON-only output so the
+    response works with the same parse_json_strict() the Together path uses.
+    """
     async with httpx.AsyncClient(timeout=120.0) as client:
         r = await client.post(
             "https://api.anthropic.com/v1/messages",
@@ -615,12 +628,15 @@ async def _call_anthropic(api_key: str, prompt: str, max_tokens: int) -> str:
                 "model": "claude-sonnet-4-5",
                 "max_tokens": max_tokens,
                 "temperature": 0.3,
+                "system": "Respond with valid JSON only. No markdown code fences. No prose before or after the JSON object.",
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
         if r.status_code >= 400:
             raise _ai_error("anthropic", r.status_code, r.text)
-        return r.json()["content"][0]["text"]
+        text = r.json()["content"][0]["text"]
+        # Strip code fences and any leading/trailing prose just in case
+        return text.replace("```json", "").replace("```", "").strip()
 
 
 async def _call_openai(api_key: str, prompt: str, max_tokens: int) -> str:
@@ -663,6 +679,81 @@ async def _call_together(api_key: str, prompt: str, max_tokens: int) -> str:
         if "<think>" in text and "</think>" in text:
             text = text.split("</think>")[-1].strip()
         return text.replace("```json", "").replace("```", "").strip()
+
+
+
+# ---------- FAILOVER WRAPPER ----------
+
+async def _call_with_failover(prompt: str, max_tokens: int = 8000) -> str:
+    """Server-key path with automatic provider failover.
+
+    Tries Together.ai first (cheapest), falls back to Anthropic if Together
+    times out, refuses connections, or returns 5xx. Falls through to a
+    helpful 503 only if BOTH providers fail.
+
+    BYOK callers do NOT go through this function — they hit _call_anthropic /
+    _call_openai / _call_together directly. Failover is for shared-server-key
+    flows only because we control the env-var keys.
+
+    Transient error policy:
+      - httpx.ReadTimeout, ConnectError, ConnectTimeout, ReadError -> failover
+      - HTTPException with status_code 5xx -> failover (Together's 503 fits)
+      - Anything else (4xx, parse errors) -> raise unchanged. We do NOT want
+        to mask 401/403 (key issues) or 429 (rate limit) by retrying — the
+        fallback won't help and would hide a real bug.
+
+    Logs which provider served the request and whether failover fired so we
+    can monitor reliability in production.
+    """
+    if not SERVER_TOGETHER_KEY and not SERVER_ANTHROPIC_KEY:
+        raise HTTPException(
+            500,
+            "No server-side AI keys configured. Set SERVER_TOGETHER_KEY and/or SERVER_ANTHROPIC_KEY in Vercel env.",
+        )
+
+    transient_exc = (httpx.ReadTimeout, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadError)
+
+    def _is_transient_http(exc: Exception) -> bool:
+        """5xx HTTPExceptions are transient. 4xx are not (would hide bugs)."""
+        if isinstance(exc, HTTPException):
+            return exc.status_code >= 500
+        return False
+
+    # Primary: Together.ai
+    if SERVER_TOGETHER_KEY:
+        try:
+            result = await _call_together(SERVER_TOGETHER_KEY, prompt, max_tokens)
+            print(f"[ai-call] source=server-shared provider=together status=ok")
+            return result
+        except transient_exc as e:
+            print(f"[ai-call FAILOVER] together transient {type(e).__name__}: {str(e)[:160]} -> trying anthropic")
+        except HTTPException as e:
+            if _is_transient_http(e):
+                print(f"[ai-call FAILOVER] together {e.status_code}: {str(e.detail)[:160]} -> trying anthropic")
+            else:
+                # 4xx — surface to caller, do NOT failover
+                raise
+
+    # Fallback: Anthropic Claude
+    if SERVER_ANTHROPIC_KEY:
+        try:
+            result = await _call_anthropic(SERVER_ANTHROPIC_KEY, prompt, max_tokens)
+            print(f"[ai-call] source=server-shared provider=anthropic status=ok-after-failover")
+            return result
+        except (transient_exc + (HTTPException,)) as e:
+            detail = str(e.detail) if isinstance(e, HTTPException) else str(e)
+            print(f"[ai-call FAILED-BOTH] anthropic also failed: {type(e).__name__}: {detail[:200]}")
+            raise HTTPException(
+                503,
+                "Both AI providers are unreachable right now. Please try again in a moment. "
+                "If this persists, email hello@sourcingnav.com.",
+            )
+
+    # Together failed and there's no Anthropic key configured
+    raise HTTPException(
+        503,
+        "AI provider unreachable. Please try again in a moment.",
+    )
 
 
 def parse_json_strict(text: str) -> dict:
