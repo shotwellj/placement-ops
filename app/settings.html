@@ -64,9 +64,26 @@
 
 <main class="page">
   <h1 class="page-title">Settings</h1>
-  <p class="page-desc">Bring your own API key. Your key, your tokens, your cost. Stored encrypted, never logged.</p>
+  <p class="page-desc">Account, sessions, and provider settings.</p>
 
-  <section class="card">
+  <!-- BYOK gate: shown to free users in place of the BYOK form -->
+  <section id="byokGate" class="card" style="display: none;">
+    <div class="card-label" style="color: var(--accent);">Pro Feature</div>
+    <h2 class="card-title">Bring your own API key</h2>
+    <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.92rem; line-height: 1.6;">
+      BYOK lets you route SourcingNav's AI calls through your own Anthropic / OpenAI / Together.ai
+      account. Pro users with audit-trail or compliance requirements can bring their own key
+      to keep all LLM activity inside their own provider account.
+    </p>
+    <p style="color: var(--text-dim); margin-bottom: 1.25rem; font-size: 0.92rem; line-height: 1.6;">
+      Free tier already includes 5 intakes/month using our shared infrastructure — no key
+      required. BYOK is for Pro users who specifically need their own provider account.
+    </p>
+    <a href="mailto:hello@sourcingnav.com?subject=Upgrade%20to%20SourcingNav%20Pro&body=Hi%2C%20I%27d%20like%20to%20upgrade%20to%20Pro.%20My%20account%20email%20is%3A%20" class="btn btn-primary" style="text-decoration: none; display: inline-block;">Email to upgrade →</a>
+  </section>
+
+  <!-- BYOK form: shown only to Pro users -->
+  <section id="byokSection" class="card" style="display: none;">
     <div class="card-label">AI Provider</div>
     <h2 class="card-title">Connect your API key</h2>
     <div class="field">
@@ -129,14 +146,28 @@ async function api(path, opts = {}) {
 async function loadAccount() {
   try {
     const user = await api('/user/me');
+    const isPro = user.plan === 'pro';
+
+    // Show the right BYOK section based on plan. BYOK is a Pro feature.
+    // Free users see the gate (upgrade CTA); Pro users see the actual form.
+    document.getElementById('byokGate').style.display = isPro ? 'none' : 'block';
+    document.getElementById('byokSection').style.display = isPro ? 'block' : 'none';
+
+    // Account card. Hide the byok_provider line for free users since they
+    // can't have a configured provider.
+    const providerLine = isPro
+      ? `<div>Current provider: ${user.byok_provider || 'not configured'}</div>`
+      : '';
     document.getElementById('accountInfo').innerHTML = `
       <div>Email: ${user.email}</div>
       <div>Plan: ${user.plan.toUpperCase()}</div>
       <div>Mode: ${user.mode}</div>
       <div>Usage: ${user.usage.intake} intakes / ${user.usage.eval} evals / ${user.usage.outreach} outreach</div>
-      <div>Current provider: ${user.byok_provider || 'not configured'}</div>
+      ${providerLine}
     `;
-    if (user.byok_provider) document.getElementById('provider').value = user.byok_provider;
+    if (isPro && user.byok_provider) {
+      document.getElementById('provider').value = user.byok_provider;
+    }
   } catch (e) {
     document.getElementById('accountInfo').textContent = 'Could not load account';
   }

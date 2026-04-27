@@ -1901,6 +1901,18 @@ async def get_me(user: dict = Depends(get_current_user)):
 
 @app.post("/api/user/byok-key")
 async def save_byok_key(req: ByokRequest, user: dict = Depends(get_current_user)):
+    """Save a BYOK API key. Pro tier ONLY.
+
+    BYOK is a Pro feature. Free-tier users get the shared SERVER_TOGETHER_KEY
+    via call_ai's fallback path; they have no need to bring their own key.
+    Defensive gate: rejects direct API calls from free users even if the
+    Settings UI somehow renders the form.
+    """
+    if user.get("plan") != "pro":
+        raise HTTPException(
+            402,
+            "BYOK is a Pro feature. Email hello@sourcingnav.com to upgrade.",
+        )
     if not fernet:
         raise HTTPException(500, "Encryption not configured")
     encrypted = fernet.encrypt(req.api_key.encode()).decode()
