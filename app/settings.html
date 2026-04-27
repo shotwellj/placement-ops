@@ -66,48 +66,7 @@
   <h1 class="page-title">Settings</h1>
   <p class="page-desc">Account, sessions, and provider settings.</p>
 
-  <!-- BYOK gate: shown to free users in place of the BYOK form -->
-  <section id="byokGate" class="card" style="display: none;">
-    <div class="card-label" style="color: var(--accent);">Pro Feature</div>
-    <h2 class="card-title">Bring your own API key</h2>
-    <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.92rem; line-height: 1.6;">
-      BYOK lets you route SourcingNav's AI calls through your own Anthropic / OpenAI / Together.ai
-      account. Pro users with audit-trail or compliance requirements can bring their own key
-      to keep all LLM activity inside their own provider account.
-    </p>
-    <p style="color: var(--text-dim); margin-bottom: 1.25rem; font-size: 0.92rem; line-height: 1.6;">
-      Free tier already includes 5 intakes/month using our shared infrastructure — no key
-      required. BYOK is for Pro users who specifically need their own provider account.
-    </p>
-    <a href="mailto:hello@sourcingnav.com?subject=Upgrade%20to%20SourcingNav%20Pro&body=Hi%2C%20I%27d%20like%20to%20upgrade%20to%20Pro.%20My%20account%20email%20is%3A%20" class="btn btn-primary" style="text-decoration: none; display: inline-block;">Email to upgrade →</a>
-  </section>
 
-  <!-- BYOK form: shown only to Pro users -->
-  <section id="byokSection" class="card" style="display: none;">
-    <div class="card-label">AI Provider</div>
-    <h2 class="card-title">Connect your API key</h2>
-    <div class="field">
-      <label for="provider">Provider</label>
-      <select id="provider">
-        <option value="anthropic">Anthropic (Claude), best quality, ~$0.08/intake</option>
-        <option value="openai">OpenAI (GPT-4o), good quality, ~$0.05/intake</option>
-        <option value="together">Together.ai (Qwen 3 235B), cheapest, ~$0.01/intake</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="apiKey">API Key</label>
-      <input type="password" id="apiKey" placeholder="sk-ant-..., sk-..., or tgp_...">
-    </div>
-    <button id="saveBtn" class="btn btn-primary">Save key</button>
-    <div id="status" class="status"></div>
-
-    <div class="help-links" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim);">
-      <p style="margin-bottom: 0.75rem;"><strong>Don't have a key yet?</strong></p>
-      <p style="margin-bottom: 0.4rem;">Anthropic: <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a></p>
-      <p style="margin-bottom: 0.4rem;">OpenAI: <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></p>
-      <p>Together.ai: <a href="https://api.together.xyz/settings/api-keys" target="_blank">api.together.xyz</a> ($1 free credit on signup)</p>
-    </div>
-  </section>
 
   <section class="card">
     <div class="card-label">Account</div>
@@ -146,56 +105,16 @@ async function api(path, opts = {}) {
 async function loadAccount() {
   try {
     const user = await api('/user/me');
-    const isPro = user.plan === 'pro';
-
-    // Show the right BYOK section based on plan. BYOK is a Pro feature.
-    // Free users see the gate (upgrade CTA); Pro users see the actual form.
-    document.getElementById('byokGate').style.display = isPro ? 'none' : 'block';
-    document.getElementById('byokSection').style.display = isPro ? 'block' : 'none';
-
-    // Account card. Hide the byok_provider line for free users since they
-    // can't have a configured provider.
-    const providerLine = isPro
-      ? `<div>Current provider: ${user.byok_provider || 'not configured'}</div>`
-      : '';
     document.getElementById('accountInfo').innerHTML = `
       <div>Email: ${user.email}</div>
       <div>Plan: ${user.plan.toUpperCase()}</div>
       <div>Mode: ${user.mode}</div>
       <div>Usage: ${user.usage.intake} intakes / ${user.usage.eval} evals / ${user.usage.outreach} outreach</div>
-      ${providerLine}
     `;
-    if (isPro && user.byok_provider) {
-      document.getElementById('provider').value = user.byok_provider;
-    }
   } catch (e) {
     document.getElementById('accountInfo').textContent = 'Could not load account';
   }
 }
-
-document.getElementById('saveBtn').addEventListener('click', async () => {
-  const provider = document.getElementById('provider').value;
-  const apiKey = document.getElementById('apiKey').value.trim();
-  const status = document.getElementById('status');
-  if (!apiKey || apiKey.length < 10) {
-    status.className = 'status err';
-    status.textContent = 'Enter a valid API key';
-    return;
-  }
-  try {
-    await api('/user/byok-key', {
-      method: 'POST',
-      body: JSON.stringify({ provider, api_key: apiKey }),
-    });
-    status.className = 'status ok';
-    status.textContent = '✓ Key saved. You can now run intakes.';
-    document.getElementById('apiKey').value = '';
-    loadAccount();
-  } catch (e) {
-    status.className = 'status err';
-    status.textContent = e.message;
-  }
-});
 
 loadAccount();
 

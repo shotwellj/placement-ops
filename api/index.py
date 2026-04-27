@@ -552,57 +552,25 @@ async def log_login_attempt(email: str, ip: Optional[str], success: bool):
 # ---------- AI ROUTER (BYOK) ----------
 
 async def call_ai(user_id: str, prompt: str, max_tokens: int = 8000) -> str:
-    """Route an LLM call to either the user's BYOK provider or the shared
-    server Together.ai key (free-tier fallback).
+    """Single code path: server keys with automatic Together -> Anthropic failover.
 
-    Decision tree:
-      1. If user has a BYOK key configured -> use it (Pro tier, unlimited).
-      2. Else if SERVER_TOGETHER_KEY is set -> use it (free tier, capped).
-      3. Else -> 400 "No AI provider configured."
+    Earlier versions had a BYOK branch that bypassed the failover wrapper,
+    causing Together 503s to surface directly to users. Recruiters (our
+    target audience) don't know what an API key is and shouldn't be asked
+    to bring one. Now everyone — free and Pro — uses our server keys with
+    failover.
 
     Free-tier abuse is prevented one layer up: every intake/eval/outreach
-    endpoint calls check_cap() BEFORE call_ai(), so a user who's hit their
-    5 intakes/mo cannot trigger another LLM call regardless of which key
-    is used here.
+    endpoint calls check_cap() BEFORE call_ai(), so a free user who hit
+    5/5 intakes cannot trigger another LLM call. Pro users have unlimited
+    intakes (no check_cap gate for them), and the LLM cost is on us until
+    a billing system is wired.
+
+    user_id is kept in the signature for the diagnostic log line and for
+    future per-user routing (e.g., model selection by tier).
     """
-    async with db() as client:
-        rs = await client.execute(
-            "SELECT byok_provider, byok_key_enc FROM users WHERE id = ?", [user_id]
-        )
-
-    has_byok = bool(rs.rows and rs.rows[0][0] and rs.rows[0][1])
-
-    if has_byok:
-        # Path 1: BYOK (Pro tier or self-funded users)
-        provider, key_enc = rs.rows[0][0], rs.rows[0][1]
-        if not fernet:
-            raise HTTPException(500, "Encryption not configured on server")
-        api_key = fernet.decrypt(key_enc.encode()).decode()
-        print(f"[ai-call] user={user_id[:8]}... provider={provider} source=byok")
-
-        if provider == "anthropic":
-            return await _call_anthropic(api_key, prompt, max_tokens)
-        if provider == "openai":
-            return await _call_openai(api_key, prompt, max_tokens)
-        if provider == "together":
-            return await _call_together(api_key, prompt, max_tokens)
-        raise HTTPException(400, f"Unknown provider: {provider}")
-
-    if SERVER_TOGETHER_KEY or SERVER_ANTHROPIC_KEY:
-        # Path 2: shared server keys with automatic failover.
-        # Caps are already enforced at the intake-flow level via check_cap(),
-        # so a free user who hit 5/5 cannot trigger this path. Pro users
-        # without their own BYOK also land here (they get reliability they
-        # didn't have before; their LLM cost is on us until billing is wired).
-        print(f"[ai-call] user={user_id[:8]}... source=server-shared (with failover)")
-        return await _call_with_failover(prompt, max_tokens)
-
-    # Path 3: nothing configured
-    raise HTTPException(
-        400,
-        "No AI provider configured. Free tier is unavailable right now — "
-        "add your own API key in Settings, or contact support."
-    )
+    print(f"[ai-call] user={user_id[:8]}... source=server-shared (with failover)")
+    return await _call_with_failover(prompt, max_tokens)
 
 
 def _ai_error(provider: str, status: int, body: str) -> HTTPException:
@@ -2164,27 +2132,20 @@ async def get_me(user: dict = Depends(get_current_user)):
 
 @app.post("/api/user/byok-key")
 async def save_byok_key(req: ByokRequest, user: dict = Depends(get_current_user)):
-    """Save a BYOK API key. Pro tier ONLY.
+    """Deprecated. BYOK has been removed entirely.
 
-    BYOK is a Pro feature. Free-tier users get the shared SERVER_TOGETHER_KEY
-    via call_ai's fallback path; they have no need to bring their own key.
-    Defensive gate: rejects direct API calls from free users even if the
-    Settings UI somehow renders the form.
+    Recruiters (our target audience) don't know what an API key is.
+    All users now use the server-keyed failover path in call_ai().
+    The byok_provider / byok_key_enc columns remain in the users table
+    for backwards compat but are no longer read by call_ai().
+
+    Endpoint kept (returning 410 Gone) so old clients that still POST
+    here get a clear error rather than a confusing 404.
     """
-    if user.get("plan") != "pro":
-        raise HTTPException(
-            402,
-            "BYOK is a Pro feature. Email hello@sourcingnav.com to upgrade.",
-        )
-    if not fernet:
-        raise HTTPException(500, "Encryption not configured")
-    encrypted = fernet.encrypt(req.api_key.encode()).decode()
-    async with db() as client:
-        await client.execute(
-            "UPDATE users SET byok_provider = ?, byok_key_enc = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            [req.provider, encrypted, user["id"]],
-        )
-    return {"ok": True, "provider": req.provider}
+    raise HTTPException(
+        410,
+        "BYOK has been removed. All users now use SourcingNav's shared infrastructure with automatic provider failover. No API key needed.",
+    )
 
 
 @app.post("/api/intake")
