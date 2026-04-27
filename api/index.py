@@ -1640,6 +1640,178 @@ No skipping. No duplicates.
 No em dashes. No code fences. JSON only.
 """
 
+PRO_BOOLEAN_PROMPT = """You are an expert sourcer with 13+ years of Boolean search experience.
+You have done thousands of senior technical searches at FAANG-tier and venture-backed companies.
+
+This is the Pro Boolean extensions pass. The free tier already produced:
+  - 3 LinkedIn Recruiter strings (sniper / precision / expanded)
+  - 7 X-ray strings (linkedin, github, medium, stackoverflow, conferences, personal_sites, specialty)
+  - Tier 1 / Tier 2 company cluster names
+
+Your job is to extend that with everything a senior sourcer would do but a junior wouldn't:
+  - Annotate WHY each existing LR tier is structured the way it is
+  - Add 2 NEW LR tiers (Dragnet for desperate-mode breadth, Company-targeted for direct poaching)
+  - Add rationale on each Tier 1 + Tier 2 company (why poach from THEM specifically)
+  - Convert the JD's watering_holes into runnable X-ray strings (role-aware: which venues match THIS specific archetype)
+  - Estimate hit volume + signal/noise per Pro string so the recruiter knows what to expect
+  - Extend mentor notes to 5-8 tactical tips, not 3
+
+PARSED CONTEXT:
+{parsed_context}
+
+EXISTING FREE-TIER OUTPUT (that you are extending — do NOT regenerate, only ANNOTATE):
+{existing_booleans}
+
+WATERING HOLES from the JD parser pass (your raw material for Pro X-rays):
+{watering_holes_list}
+
+──────────────────────────────────────────────────────────
+RATIONALE on existing 3 LR tiers
+──────────────────────────────────────────────────────────
+
+For each of sniper / precision / expanded, write 1-2 sentences explaining:
+  - WHY this string is structured this way (why these specific terms)
+  - When to use this vs the others
+  - What kind of candidate it surfaces
+
+Tone: peer-to-peer. Like a senior sourcer explaining their reasoning to a mid-level peer.
+
+──────────────────────────────────────────────────────────
+NEW LR Tier 4: DRAGNET (widest possible net)
+──────────────────────────────────────────────────────────
+
+When sniper/precision/expanded are all dry, the dragnet runs. Should:
+  - Drop most "preferred" requirements
+  - Use only Tier 1 blocker skills + level signals
+  - Open up location to multi-state or even nationwide
+  - Drop seniority constraints if the role allows
+  - Expected hits: 1000-5000 results
+  - Use case: dry market, willing to accept lower fit for higher volume
+
+LR syntax: title:, location:, current_company:, AND keyword OK in LR.
+
+──────────────────────────────────────────────────────────
+NEW LR Tier 5: COMPANY-TARGETED (direct poach)
+──────────────────────────────────────────────────────────
+
+Names specific Tier 1 + Tier 2 companies in the LR string itself:
+  current_company:('Company A' OR 'Company B' OR 'Company C')
+  AND title:('Role A' OR 'Role B')
+
+Use case: when warm-channel and watering-hole sourcing are exhausted and
+you're going direct. Explicit poaching list.
+
+NEVER include the hiring company in the company-targeted string.
+
+──────────────────────────────────────────────────────────
+COMPANY CLUSTER RATIONALE
+──────────────────────────────────────────────────────────
+
+For each Tier 1 and Tier 2 company already in the existing output, write
+1 sentence explaining WHY it's a poaching target. Examples:
+
+  Tier 1 NVIDIA: "Direct competitor in cloud AI infrastructure. Their data
+  center BMC team is the most direct functional analog to this role."
+
+  Tier 2 Supermicro: "Server hardware manufacturer with deep BMC expertise.
+  Their firmware engineers ship at scale into hyperscaler customers."
+
+Be specific. Don't write "they are a tech company." Write what makes them
+a defensible source for THIS role.
+
+──────────────────────────────────────────────────────────
+WATERING HOLE -> RUNNABLE X-RAY conversion
+──────────────────────────────────────────────────────────
+
+For each watering hole in the input, produce a runnable X-ray string
+following the same rules as the free-tier X-rays:
+  - DOUBLE quotes around phrases (escape them as \"...\")
+  - NO literal AND keyword (Google treats space as implicit AND)
+  - OR (uppercase) inside parentheses for alternatives
+  - site: operator
+  - Skip generic catch-alls
+
+Each Pro X-ray gets:
+  - venue_name (matches the watering_hole entry)
+  - venue_type (mailing_list / conference / etc)
+  - xray_string (the actual runnable string)
+  - signal: what kind of candidate signal this surfaces
+  - hit_volume: low (<50) / medium (50-500) / high (500+)
+  - signal_to_noise: high (most results are real candidates) / medium / low
+
+──────────────────────────────────────────────────────────
+DIFFICULTY SCORING
+──────────────────────────────────────────────────────────
+
+For every NEW Pro string (the 2 LR tiers + each Pro X-ray), include:
+  - hit_volume: low / medium / high
+  - signal_to_noise: high / medium / low
+
+Be honest. If the dragnet returns 5000 mostly-noise hits, mark it
+hit_volume=high, signal_to_noise=low. The recruiter needs to know
+what they're getting into.
+
+──────────────────────────────────────────────────────────
+EXTENDED MENTOR NOTES (5-8 tactical tips)
+──────────────────────────────────────────────────────────
+
+Free tier has 3 notes. Pro extends to 5-8. New notes should cover:
+  - Sequencing: which string to run FIRST and why
+  - Time-of-day or day-of-week tactics if relevant
+  - Specific watering hole insights (e.g., "openbmc.dev mailing list activity peaks Tuesdays")
+  - Skill substitution patterns (which JD skills to relax first if results are dry)
+  - Compensation positioning (when to lead with cash vs equity in InMails)
+  - Anti-patterns: things a junior sourcer might try that wastes time
+
+──────────────────────────────────────────────────────────
+RETURN ONLY THIS JSON
+──────────────────────────────────────────────────────────
+
+{{
+  "lr_rationale": {{
+    "sniper": "1-2 sentences on why this string is structured this way and when to use it",
+    "precision": "...",
+    "expanded": "..."
+  }},
+  "lr_dragnet": {{
+    "string": "LR syntax string for the widest possible net",
+    "rationale": "1-2 sentences on when to deploy this",
+    "hit_volume": "high",
+    "signal_to_noise": "low"
+  }},
+  "lr_company_targeted": {{
+    "string": "LR syntax with current_company:('A' OR 'B' OR 'C') AND title:('X' OR 'Y')",
+    "rationale": "1-2 sentences on why these companies + how to follow up",
+    "hit_volume": "medium",
+    "signal_to_noise": "high"
+  }},
+  "company_cluster_rationale": {{
+    "tier_1": [
+      {{"company": "Company A", "rationale": "1 sentence on why this is a defensible source for THIS role"}}
+    ],
+    "tier_2": [
+      {{"company": "Company B", "rationale": "..."}}
+    ]
+  }},
+  "pro_xrays": [
+    {{
+      "venue_name": "openbmc.dev mailing list",
+      "venue_type": "mailing_list",
+      "xray_string": "site:lists.ozlabs.org \"openbmc\" \"patch\" \"review\"",
+      "signal": "Active OpenBMC maintainers — patch submissions = real production-grade contribution",
+      "hit_volume": "low",
+      "signal_to_noise": "high"
+    }}
+  ],
+  "extended_mentor_notes": [
+    {{"label": "Sequencing", "note": "Run the GitHub OpenBMC X-ray first — merged PRs are higher signal than LR for this archetype"}},
+    {{"label": "Anti-pattern", "note": "Don't blast InMails on Mondays — Staff-level engineers triage their inbox Sunday night"}}
+  ]
+}}
+
+No em dashes. No code fences. JSON only.
+"""
+
 CANDIDATE_EVAL_PROMPT = """You are an expert technical recruiter with 13+ years of experience evaluating candidates.
 
 You receive two inputs: a parsed job requisition and a raw candidate profile (could be a LinkedIn dump, resume text, or pasted notes).
@@ -2242,23 +2414,76 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             print(f"[ai-pro-skill-briefing FAIL] type={type(e).__name__} err={str(e)[:200]}")
             return []
 
-    # Fire all three concurrently. return_exceptions=True ensures we get a
+
+    async def _run_pro_boolean_extensions():
+        """Step 3.9 body — Pro tier ONLY. Returns dict of pro boolean extensions.
+
+        Gated on user["plan"] == "pro". Free users get an empty dict; the UI
+        shows a locked placeholder card with structure visible but content
+        blocked out (see renderProBooleanExtensionsCard).
+
+        Inputs:
+          - parsed_context: same context dict the other enrichment calls use
+          - existing_booleans: the free-tier output from step 3 (so the model
+            can ANNOTATE the existing 3 LR tiers, not regenerate them)
+          - watering_holes_list: stringified watering_holes from parsed (raw
+            material for the Pro X-ray conversion — role-aware by construction)
+
+        IMPORTANT: this depends on `booleans` (step 3 output) being available,
+        so it runs in the parallel block alongside the other enrichments.
+        Step 3 finishes BEFORE the parallel block starts (see flow).
+        """
+        if user.get("plan") != "pro":
+            return {}
+        try:
+            holes = parsed.get("watering_holes") or []
+            if not holes:
+                holes_str = "(none — produce 3-5 generic Pro X-rays based on the role archetype)"
+            else:
+                holes_str = "\n".join(
+                    f"- {h.get('venue', '')} ({h.get('venue_type', 'unknown')}): {h.get('signal', '')}"
+                    for h in holes if h.get('venue')
+                )
+            ctx = json.dumps({
+                "role_title": parsed.get("core", {}).get("role_title"),
+                "level": parsed.get("core", {}).get("level"),
+                "industry": parsed.get("core", {}).get("industry"),
+                "company": parsed.get("core", {}).get("company"),
+                "location": parsed.get("core", {}).get("location"),
+            })
+            text = await call_ai(
+                user["id"],
+                PRO_BOOLEAN_PROMPT.format(
+                    parsed_context=ctx,
+                    existing_booleans=json.dumps(booleans, indent=2)[:3000],
+                    watering_holes_list=holes_str,
+                ),
+                max_tokens=3500,
+            )
+            return parse_json_strict(text) or {}
+        except Exception as e:
+            print(f"[ai-pro-boolean FAIL] type={type(e).__name__} err={str(e)[:200]}")
+            return {}
+
+    # Fire all enrichment tasks concurrently. return_exceptions=True ensures we get a
     # value back for each task even if one explodes — but each task already
     # catches its own exceptions and returns a safe default ({} or []), so
     # the gather should never actually surface an exception. Belt + suspenders.
     enrich_t0 = datetime.now(timezone.utc)
-    skill_alternatives, objection_playbook, sequenced_play, pro_skill_briefing = await asyncio.gather(
+    skill_alternatives, objection_playbook, sequenced_play, pro_skill_briefing, pro_boolean_extensions = await asyncio.gather(
         _run_skill_alternatives(),
         _run_objection_playbook(),
         _run_sequenced_play(),
         _run_pro_skill_briefing(),
+        _run_pro_boolean_extensions(),
         return_exceptions=False,  # tasks handle their own exceptions
     )
     print(f"[intake] enrichment parallel block took {(datetime.now(timezone.utc) - enrich_t0).total_seconds():.1f}s "
           f"(skill_alts={'ok' if skill_alternatives else 'empty'}, "
           f"objections={len(objection_playbook) if isinstance(objection_playbook, list) else 'err'}, "
           f"seq_play={len(sequenced_play) if isinstance(sequenced_play, list) else 'err'}, "
-          f"pro_briefing={len(pro_skill_briefing) if isinstance(pro_skill_briefing, list) else 'skip/err'} plan={user.get('plan')})")
+          f"pro_briefing={len(pro_skill_briefing) if isinstance(pro_skill_briefing, list) else 'skip/err'}, "
+          f"pro_boolean={'ok' if pro_boolean_extensions else 'skip/empty'} plan={user.get('plan')})")
 
     # Step 4: save to DB + compliance records
     try:
@@ -2312,6 +2537,8 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                 parsed["sequenced_play"] = sequenced_play
             if pro_skill_briefing:
                 parsed["pro_skill_briefing"] = pro_skill_briefing
+            if pro_boolean_extensions:
+                parsed["pro_boolean_extensions"] = pro_boolean_extensions
             await client.execute(
                 """INSERT INTO requisitions
                    (id, org_id, user_id, title, jd_raw, parsed_json, boolean_strings_json, status, opened_at, updated_at)
