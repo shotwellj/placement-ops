@@ -798,6 +798,148 @@ function renderSequencedPlayCard(plays) {
   `;
 }
 
+
+function renderProSkillBriefingCard(briefing, isProUser) {
+  // Free-tier path: show a locked placeholder with the SHAPE of the value
+  // (3 fake skill rows with realistic structure but obvious placeholder
+  // content). Server never sent us real Pro content if user is free.
+  if (!isProUser) {
+    const lockedRow = (skill, tierLabel, tierBg, tierFg) => `
+      <div style="border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.15rem; margin-bottom: 1rem; background: var(--bg-card); position: relative; overflow: hidden;">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem;">
+          <span style="display: inline-block; padding: 0.22rem 0.6rem; background: ${tierBg}; color: ${tierFg}; border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${tierLabel}</span>
+          <span style="display: inline-block; padding: 0.15rem 0.5rem; background: rgba(74, 158, 255, 0.12); color: var(--blue); border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">Onsite Technical</span>
+        </div>
+        <div style="font-weight: 700; color: var(--text); font-size: 0.95rem; margin-bottom: 0.6rem;">${escapeHtml(skill)}</div>
+        <div style="font-size: 0.85rem; color: var(--text-dim); line-height: 1.6; margin-bottom: 0.8rem;">
+          <span style="display: inline-block; background: var(--text-mute); color: var(--text-mute); border-radius: 3px; padding: 0 6px;">████████ ███ ███████ ████ ████████ ██ ████ ████ ████████.</span>
+          <span style="display: inline-block; background: var(--text-mute); color: var(--text-mute); border-radius: 3px; padding: 0 6px; margin-top: 4px;">██████████ ████████ ██ ██ ██████ ████████.</span>
+        </div>
+        <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+          <span style="font-size: 0.72rem; color: var(--text-mute); padding: 0.3rem 0.55rem; background: var(--bg-elev); border-radius: 4px; border-left: 2px solid var(--border);">Pushback: ████ ████ ████</span>
+          <span style="font-size: 0.72rem; color: var(--text-mute); padding: 0.3rem 0.55rem; background: var(--bg-elev); border-radius: 4px; border-left: 2px solid var(--border);">Substitutions: ████, ████, ████</span>
+        </div>
+      </div>
+    `;
+    return `
+      <section class="card" style="position: relative;">
+        <div style="position: absolute; top: 1.25rem; right: 1.25rem; padding: 0.3rem 0.7rem; background: linear-gradient(135deg, rgba(255,183,77,0.18), rgba(245,158,11,0.18)); color: var(--warn); border: 1px solid var(--warn); border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Pro</div>
+        <div class="card-label">Hiring Manager Briefing</div>
+        <h2 class="card-title">Pro skill triage</h2>
+        <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.92rem;">
+          Every JD lists 8-15 "required" skills. In reality, 2-3 are true
+          Tier 1 blockers and the rest are negotiable. Pro Intake re-classifies
+          each must-have into 3 tiers, names the interview stage where it gets
+          tested, gives you the language to push back on the hiring manager,
+          and suggests acceptable substitutions so a strong candidate isn't
+          filtered for the wrong keyword.
+        </p>
+        ${lockedRow('Skill name visible to free users', 'Tier 1 — Non-negotiable', 'rgba(255, 107, 107, 0.12)', 'var(--danger)')}
+        ${lockedRow('Skill name visible to free users', 'Tier 2 — Strong preference', 'rgba(255, 183, 77, 0.12)', 'var(--warn)')}
+        ${lockedRow('Skill name visible to free users', 'Tier 3 — Nice to have', 'rgba(74, 222, 128, 0.12)', 'var(--good)')}
+        <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(61,217,214,0.06), rgba(74,158,255,0.06)); border: 1px solid rgba(61,217,214,0.3); border-radius: 10px;">
+          <div style="font-weight: 700; color: var(--text); font-size: 1rem; margin-bottom: 0.5rem;">Unlock the full briefing</div>
+          <p style="color: var(--text-dim); font-size: 0.9rem; line-height: 1.55; margin-bottom: 1rem;">
+            Pro Intake runs an additional senior-recruiter analysis pass on
+            every must-have skill. Every claim is grounded in JD quotes —
+            no fabricated specifics. Paste the output into Slack and brief
+            your hiring manager from it directly.
+          </p>
+          <a href="mailto:hello@sourcingnav.com?subject=Upgrade%20to%20SourcingNav%20Pro&body=Hi%2C%20I'd%20like%20to%20upgrade%20my%20account%20to%20Pro.%20My%20account%20email%20is%3A%20" class="btn btn-primary" style="font-size: 0.92rem; padding: 0.7rem 1.4rem; text-decoration: none; display: inline-block;">Email to upgrade →</a>
+        </div>
+      </section>
+    `;
+  }
+
+  // Pro path: real content
+  if (!briefing || !Array.isArray(briefing) || briefing.length === 0) return '';
+
+  const tierStyle = (tier) => {
+    const map = {
+      1: { label: 'Tier 1 — Non-negotiable', bg: 'rgba(255, 107, 107, 0.12)', fg: 'var(--danger)' },
+      2: { label: 'Tier 2 — Strong preference', bg: 'rgba(255, 183, 77, 0.12)', fg: 'var(--warn)' },
+      3: { label: 'Tier 3 — Nice to have', bg: 'rgba(74, 222, 128, 0.12)', fg: 'var(--good)' },
+    };
+    return map[tier] || map[2];
+  };
+
+  const stageLabel = (s) => {
+    const map = {
+      resume_screen: 'Resume screen',
+      phone_screen: 'Phone screen',
+      onsite_technical: 'Onsite technical',
+      not_directly_tested: 'Not directly tested',
+    };
+    return map[s] || (s || '').replace(/_/g, ' ');
+  };
+
+  const stageColor = (s) => {
+    const map = {
+      resume_screen: ['rgba(139, 155, 179, 0.12)', 'var(--text-dim)'],
+      phone_screen: ['rgba(74, 158, 255, 0.12)', 'var(--blue)'],
+      onsite_technical: ['rgba(139, 92, 246, 0.12)', '#a78bfa'],
+      not_directly_tested: ['rgba(139, 155, 179, 0.08)', 'var(--text-mute)'],
+    };
+    return map[s] || ['rgba(139,155,179,0.12)', 'var(--text-dim)'];
+  };
+
+  const rows = briefing.map(b => {
+    const t = tierStyle(b.tier);
+    const [sBg, sFg] = stageColor(b.interview_stage);
+    const subs = (b.acceptable_substitutions || []).filter(Boolean);
+    return `
+      <div style="border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.15rem; margin-bottom: 1rem; background: var(--bg-card);">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem;">
+          <span style="display: inline-block; padding: 0.22rem 0.6rem; background: ${t.bg}; color: ${t.fg}; border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${t.label}</span>
+          <span style="display: inline-block; padding: 0.15rem 0.5rem; background: ${sBg}; color: ${sFg}; border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${escapeHtml(stageLabel(b.interview_stage))}</span>
+          ${b.safe_to_paste_verbatim === false ? `<span style="display: inline-block; padding: 0.15rem 0.5rem; background: rgba(255, 183, 77, 0.18); color: var(--warn); border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border: 1px solid var(--warn);">verify before sending</span>` : ''}
+        </div>
+        <div style="font-weight: 700; color: var(--text); font-size: 0.98rem; margin-bottom: 0.55rem;">${escapeHtml(b.skill || '')}</div>
+        <div style="font-size: 0.92rem; line-height: 1.65; color: var(--text-dim); margin-bottom: 0.9rem;">${escapeHtml(b.rationale || '')}</div>
+
+        <div style="margin-bottom: 0.8rem;">
+          <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; font-weight: 700;">Pushback to the hiring manager</div>
+          <div style="font-size: 0.9rem; line-height: 1.6; color: var(--text); padding: 0.7rem 0.85rem; background: var(--bg-elev); border-radius: 6px; border-left: 3px solid var(--accent);">${escapeHtml(b.pushback_guidance || '')}</div>
+        </div>
+
+        ${subs.length ? `
+          <div style="margin-bottom: 0.8rem;">
+            <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; font-weight: 700;">Acceptable substitutions</div>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+              ${subs.map(s => `<span style="display: inline-block; padding: 0.3rem 0.65rem; background: rgba(74, 222, 128, 0.08); color: var(--good); border: 1px solid rgba(74, 222, 128, 0.25); border-radius: 5px; font-size: 0.78rem; font-weight: 600;">${escapeHtml(s)}</span>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${(b.grounded_in && b.grounded_in.length) ? `
+          <div>
+            <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; font-weight: 700;">Grounded in</div>
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem;">
+              ${b.grounded_in.map(g => `<li style="font-size: 0.78rem; color: var(--text-dim); padding: 0.3rem 0.6rem; background: var(--bg-elev); border-radius: 4px; border-left: 2px solid var(--border);">${escapeHtml(g)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <section class="card" style="position: relative;">
+      <div style="position: absolute; top: 1.25rem; right: 1.25rem; padding: 0.3rem 0.7rem; background: linear-gradient(135deg, rgba(61,217,214,0.18), rgba(74,158,255,0.18)); color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Pro</div>
+      <div class="card-label">Hiring Manager Briefing</div>
+      <h2 class="card-title">Pro skill triage</h2>
+      <p style="color: var(--text-dim); margin-bottom: 1.25rem; font-size: 0.92rem;">
+        Each must-have skill re-classified into Tier 1 (non-negotiable),
+        Tier 2 (strong preference), or Tier 3 (nice-to-have actually).
+        Includes the interview stage where it gets tested, the language
+        to push back on the hiring manager, and acceptable substitutions
+        so you don't auto-filter strong candidates with the wrong keyword.
+      </p>
+      ${rows}
+    </section>
+  `;
+}
+
 function renderResults(data) {
   const p = data.parsed;
   const b = data.boolean_strings;
@@ -973,6 +1115,11 @@ renderResults = function(data) {
       renderWateringHolesCard(_p.watering_holes),
       renderObjectionPlaybookCard(data.objection_playbook || _p.objection_playbook),
       renderSequencedPlayCard(data.sequenced_play || _p.sequenced_play),
+      // Pro Skill Briefing — always rendered. Free users see a locked placeholder
+      // with the structure visible (the SHAPE of the value) but content blocked
+      // out. Pro users get the real briefing. Server never sends real Pro content
+      // to free users (gated server-side via user.plan == 'pro').
+      renderProSkillBriefingCard(data.pro_skill_briefing || _p.pro_skill_briefing, user && user.plan === 'pro'),
     ].filter(Boolean).join('');
     // Wire Copy buttons on the objection playbook counter blocks
     grand.querySelectorAll('.bool-copy').forEach(btn => {

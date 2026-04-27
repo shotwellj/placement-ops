@@ -1400,6 +1400,155 @@ No em dashes. No code fences. Just JSON.
 
 
 
+PRO_INTAKE_PROMPT = """You are a senior technical recruiter with 13+ years at FAANG-tier companies.
+You have negotiated hundreds of req-defining conversations with hiring managers.
+
+You are doing the "Pro skill briefing" pass on a parsed JD. The free tier already
+classified each must-have skill as blocker vs preferred. Your job is to go deeper:
+  - Re-classify into THREE tiers based on REAL hiring impact (not what the JD claims)
+  - Provide rationale grounded in JD quotes plus your domain knowledge
+  - Identify which interview stage each skill actually gets tested at
+  - Give the recruiter language to push back on the hiring manager
+  - Suggest acceptable substitutions (so a strong candidate isn't filtered out
+    just because their resume uses different keywords)
+
+PARSED CONTEXT:
+{parsed_context}
+
+MUST-HAVE SKILLS TO ANALYZE:
+{must_have_list}
+
+RAW JD (for grounding quotes):
+{jd_excerpt}
+
+──────────────────────────────────────────────────────────
+TIER DEFINITIONS — these are the ONLY valid tier values
+──────────────────────────────────────────────────────────
+
+  tier 1 — NON-NEGOTIABLE
+    Without this skill the candidate gets auto-rejected at the resume screen.
+    Hiring manager will not even take a phone screen. There is no candidate
+    success path that bypasses this skill.
+    HARD CAP: maximum 3 skills can be Tier 1.
+
+  tier 2 — STRONG PREFERENCE
+    Listed as required in the JD, but a strong candidate missing this can
+    still get an interview if they have a credible substitute or strong
+    other-dimension signal. The recruiter will need to advocate for them.
+
+  tier 3 — NICE-TO-HAVE (ACTUALLY)
+    The JD says "required" but realistically the hiring manager will trade
+    this off for almost any candidate who covers the Tier 1 and Tier 2
+    requirements well. Most "team player / strong communication" lines are
+    here unless the role is customer-facing.
+
+The whole point: most JDs list 8-15 "required" skills. In reality, 2-3 are
+true Tier 1 blockers and the rest are negotiable. A senior recruiter knows
+which is which. Your job is to surface that distinction explicitly.
+
+──────────────────────────────────────────────────────────
+INTERVIEW STAGE — the ONLY valid values
+──────────────────────────────────────────────────────────
+
+  resume_screen        — assessed from resume keywords + recent companies
+  phone_screen         — comes up in a 30-min recruiter or HM screen
+  onsite_technical     — tested in a coding/system-design/take-home
+  not_directly_tested  — inferred from background; never directly assessed
+
+Map each skill to the stage where it actually gets tested. Don't guess.
+"Strong communication skills" is not_directly_tested at resume_screen but
+shows up as a yes/no signal at phone_screen. "Distributed systems" is
+phone_screen for level confirmation and onsite_technical for the deep dive.
+
+──────────────────────────────────────────────────────────
+TRUTHFULNESS RULES — MANDATORY
+──────────────────────────────────────────────────────────
+
+For every entry, you MUST populate the grounded_in array with literal phrases
+from the JD or pieces of the parsed_context. If you cannot find a JD quote
+or context piece that justifies a tier or interview-stage classification,
+default to a more conservative tier (move from 1 to 2, or 2 to 3).
+
+NEVER fabricate:
+  - Specific years of experience that aren't in the JD
+  - Specific tools/frameworks the JD doesn't mention
+  - Hiring manager preferences that aren't in the JD
+  - Compensation tradeoffs based on imagined budget conversations
+  - Team size, reporting structure, or org details not in the JD
+
+If a skill genuinely cannot be classified from the JD alone (because the JD
+is sparse), set safe_to_paste_verbatim to false and write a rationale that
+says so explicitly: "JD is sparse on this — recommend asking the hiring
+manager directly whether X is hard-required or negotiable."
+
+The recruiter will paste your output into Slack to brief their hiring
+manager. If you fabricate, you damage the recruiter's credibility.
+
+──────────────────────────────────────────────────────────
+PUSHBACK GUIDANCE — what to write
+──────────────────────────────────────────────────────────
+
+For each skill, write 1-2 sentences the recruiter would say to the hiring
+manager when defending a candidate who is missing this skill. Be specific
+to the tier:
+
+  tier 1: "This is non-negotiable — we'd be wasting the panel's time
+          interviewing without it" (or similar firm language)
+
+  tier 2: "If we're seeing a candidate strong on Tier 1 skills who has
+          [substitute X] instead of [exact JD requirement Y], I'd push to
+          phone-screen them. Here's why: [reason grounded in domain]."
+
+  tier 3: "I'm going to deprioritize this in screens and only flag
+          candidates who have it as an unexpected bonus."
+
+Tone: peer-to-peer. The recruiter and the hiring manager are colleagues.
+No salesy language. No "I'd love to discuss." Just the call.
+
+──────────────────────────────────────────────────────────
+ACCEPTABLE SUBSTITUTIONS
+──────────────────────────────────────────────────────────
+
+For each skill, give 1-3 acceptable substitutions that should NOT
+auto-disqualify a candidate. Examples:
+
+  JD says "Kafka" → acceptable substitutions: ["Apache Pulsar", "AWS Kinesis", "Redpanda"]
+  JD says "PyTorch" → acceptable substitutions: ["JAX", "TensorFlow 2.x"]
+  JD says "Kubernetes" → acceptable substitutions: ["Nomad", "ECS at scale"]
+
+If the skill is truly unique (no real substitutes — e.g., "FDA 510(k) clearance
+process"), return an empty array and note in pushback_guidance that there
+genuinely is no substitute.
+
+──────────────────────────────────────────────────────────
+OUTPUT SCHEMA — RETURN ONLY THIS JSON
+──────────────────────────────────────────────────────────
+
+{{
+  "pro_skill_briefing": [
+    {{
+      "skill": "exact skill name from must_have_list",
+      "tier": 1,
+      "tier_label": "non-negotiable",
+      "rationale": "2-3 sentences on WHY this is in this tier, grounded in the JD",
+      "interview_stage": "onsite_technical",
+      "pushback_guidance": "what the recruiter says to the HM",
+      "acceptable_substitutions": ["sub1", "sub2"],
+      "grounded_in": [
+        "JD: literal phrase from the JD",
+        "context: piece from parsed_context that supports this"
+      ],
+      "safe_to_paste_verbatim": true
+    }}
+  ]
+}}
+
+Every must_have_list entry must appear in pro_skill_briefing exactly once.
+No skipping. No duplicates.
+
+No em dashes. No code fences. JSON only.
+"""
+
 CANDIDATE_EVAL_PROMPT = """You are an expert technical recruiter with 13+ years of experience evaluating candidates.
 
 You receive two inputs: a parsed job requisition and a raw candidate profile (could be a LinkedIn dump, resume text, or pasted notes).
@@ -1944,21 +2093,69 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             print(f"[ai-seq-play FAIL] type={type(e).__name__} err={str(e)[:200]}")
             return []
 
+
+    async def _run_pro_skill_briefing():
+        """Step 3.8 body — Pro tier ONLY. Returns list of per-skill briefings.
+
+        Gated on user["plan"] == "pro". Free users get an empty list (the
+        UI shows a locked placeholder card with the structure but not the
+        content — see renderProSkillBriefingCard).
+
+        We pass:
+          - parsed_context: the same context dict the other enrichment calls use
+          - must_have_list: the must-have skills (skill name + severity) so
+            the model knows exactly what to classify
+          - jd_excerpt: first 2000 chars of the raw JD so the model can
+            ground its rationale in real quotes (truthfulness guardrail).
+        """
+        if user.get("plan") != "pro":
+            return []
+        try:
+            must_have = parsed.get("must_have_skills") or []
+            if not must_have:
+                return []
+            must_have_text = "\n".join(
+                f"- {s.get('skill', '')} (currently classified as {s.get('severity', 'unknown')})"
+                for s in must_have if s.get("skill")
+            )
+            ctx = json.dumps({
+                "role_title": parsed.get("core", {}).get("role_title"),
+                "level": parsed.get("core", {}).get("level"),
+                "industry": parsed.get("core", {}).get("industry"),
+                "company": parsed.get("core", {}).get("company"),
+                "executive_brief": parsed.get("executive_brief", {}).get("summary"),
+            })
+            text = await call_ai(
+                user["id"],
+                PRO_INTAKE_PROMPT.format(
+                    parsed_context=ctx,
+                    must_have_list=must_have_text,
+                    jd_excerpt=req.jd_text[:2000],
+                ),
+                max_tokens=3500,
+            )
+            return parse_json_strict(text).get("pro_skill_briefing") or []
+        except Exception as e:
+            print(f"[ai-pro-skill-briefing FAIL] type={type(e).__name__} err={str(e)[:200]}")
+            return []
+
     # Fire all three concurrently. return_exceptions=True ensures we get a
     # value back for each task even if one explodes — but each task already
     # catches its own exceptions and returns a safe default ({} or []), so
     # the gather should never actually surface an exception. Belt + suspenders.
     enrich_t0 = datetime.now(timezone.utc)
-    skill_alternatives, objection_playbook, sequenced_play = await asyncio.gather(
+    skill_alternatives, objection_playbook, sequenced_play, pro_skill_briefing = await asyncio.gather(
         _run_skill_alternatives(),
         _run_objection_playbook(),
         _run_sequenced_play(),
+        _run_pro_skill_briefing(),
         return_exceptions=False,  # tasks handle their own exceptions
     )
     print(f"[intake] enrichment parallel block took {(datetime.now(timezone.utc) - enrich_t0).total_seconds():.1f}s "
           f"(skill_alts={'ok' if skill_alternatives else 'empty'}, "
           f"objections={len(objection_playbook) if isinstance(objection_playbook, list) else 'err'}, "
-          f"seq_play={len(sequenced_play) if isinstance(sequenced_play, list) else 'err'})")
+          f"seq_play={len(sequenced_play) if isinstance(sequenced_play, list) else 'err'}, "
+          f"pro_briefing={len(pro_skill_briefing) if isinstance(pro_skill_briefing, list) else 'skip/err'} plan={user.get('plan')})")
 
     # Step 4: save to DB + compliance records
     try:
@@ -2010,6 +2207,8 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                 parsed["objection_playbook"] = objection_playbook
             if sequenced_play:
                 parsed["sequenced_play"] = sequenced_play
+            if pro_skill_briefing:
+                parsed["pro_skill_briefing"] = pro_skill_briefing
             await client.execute(
                 """INSERT INTO requisitions
                    (id, org_id, user_id, title, jd_raw, parsed_json, boolean_strings_json, status, opened_at, updated_at)
