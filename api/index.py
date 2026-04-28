@@ -579,6 +579,44 @@ def _ai_error(provider: str, status: int, body: str) -> HTTPException:
     return HTTPException(500, f"{provider} {status}: {snippet}")
 
 
+async def _call_anthropic_haiku(api_key: str, prompt: str, max_tokens: int) -> str:
+    """Call Anthropic Claude Haiku 4.5 — our PRIMARY model for all intake calls.
+
+    Why Haiku 4.5 as primary:
+      - 5-8x cheaper than Together Qwen 235B for our workload (~\$0.07/intake
+        vs ~\$0.45/intake)
+      - Matches Sonnet 4 on coding/reasoning benchmarks per Anthropic
+      - 4-5x faster than Sonnet 4.5 (lower latency on the parallel
+        enrichment block)
+      - Same Anthropic infrastructure as our fallback model = no more
+        multiplicative cross-vendor failure surface
+
+    Same JSON-only system message + fence stripping as the Sonnet helper.
+    Timeout is 90s (Haiku is fast; if it's not done in 90s something's
+    actually wrong and we should fail over).
+    """
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        r = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-haiku-4-5",
+                "max_tokens": max_tokens,
+                "temperature": 0.3,
+                "system": "Respond with valid JSON only. No markdown code fences. No prose before or after the JSON object.",
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
+        if r.status_code >= 400:
+            raise _ai_error("anthropic-haiku", r.status_code, r.text)
+        text = r.json()["content"][0]["text"]
+        return text.replace("```json", "").replace("```", "").strip()
+
+
 async def _call_anthropic(api_key: str, prompt: str, max_tokens: int) -> str:
     """Call Anthropic Claude. Used as fallback when Together.ai fails AND as
     a BYOK option. The system message enforces JSON-only output so the
@@ -653,75 +691,91 @@ async def _call_together(api_key: str, prompt: str, max_tokens: int) -> str:
 # ---------- FAILOVER WRAPPER ----------
 
 async def _call_with_failover(prompt: str, max_tokens: int = 8000) -> str:
-    """Server-key path with automatic provider failover.
+    """Server-key path with retry + automatic Haiku -> Sonnet failover.
 
-    Tries Together.ai first (cheapest), falls back to Anthropic if Together
-    times out, refuses connections, or returns 5xx. Falls through to a
-    helpful 503 only if BOTH providers fail.
+    Stack as of 2026-04-28:
+      Primary: Claude Haiku 4.5 (cheap, fast, reliable)
+      Fallback: Claude Sonnet 4.5 (same vendor, smarter model)
 
-    BYOK callers do NOT go through this function — they hit _call_anthropic /
-    _call_openai / _call_together directly. Failover is for shared-server-key
-    flows only because we control the env-var keys.
+    Why this stack:
+      - Together.ai had repeated 503/timeout failures in production. The
+        "cross-vendor failover" architecture was supposed to mask this,
+        but multiplicative failure across many parallel calls per intake
+        meant users still hit "both providers down" errors regularly.
+      - Anthropic infrastructure has been rock-solid in our usage.
+      - Haiku 4.5 is ~5-8x CHEAPER than Together Qwen 235B for our
+        workload. The "Together = cheap" assumption is obsolete.
+      - Same-vendor primary+fallback eliminates the multiplicative
+        cross-vendor failure surface. If Anthropic is down, we're down,
+        but they basically aren't down.
 
-    Transient error policy:
-      - httpx.ReadTimeout, ConnectError, ConnectTimeout, ReadError -> failover
-      - HTTPException with status_code 5xx -> failover (Together's 503 fits)
-      - Anything else (4xx, parse errors) -> raise unchanged. We do NOT want
-        to mask 401/403 (key issues) or 429 (rate limit) by retrying — the
-        fallback won't help and would hide a real bug.
+    Retry policy:
+      - On Haiku transient failure (timeout, connect error, 5xx): wait
+        1 second, retry Haiku ONCE. Most transient blips clear in <1s.
+      - If Haiku retry also fails: fall over to Sonnet 4.5 immediately.
+      - If Sonnet also fails: surface a clean 503 to the user.
 
-    Logs which provider served the request and whether failover fired so we
-    can monitor reliability in production.
+    Transient error policy (same as before):
+      - httpx.ReadTimeout, ConnectError, ConnectTimeout, ReadError -> retry/failover
+      - HTTPException 5xx -> retry/failover
+      - 4xx -> raise unchanged (auth issues, bad requests, rate limits;
+        retrying or failing over would hide the real bug)
+
+    Together.ai is no longer in the path. The _call_together helper still
+    exists for BYOK back-compat (in case any user has a saved Together
+    key from before BYOK was killed), but it is no longer called by this
+    failover wrapper.
     """
-    if not SERVER_TOGETHER_KEY and not SERVER_ANTHROPIC_KEY:
+    if not SERVER_ANTHROPIC_KEY:
         raise HTTPException(
             500,
-            "No server-side AI keys configured. Set SERVER_TOGETHER_KEY and/or SERVER_ANTHROPIC_KEY in Vercel env.",
+            "No server-side AI key configured. Set SERVER_ANTHROPIC_KEY in Vercel env.",
         )
 
     transient_exc = (httpx.ReadTimeout, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadError)
 
     def _is_transient_http(exc: Exception) -> bool:
-        """5xx HTTPExceptions are transient. 4xx are not (would hide bugs)."""
         if isinstance(exc, HTTPException):
             return exc.status_code >= 500
         return False
 
-    # Primary: Together.ai
-    if SERVER_TOGETHER_KEY:
+    # ── Primary: Haiku 4.5 with one retry on transient errors ──
+    for attempt in (1, 2):
         try:
-            result = await _call_together(SERVER_TOGETHER_KEY, prompt, max_tokens)
-            print(f"[ai-call] source=server-shared provider=together status=ok")
+            result = await _call_anthropic_haiku(SERVER_ANTHROPIC_KEY, prompt, max_tokens)
+            tag = "ok" if attempt == 1 else "ok-after-retry"
+            print(f"[ai-call] source=server-shared provider=haiku-4.5 attempt={attempt} status={tag}")
             return result
         except transient_exc as e:
-            print(f"[ai-call FAILOVER] together transient {type(e).__name__}: {str(e)[:160]} -> trying anthropic")
+            if attempt == 1:
+                print(f"[ai-call RETRY] haiku transient {type(e).__name__}: {str(e)[:160]} -> retrying in 1s")
+                await asyncio.sleep(1.0)
+            else:
+                print(f"[ai-call FAILOVER] haiku failed twice ({type(e).__name__}): {str(e)[:160]} -> trying sonnet")
         except HTTPException as e:
             if _is_transient_http(e):
-                print(f"[ai-call FAILOVER] together {e.status_code}: {str(e.detail)[:160]} -> trying anthropic")
+                if attempt == 1:
+                    print(f"[ai-call RETRY] haiku {e.status_code}: {str(e.detail)[:160]} -> retrying in 1s")
+                    await asyncio.sleep(1.0)
+                else:
+                    print(f"[ai-call FAILOVER] haiku failed twice ({e.status_code}): {str(e.detail)[:160]} -> trying sonnet")
             else:
-                # 4xx — surface to caller, do NOT failover
+                # 4xx (auth, bad request, rate limit) — surface immediately, never retry/failover
                 raise
 
-    # Fallback: Anthropic Claude
-    if SERVER_ANTHROPIC_KEY:
-        try:
-            result = await _call_anthropic(SERVER_ANTHROPIC_KEY, prompt, max_tokens)
-            print(f"[ai-call] source=server-shared provider=anthropic status=ok-after-failover")
-            return result
-        except (transient_exc + (HTTPException,)) as e:
-            detail = str(e.detail) if isinstance(e, HTTPException) else str(e)
-            print(f"[ai-call FAILED-BOTH] anthropic also failed: {type(e).__name__}: {detail[:200]}")
-            raise HTTPException(
-                503,
-                "Both AI providers are unreachable right now. Please try again in a moment. "
-                "If this persists, email hello@sourcingnav.com.",
-            )
-
-    # Together failed and there's no Anthropic key configured
-    raise HTTPException(
-        503,
-        "AI provider unreachable. Please try again in a moment.",
-    )
+    # ── Fallback: Sonnet 4.5 ──
+    try:
+        result = await _call_anthropic(SERVER_ANTHROPIC_KEY, prompt, max_tokens)
+        print(f"[ai-call] source=server-shared provider=sonnet-4.5 status=ok-after-failover")
+        return result
+    except (transient_exc + (HTTPException,)) as e:
+        detail = str(e.detail) if isinstance(e, HTTPException) else str(e)
+        print(f"[ai-call FAILED-BOTH] sonnet also failed: {type(e).__name__}: {detail[:200]}")
+        raise HTTPException(
+            503,
+            "Our AI provider is having a brief hiccup. Please try again in a moment. "
+            "If this persists, email hello@sourcingnav.com.",
+        )
 
 
 def parse_json_strict(text: str) -> dict:
