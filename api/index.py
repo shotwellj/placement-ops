@@ -2075,6 +2075,213 @@ class CandidateEvalRequest(BaseModel):
 
 
 
+
+# ---------- JD SIGNATURE EXTRACTION (Phase B3 Foundation) ----------
+#
+# Every successful intake stores a denormalized signature row capturing
+# the signal-rich features of the parsed JD. This is the data foundation
+# for Phase B3 (role archetype clustering) — we accumulate signatures
+# now, cluster later when N is meaningful (>= 30).
+#
+# Goal: tell the story of how the talent market is changing.
+# That requires:
+#   - Stable canonical skill names (already done by JD_PARSER_PROMPT)
+#   - First-class columns for industry / level / company / timestamp
+#     (so time-series queries are one-liners, no JSON parsing needed)
+#   - JSON arrays for the rich features (skills, aliases, crossovers,
+#     poaching companies, watering hole types) for cluster computation
+#   - A signature_text field that concatenates the above for embedding-
+#     based similarity later
+#
+# Storage policy: INSERT OR REPLACE so re-running on the same req_id
+# is idempotent. Backfill can be run safely.
+
+import re
+
+def _parse_comp_range(comp_str: str) -> tuple:
+    """Parse a comp range string into (min, max, is_hourly).
+
+    Handles both salary formats ('$150k - $220k', '$220k - $280k') and
+    hourly formats ('$50 - $100/hr'). Returns (None, None, False) on any
+    parse failure — the goal is best-effort enrichment, never to crash
+    the intake pipeline over a malformed comp string.
+
+    Returns:
+      (min_int, max_int, is_hourly_bool)
+      For salary: returns the dollar amount (e.g., 150000 not 150)
+      For hourly: returns the hourly rate (e.g., 50 not 50000)
+    """
+    if not comp_str or not isinstance(comp_str, str):
+        return (None, None, False)
+
+    is_hourly = bool(re.search(r"/hr|/hour|per hour|hourly", comp_str.lower()))
+
+    # Find all dollar amounts. Strip commas, handle 'k' suffix.
+    matches = re.findall(r"\$([\d,]+)\s*(k|K)?", comp_str)
+    if not matches:
+        return (None, None, is_hourly)
+
+    nums = []
+    for raw, k_suffix in matches:
+        try:
+            n = int(raw.replace(",", ""))
+            if k_suffix:
+                n *= 1000
+            nums.append(n)
+        except (ValueError, TypeError):
+            continue
+
+    if len(nums) >= 2:
+        return (min(nums[:2]), max(nums[:2]), is_hourly)
+    if len(nums) == 1:
+        return (nums[0], nums[0], is_hourly)
+    return (None, None, is_hourly)
+
+
+def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
+    """Extract a flat signature dict from the parsed JD output.
+
+    Defensive: every field uses .get() chains because the JD parser can
+    occasionally produce shapes that don't match the spec. Missing fields
+    become NULL in the database — better than crashing the intake.
+
+    Returns a dict ready to be passed as positional args to the INSERT.
+    """
+    core = parsed.get("core", {}) or {}
+    exec_brief = parsed.get("executive_brief", {}) or {}
+    market_dyn = parsed.get("market_dynamics", {}) or {}
+    comp = parsed.get("comp_snapshot", {}) or {}
+    alt_titles = parsed.get("alt_titles", {}) or {}
+    market360 = parsed.get("market360", {}) or {}
+
+    # Skills — split blockers vs preferred
+    must_have = parsed.get("must_have_skills", []) or []
+    blockers = [m.get("skill") for m in must_have if m.get("severity") == "blocker" and m.get("skill")]
+    preferred = [m.get("skill") for m in must_have if m.get("severity") == "preferred" and m.get("skill")]
+
+    # Canonical skills — all of them, with severity preserved as a tuple
+    canonical = parsed.get("canonical_skills", []) or []
+    canonical_clean = [
+        {"name": c.get("name"), "severity": c.get("severity")}
+        for c in canonical
+        if c.get("name")
+    ]
+
+    # Functional aliases — what peer companies call this same person
+    func_aliases = alt_titles.get("functional_aliases", []) or []
+    aliases_clean = [a.get("title") for a in func_aliases if a.get("title")]
+
+    # Adjacent crossover — DIFFERENT roles where the same person fits.
+    # This is where Talent Engineer / Forward-Deployed Engineer / Prompt
+    # Engineer-style emerging archetypes will surface in clustering.
+    crossovers = alt_titles.get("adjacent_crossover", []) or []
+    crossover_clean = [
+        {"title": c.get("title"), "difficulty": c.get("transition_difficulty")}
+        for c in crossovers
+        if c.get("title")
+    ]
+
+    # Watering hole VENUE_TYPES — not the venues themselves (too granular
+    # for clustering), but the type categories (mailing_list, conference,
+    # community, code_host, training_alumni, competition, discord_slack,
+    # publication). The TYPE distribution per role tells us which kinds
+    # of communities matter for which archetypes.
+    watering_holes = parsed.get("watering_holes", []) or []
+    venue_types = sorted(set(
+        h.get("venue_type") for h in watering_holes if h.get("venue_type")
+    ))
+
+    # Poaching target companies — this is the sourcing universe for the
+    # role. Patterns here will reveal which companies cluster together
+    # for which role archetypes.
+    poach = market360.get("poaching_targets", []) or []
+    poach_companies = [p.get("company") for p in poach if p.get("company")]
+
+    # Comp parse
+    base_min, base_max, is_hourly = _parse_comp_range(comp.get("base_range", ""))
+
+    # Build the signature_text: a concatenation of the most distinctive
+    # features for future embedding-based similarity. Order matters
+    # (most distinctive first) because some embedding models weight
+    # earlier tokens more.
+    sig_text_parts = [
+        core.get("role_title") or "",
+        core.get("level") or "",
+        core.get("industry") or "",
+        " ".join(blockers),
+        " ".join(preferred),
+        " ".join(aliases_clean),
+        " ".join(c.get("title", "") for c in crossover_clean),
+        " ".join(venue_types),
+        exec_brief.get("summary") or "",
+    ]
+    signature_text = " | ".join(p.strip() for p in sig_text_parts if p and p.strip())
+
+    return {
+        "req_id":                          req_id,
+        "user_id":                         user_id,
+        "role_title":                      core.get("role_title"),
+        "level":                           core.get("level"),
+        "industry":                        core.get("industry"),
+        "company":                         core.get("company"),
+        "location":                        core.get("location"),
+        "remote_policy":                   core.get("remote_policy"),
+        "base_range_min":                  base_min,
+        "base_range_max":                  base_max,
+        "is_hourly":                       1 if is_hourly else 0,
+        "difficulty_score":                market_dyn.get("difficulty_score"),
+        "market_temperature":              exec_brief.get("market_temperature"),
+        "canonical_skills_json":           json.dumps(canonical_clean),
+        "blocker_skills_json":             json.dumps(blockers),
+        "preferred_skills_json":           json.dumps(preferred),
+        "functional_aliases_json":         json.dumps(aliases_clean),
+        "adjacent_crossover_json":         json.dumps(crossover_clean),
+        "watering_hole_types_json":        json.dumps(venue_types),
+        "poaching_target_companies_json":  json.dumps(poach_companies),
+        "signature_text":                  signature_text,
+    }
+
+
+async def _save_signature(req_id: str, user_id: str, parsed: dict) -> bool:
+    """Write a signature row. INSERT OR REPLACE so re-runs are idempotent.
+
+    Returns True on success, False on any failure. Caller should treat
+    failures as non-blocking: a missing signature does not break the
+    intake; it just means that req won't contribute to clustering data.
+
+    Logged so failures are visible in Vercel logs without breaking UX.
+    """
+    try:
+        sig = _extract_signature(req_id, user_id, parsed)
+        async with db() as client:
+            await client.execute(
+                """INSERT OR REPLACE INTO jd_signatures (
+                    req_id, user_id, role_title, level, industry, company,
+                    location, remote_policy, base_range_min, base_range_max,
+                    is_hourly, difficulty_score, market_temperature,
+                    canonical_skills_json, blocker_skills_json, preferred_skills_json,
+                    functional_aliases_json, adjacent_crossover_json,
+                    watering_hole_types_json, poaching_target_companies_json,
+                    signature_text, parsed_at, parser_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'v1')""",
+                [
+                    sig["req_id"], sig["user_id"], sig["role_title"], sig["level"],
+                    sig["industry"], sig["company"], sig["location"], sig["remote_policy"],
+                    sig["base_range_min"], sig["base_range_max"], sig["is_hourly"],
+                    sig["difficulty_score"], sig["market_temperature"],
+                    sig["canonical_skills_json"], sig["blocker_skills_json"],
+                    sig["preferred_skills_json"], sig["functional_aliases_json"],
+                    sig["adjacent_crossover_json"], sig["watering_hole_types_json"],
+                    sig["poaching_target_companies_json"], sig["signature_text"],
+                ],
+            )
+        print(f"[signature] saved req_id={req_id[:8]}... role={sig['role_title']} skills={len(json.loads(sig['canonical_skills_json']))}")
+        return True
+    except Exception as e:
+        print(f"[signature FAIL] req_id={req_id[:8]}... type={type(e).__name__} err={str(e)[:200]}")
+        return False
+
+
 # ---------- EMAIL HELPERS ----------
 
 async def _send_email(to: str, subject: str, html: str) -> bool:
@@ -3024,6 +3231,14 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     except Exception as e:
         print(f"[intake-email schedule FAIL] type={type(e).__name__} err={str(e)[:200]}")
 
+    # Step 7: extract + save the JD signature (Phase B3 foundation).
+    # Fire-and-forget: signature failures must NEVER break the intake.
+    # Every successful intake contributes to the clustering data set.
+    try:
+        asyncio.create_task(_save_signature(req_id, user["id"], parsed))
+    except Exception as e:
+        print(f"[signature schedule FAIL] type={type(e).__name__} err={str(e)[:200]}")
+
     return {
         "req_id": req_id,
         "parsed": parsed,
@@ -3737,4 +3952,221 @@ async def taxonomy_recent_decisions(limit: int = 20, user: dict = Depends(get_cu
             }
             for r in (rs.rows or [])
         ]
+    }
+
+
+# ---------- ADMIN: SIGNATURE INTROSPECTION (Phase B3) ----------
+#
+# Two endpoints:
+#   POST /api/admin/backfill-signatures  → re-extract signatures for ALL
+#         existing requisitions. Idempotent. Run after deploy or after
+#         changing the extraction logic.
+#   GET  /api/admin/signatures/stats     → first peek at the data:
+#         row count, industry distribution, top skills, archetype hints.
+#
+# Auth: requires the calling user to have plan='pro'. Not bulletproof
+# (anyone Pro could call them), but good enough for the only-Jason-uses-
+# this-now state. Tighten before public Pro launch.
+
+@app.post("/api/admin/backfill-signatures")
+async def backfill_signatures(user: dict = Depends(get_current_user)):
+    """Re-extract signatures for every requisition that has parsed_json.
+
+    Idempotent (uses INSERT OR REPLACE). Safe to run after schema or
+    extraction-logic changes. Returns counts so you know what happened.
+    """
+    if user.get("plan") != "pro":
+        raise HTTPException(403, "Admin endpoint — Pro tier required")
+
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT id, user_id, parsed_json
+               FROM requisitions
+               WHERE parsed_json IS NOT NULL
+               ORDER BY opened_at DESC"""
+        )
+
+    total = len(rs.rows)
+    succeeded = 0
+    failed = 0
+    skipped = 0
+
+    for row in rs.rows:
+        req_id, ru_id, parsed_json = row
+        if not parsed_json:
+            skipped += 1
+            continue
+        try:
+            parsed = json.loads(parsed_json)
+        except Exception:
+            failed += 1
+            continue
+        ok = await _save_signature(req_id, ru_id, parsed)
+        if ok:
+            succeeded += 1
+        else:
+            failed += 1
+
+    return {
+        "total_reqs_with_parse": total,
+        "signatures_written": succeeded,
+        "failed": failed,
+        "skipped_no_parse": skipped,
+    }
+
+
+@app.get("/api/admin/signatures/stats")
+async def signatures_stats(user: dict = Depends(get_current_user)):
+    """First peek at the accumulated signature data. The narrative ammo:
+    row count, industry mix, top skills, level distribution, geography,
+    earliest and latest signature dates.
+
+    As N grows, this endpoint will get richer. For now it answers the
+    fundamental question: how much data do we have, and what does its
+    shape look like?
+    """
+    if user.get("plan") != "pro":
+        raise HTTPException(403, "Admin endpoint — Pro tier required")
+
+    async with db() as client:
+        # Row count + date range
+        rs = await client.execute(
+            """SELECT COUNT(*),
+                      MIN(parsed_at),
+                      MAX(parsed_at),
+                      COUNT(DISTINCT industry),
+                      COUNT(DISTINCT level),
+                      COUNT(DISTINCT company),
+                      COUNT(DISTINCT user_id)
+               FROM jd_signatures"""
+        )
+        total, earliest, latest, n_industries, n_levels, n_companies, n_users = rs.rows[0] if rs.rows else (0, None, None, 0, 0, 0, 0)
+
+        # Industry distribution
+        rs = await client.execute(
+            """SELECT industry, COUNT(*) as n
+               FROM jd_signatures
+               WHERE industry IS NOT NULL
+               GROUP BY industry
+               ORDER BY n DESC
+               LIMIT 20"""
+        )
+        industry_dist = [{"industry": r[0], "count": r[1]} for r in rs.rows]
+
+        # Level distribution
+        rs = await client.execute(
+            """SELECT level, COUNT(*) as n
+               FROM jd_signatures
+               WHERE level IS NOT NULL
+               GROUP BY level
+               ORDER BY n DESC"""
+        )
+        level_dist = [{"level": r[0], "count": r[1]} for r in rs.rows]
+
+        # Remote policy distribution
+        rs = await client.execute(
+            """SELECT remote_policy, COUNT(*) as n
+               FROM jd_signatures
+               WHERE remote_policy IS NOT NULL
+               GROUP BY remote_policy
+               ORDER BY n DESC"""
+        )
+        remote_dist = [{"remote_policy": r[0], "count": r[1]} for r in rs.rows]
+
+        # Difficulty score distribution
+        rs = await client.execute(
+            """SELECT difficulty_score, COUNT(*) as n
+               FROM jd_signatures
+               WHERE difficulty_score IS NOT NULL
+               GROUP BY difficulty_score
+               ORDER BY difficulty_score"""
+        )
+        difficulty_dist = [{"score": r[0], "count": r[1]} for r in rs.rows]
+
+        # Top blocker skills across all signatures (the most-required skills
+        # tell us what the market needs MOST). Done in Python because SQLite
+        # JSON1 GROUP BY on json arrays is awkward.
+        rs = await client.execute("SELECT blocker_skills_json FROM jd_signatures WHERE blocker_skills_json IS NOT NULL")
+        skill_freq = {}
+        for r in rs.rows:
+            try:
+                skills = json.loads(r[0])
+                for s in skills:
+                    if s:
+                        skill_freq[s] = skill_freq.get(s, 0) + 1
+            except Exception:
+                continue
+        top_blocker_skills = sorted(skill_freq.items(), key=lambda x: -x[1])[:25]
+        top_blocker_skills = [{"skill": s, "count": c} for s, c in top_blocker_skills]
+
+        # Top preferred skills
+        rs = await client.execute("SELECT preferred_skills_json FROM jd_signatures WHERE preferred_skills_json IS NOT NULL")
+        pref_freq = {}
+        for r in rs.rows:
+            try:
+                skills = json.loads(r[0])
+                for s in skills:
+                    if s:
+                        pref_freq[s] = pref_freq.get(s, 0) + 1
+            except Exception:
+                continue
+        top_preferred_skills = sorted(pref_freq.items(), key=lambda x: -x[1])[:25]
+        top_preferred_skills = [{"skill": s, "count": c} for s, c in top_preferred_skills]
+
+        # Top adjacent crossover roles — THIS is the early signal for
+        # emerging archetypes. If "Forward-Deployed Engineer" or "Prompt
+        # Engineer" starts showing up here repeatedly across different
+        # base roles, that's the archetype emerging.
+        rs = await client.execute("SELECT adjacent_crossover_json FROM jd_signatures WHERE adjacent_crossover_json IS NOT NULL")
+        crossover_freq = {}
+        for r in rs.rows:
+            try:
+                cs = json.loads(r[0])
+                for c in cs:
+                    title = c.get("title")
+                    if title:
+                        crossover_freq[title] = crossover_freq.get(title, 0) + 1
+            except Exception:
+                continue
+        top_crossovers = sorted(crossover_freq.items(), key=lambda x: -x[1])[:25]
+        top_crossovers = [{"crossover_role": s, "count": c} for s, c in top_crossovers]
+
+        # Top poaching target companies across all reqs — tells us which
+        # companies are the most defensible talent sources across our
+        # whole intake corpus.
+        rs = await client.execute("SELECT poaching_target_companies_json FROM jd_signatures WHERE poaching_target_companies_json IS NOT NULL")
+        poach_freq = {}
+        for r in rs.rows:
+            try:
+                cs = json.loads(r[0])
+                for c in cs:
+                    if c:
+                        poach_freq[c] = poach_freq.get(c, 0) + 1
+            except Exception:
+                continue
+        top_poach_companies = sorted(poach_freq.items(), key=lambda x: -x[1])[:25]
+        top_poach_companies = [{"company": s, "count": c} for s, c in top_poach_companies]
+
+    return {
+        "total_signatures": total,
+        "earliest_signature": earliest,
+        "latest_signature": latest,
+        "unique_industries": n_industries,
+        "unique_levels": n_levels,
+        "unique_companies": n_companies,
+        "unique_users": n_users,
+        "industry_distribution": industry_dist,
+        "level_distribution": level_dist,
+        "remote_policy_distribution": remote_dist,
+        "difficulty_distribution": difficulty_dist,
+        "top_blocker_skills": top_blocker_skills,
+        "top_preferred_skills": top_preferred_skills,
+        "top_adjacent_crossover_roles": top_crossovers,
+        "top_poaching_target_companies": top_poach_companies,
+        "clustering_readiness": {
+            "current_n": total,
+            "minimum_for_meaningful_clustering": 30,
+            "recommended_for_emerging_archetypes": 100,
+            "ready_for_clustering": total >= 30,
+        },
     }
