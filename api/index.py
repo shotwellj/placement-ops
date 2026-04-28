@@ -2138,6 +2138,115 @@ def _parse_comp_range(comp_str: str) -> tuple:
     return (None, None, is_hourly)
 
 
+# Stopwords for keyword extraction from verbose competency statements.
+# Used by _derive_canonical_from_must_have when the parser produces wordy
+# skill strings instead of short canonical names. We strip these so what's
+# left is the high-signal terminology (tech names, acronyms, domains).
+_SKILL_STOPWORDS = frozenset([
+    "and", "or", "of", "in", "on", "at", "to", "for", "with", "the",
+    "a", "an", "as", "is", "are", "be", "by", "from", "into", "via",
+    "experience", "experiences", "knowledge", "skills", "ability",
+    "abilities", "proficiency", "proficient", "fluency", "fluent",
+    "expertise", "expert", "strong", "deep", "solid", "good", "great",
+    "excellent", "advanced", "intermediate", "basic", "demonstrated",
+    "proven", "hands-on", "hands", "on", "extensive", "significant",
+    "years", "year", "yrs", "yr", "plus", "+", "or", "more",
+    "working", "work", "background", "track", "record",
+    "candidate", "candidates", "position", "role", "team", "company",
+    "ideal", "preferred", "required", "must", "have", "should", "will",
+    "able", "capable", "willing", "ready", "open", "looking", "seeking",
+    "delivery", "development", "developing", "develops", "developed",
+    "design", "designing", "designed", "build", "building", "built",
+    "implement", "implementing", "implemented", "create", "creating",
+    "production", "production-grade", "production-quality",
+    "real-world", "real", "world", "high-stakes", "scale", "scale-critical",
+    "end-to-end", "cross-functional", "systems", "system",
+    "code", "coding", "programming", "software", "engineering",
+    "such", "as", "including", "include", "etc", "e.g.", "i.e.",
+    "this", "these", "those", "that", "which",
+    "you", "your", "we", "our", "us", "they", "their",
+    "across", "between", "among", "within", "throughout",
+    "successful", "demonstrably", "directly", "actively",
+])
+
+
+def _derive_canonical_from_must_have(must_have: list) -> list:
+    """Derive canonical_skills-shaped output from must_have_skills.
+
+    Used as a fallback when parsed.canonical_skills is missing (for reqs
+    parsed with older prompt versions) or empty.
+
+    Two extraction strategies based on skill string length:
+
+    1. Short skill string (<=4 words): use as-is. Looks like a real
+       canonical name already ("Python", "Machine Learning Engineering",
+       "Natural Language Processing (NLP)").
+
+    2. Verbose skill string (>4 words): extract high-signal tokens.
+       Strip stopwords, keep capitalized words, acronyms, and short
+       tech-looking tokens. "Chip design or verification experience (RTL,
+       simulators, EDA tools)" becomes ["Chip design", "RTL", "EDA"].
+
+    Returns a list of {name, severity} dicts matching canonical_skills shape.
+    """
+    out = []
+    seen = set()  # dedupe within this skill set
+
+    for ms in must_have:
+        if not isinstance(ms, dict):
+            continue
+        skill_str = (ms.get("skill") or "").strip()
+        severity = ms.get("severity") or "preferred"
+        if not skill_str or severity not in ("blocker", "preferred"):
+            continue
+
+        word_count = len(skill_str.split())
+
+        if word_count <= 4:
+            # Short — use as-is
+            key = skill_str.lower()
+            if key not in seen:
+                seen.add(key)
+                out.append({"name": skill_str, "severity": severity})
+        else:
+            # Verbose — extract keyword tokens.
+            # Strategy: split on common delimiters, then keep tokens that are
+            # either ALL-CAPS acronyms (RTL, EDA, LLM) or capitalized words
+            # not in the stopword list (Python, Chip, NumPy).
+            # Also handle parenthesized lists ("(RTL, simulators, EDA)").
+            import re as _re
+            # Split on commas, parens, slashes, semicolons
+            tokens = _re.split(r"[,()/;]", skill_str)
+            for tok in tokens:
+                tok = tok.strip()
+                if not tok:
+                    continue
+                # Inside each token, look for high-signal words
+                words = _re.findall(r"[A-Za-z][A-Za-z0-9.+#\-]*", tok)
+                # Keep acronyms (all-caps, length 2-6) and Capitalized words
+                # not in stopword list
+                kept = []
+                for w in words:
+                    wl = w.lower()
+                    if wl in _SKILL_STOPWORDS:
+                        continue
+                    is_acronym = len(w) >= 2 and len(w) <= 6 and w.isupper()
+                    is_capitalized = w[0].isupper() and not w.isupper()
+                    is_techy = any(c in w for c in ".+#-") and len(w) >= 2  # C++, C#, .NET, Node.js
+                    if is_acronym or is_capitalized or is_techy:
+                        kept.append(w)
+                if kept:
+                    # Reassemble adjacent kept words as a single skill
+                    # (e.g., "Machine Learning" stays together)
+                    combined = " ".join(kept)
+                    key = combined.lower()
+                    if key not in seen and len(combined) >= 2:
+                        seen.add(key)
+                        out.append({"name": combined, "severity": severity})
+
+    return out
+
+
 def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
     """Extract a flat signature dict from the parsed JD output.
 
@@ -2146,6 +2255,13 @@ def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
     become NULL in the database — better than crashing the intake.
 
     Returns a dict ready to be passed as positional args to the INSERT.
+
+    canonical_skills resolution order (added 2026-04-28):
+      1. Use parsed.canonical_skills if present and non-empty
+      2. Else derive from parsed.must_have_skills via keyword extraction
+         (handles older parses that pre-date the canonical_skills prompt
+         AND verbose-skill-string JDs that need keyword extraction)
+      3. Else empty list (truly unparseable JD)
     """
     core = parsed.get("core", {}) or {}
     exec_brief = parsed.get("executive_brief", {}) or {}
@@ -2159,13 +2275,21 @@ def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
     blockers = [m.get("skill") for m in must_have if m.get("severity") == "blocker" and m.get("skill")]
     preferred = [m.get("skill") for m in must_have if m.get("severity") == "preferred" and m.get("skill")]
 
-    # Canonical skills — all of them, with severity preserved as a tuple
+    # Canonical skills — primary path: use parser output if present
     canonical = parsed.get("canonical_skills", []) or []
     canonical_clean = [
         {"name": c.get("name"), "severity": c.get("severity")}
         for c in canonical
         if c.get("name")
     ]
+
+    # Fallback: derive from must_have_skills when canonical is missing/empty.
+    # This recovers signatures for reqs parsed with older prompt versions
+    # AND reqs whose JDs produced verbose-sentence skill strings.
+    if not canonical_clean and must_have:
+        canonical_clean = _derive_canonical_from_must_have(must_have)
+        if canonical_clean:
+            print(f"[signature fallback] req={req_id[:8]} derived {len(canonical_clean)} canonical skills from must_have_skills")
 
     # Functional aliases — what peer companies call this same person
     func_aliases = alt_titles.get("functional_aliases", []) or []
