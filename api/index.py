@@ -79,6 +79,38 @@ SERVER_TOGETHER_KEY = os.environ.get("SERVER_TOGETHER_KEY", "")
 # never on 4xx (which would just hide bugs). See _call_with_failover().
 SERVER_ANTHROPIC_KEY = os.environ.get("SERVER_ANTHROPIC_KEY", "")
 
+# ---------- STARTUP VALIDATION ----------
+# Detect the empty-key silent failure that took prod down on 2026-04-28.
+# Symptom: Vercel UI shows the env var exists (encrypted) but the value
+# stored is an empty string. call_ai then sends "" as the API key,
+# Anthropic returns 401, our code raises HTTPException(500) which is NOT
+# 5xx-classified as transient by failover, so failover doesn't trigger,
+# and BOTH primary and fallback fail with the same auth error → users
+# see the "both providers down" error.
+#
+# This check turns that silent runtime failure into a loud boot-time
+# failure. If the key is missing or doesn't look like an Anthropic key,
+# we crash the app on startup so Vercel marks the deploy as failed.
+# Better to fail to deploy than to deploy a broken function.
+#
+# Local dev tolerated: if VERCEL env var is unset (i.e., running locally),
+# we skip the check so devs without a key can still run demos / tests.
+_IS_VERCEL_PROD = os.environ.get("VERCEL_ENV") == "production"
+if _IS_VERCEL_PROD:
+    if not SERVER_ANTHROPIC_KEY:
+        raise RuntimeError(
+            "BOOT FAIL: SERVER_ANTHROPIC_KEY is empty in production. "
+            "Check Vercel env vars: the variable exists but the value is empty. "
+            "Re-save the key in https://vercel.com/{team}/{project}/settings/environment-variables"
+        )
+    if not SERVER_ANTHROPIC_KEY.startswith("sk-ant-"):
+        raise RuntimeError(
+            f"BOOT FAIL: SERVER_ANTHROPIC_KEY does not look like an Anthropic key "
+            f"(expected prefix sk-ant-, got prefix {SERVER_ANTHROPIC_KEY[:10]!r}). "
+            f"Verify the value in Vercel env settings."
+        )
+    print(f"[boot] SERVER_ANTHROPIC_KEY validated (length={len(SERVER_ANTHROPIC_KEY)}, prefix={SERVER_ANTHROPIC_KEY[:10]})")
+
 fernet = None
 if HAS_CRYPTO and BYOK_ENCRYPTION_KEY:
     try:
