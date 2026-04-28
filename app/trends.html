@@ -364,10 +364,22 @@ function renderPage(stats, clusterRun) {
 </script>
 <script>
 async function fetchJSON(path) {
-  const r = await fetch(API + path, { credentials: 'include' });
+  // Auth: read bearer token from localStorage (same pattern /app/index.html uses).
+  // Server's get_current_user dependency reads Authorization header, not cookies.
+  // Without this header the request 401s before reaching the Pro gate.
+  const token = localStorage.getItem('sn_token');
+  if (!token) {
+    throw new Error('Not signed in. Sign in at /app/ first, then return here.');
+  }
+  const r = await fetch(API + path, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
   if (!r.ok) {
-    if (r.status === 401 || r.status === 403) {
-      throw new Error(`Pro tier required (got ${r.status}). Sign in at /app/ with a Pro account.`);
+    if (r.status === 401) {
+      throw new Error('Session expired. Sign in again at /app/.');
+    }
+    if (r.status === 403) {
+      throw new Error('Pro tier required. Email hello@sourcingnav.com to upgrade.');
     }
     throw new Error(`API ${path} returned ${r.status}`);
   }
@@ -402,8 +414,15 @@ document.getElementById('recluster').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Clustering...';
   try {
-    const r = await fetch(API + '/api/admin/cluster-signatures', { method: 'POST', credentials: 'include' });
+    const token = localStorage.getItem('sn_token');
+    if (!token) throw new Error('Not signed in. Sign in at /app/ first.');
+    const r = await fetch(API + '/api/admin/cluster-signatures', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
     if (!r.ok) {
+      if (r.status === 401) throw new Error('Session expired. Sign in again at /app/.');
+      if (r.status === 403) throw new Error('Pro tier required.');
       throw new Error(`Cluster run returned ${r.status}`);
     }
     await loadAndRender();
