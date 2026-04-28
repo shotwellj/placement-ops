@@ -821,11 +821,31 @@ CRITICAL RULES FOR comp_snapshot:
 ALWAYS populate this with realistic ranges, even if comp is not in the JD.
 Use your knowledge of the role title, level, location, company tier, and industry.
 
+EMPLOYMENT TYPE DETECTION (do this FIRST before formatting comp):
+Look at the JD for hourly / contract / 1099 / W2-contract indicators:
+  - Phrases like "$X/hr", "$X per hour", "/hour", "hourly rate"
+  - Phrases like "contract", "1099", "C2C", "contract-to-hire", "W2 contract"
+  - Phrases like "freelance", "gig", "task-based pay"
+  - Companies known for crowdsourced/task-based work (DataAnnotation, Scale AI taskers, Mechanical Turk, Outlier, Labelbox annotators, Surge AI raters)
+
+If ANY of those signals are present, this is a HOURLY role. NEVER convert
+hourly rates to fake annual figures. A "$50-100/hr" rate is NOT "$104k-$208k
+annual" — taskers don't work 40hr/wk for 52 weeks. Reporting fake annual
+comp on hourly work is the kind of error that destroys recruiter trust
+in the tool.
+
 SCHEMA LOCK. comp_snapshot MUST use exactly these four string fields and NO others:
-  - base_range:        STRING formatted "$XXXk - $XXXk" (e.g. "$220k - $280k")
-  - total_comp_range:  STRING formatted "$XXXk - $XXXk (incl. equity/bonus)"
-  - equity_notes:      STRING, 1-2 sentences on equity expectations
-  - negotiation_notes: STRING, 1-2 sentences on what levers to pull
+  - base_range:        STRING. For salaried roles: "$XXXk - $XXXk" (e.g. "$220k - $280k").
+                       For hourly/contract roles: "$XX - $XX/hr" (e.g. "$50 - $100/hr"). Preserve
+                       hourly format AS-IS, do NOT convert to annual.
+  - total_comp_range:  STRING. For salaried: "$XXXk - $XXXk (incl. equity/bonus)".
+                       For hourly/contract: "$XX - $XX/hr (variable, work-dependent)". Do NOT
+                       fabricate annual totals from hourly rates.
+  - equity_notes:      STRING, 1-2 sentences on equity expectations. For hourly/contract roles,
+                       say something like "No equity. Pay is hourly/per-task only."
+  - negotiation_notes: STRING, 1-2 sentences on what levers to pull. For hourly/contract roles,
+                       focus on rate negotiation, project scope, and shift availability rather
+                       than equity/bonus levers.
 
 Do NOT use base_min, base_max, total_comp_min, total_comp_max, or any numeric fields.
 Do NOT nest objects inside comp_snapshot. All four values are flat strings.
