@@ -159,6 +159,7 @@
     </div>
     <div class="btn-row">
       <button id="runBtn" class="btn btn-primary"><span>Run Intake</span><span style="font-family: var(--font-mono); opacity: 0.6;">→</span></button>
+      <button id="sampleBtn" class="btn btn-ghost" title="Populate with a real DataAnnotation Staff SWE - AI Trainer JD so you can see what intake produces without sourcing your own.">Try sample JD</button>
       <button id="clearBtn" class="btn btn-ghost">Clear</button>
       <span style="color: var(--text-mute); font-size: 0.85rem; margin-left: auto;"><span id="charCount">0</span> chars</span>
     </div>
@@ -344,6 +345,26 @@ $('authSend').addEventListener('click', async () => {
 
 $('jdInput').addEventListener('input', () => {
   $('charCount').textContent = $('jdInput').value.length.toLocaleString();
+});
+
+$('sampleBtn').addEventListener('click', () => {
+  // Populate with a real DataAnnotation Staff SWE - AI Trainer JD.
+  // This is the same JD used in /ui/demo-leidos.html's parent corpus
+  // and produces clean output across every prompt (parser, boolean
+  // builder, skill briefing, boolean extensions, sequenced play).
+  // Auto-fills the optional company/title fields too so users can
+  // run intake immediately.
+  const SAMPLE_JD = "Staff Software Engineer - AI Trainer- job post\nDataAnnotation\n4.1\n4.1 out of 5 stars\nWalnut Creek, CA\u2022Remote\n$50 - $100 an hour - Contract\nDataAnnotation\nWalnut Creek, CA\u2022Remote\n$50 - $100 an hour\nJob details\nHere\u2019s how the job details align with your profile.\nPay\n\n$50 - $100 an hour\nJob type\n\nContract\n&nbsp;\nBenefits\nPulled from the full job description\nFlexible schedule\n&nbsp;\nFull job description\nJoin the DataAnnotation team and contribute to developing cutting-edge AI systems, while enjoying the flexibility of remote work and setting your own schedule.\n\nWe are looking for a proficient Staff Software Engineer - AI Trainer to help advance AI development. As a member of DataAnnotation\u2019s coding team, you\u2019ll be part of a growing community of over 100,000 professionals \u2014 including front-end, back-end, full-stack, machine learning, and other engineers \u2014 who are driving real-world impact in AI development.\n\nOur platform offers an engaging blend of flexibility and challenge: you\u2019ll work closely with state-of the art AI models to take on programming tasks that include creating and solving challenging coding problems, building beautiful apps with rich functionality, and synthesizing insights through data analysis and visualization. Your work directly contributes to refining intelligent systems that learn, adapt, and evolve. Some team members fit this work alongside a full-time role, while others treat it as their primary focus, choosing projects and schedules that align with their availability and goals.\n\nTo get started, once you sign up for an account, you'll take a short assessment (this serves as our version of an interview). If you pass that assessment, you\u2019ll receive an email confirmation, and paid work will become available to you through our platform.\n\nBenefits:\n\nFully remote: work from anywhere in the US, Canada, UK, Ireland, Australia, and New Zealand.\nFlexible schedule: choose which projects you take on and when you work.\nCompetitive pay: projects are paid hourly, up to $100+ USD per hour. Opportunities for higher-paying projects are available with strong performance.\nImpact: help shape the future of AI technologies.\nResponsibilities:\n\nDesign and solve diverse coding problems used to train AI systems.\nWrite clear, high-quality code snippets and detailed explanations.\nEvaluate AI-generated code for accuracy, performance, and clarity.\nProvide feedback that directly shapes the next generation of AI models.\nQualifications:\n\nFluency in English (native or bilingual level).\nProficiency in at least one of the following programming languages or frameworks: JavaScript, TypeScript, Python, C, C#, C++, React, Go, Java, Kotlin, or Swift.\nExcellent writing and grammar skills.\nA bachelor\u2019s degree (completed or in progress).\nPrevious experience as a Software Developer, Coder, Software Engineer, or Programmer is preferred.\nNote: Payment is made via PayPal. We will never ask for any money from you. PayPal will handle any currency conversions from USD. This job is only available to those in the US, Canada, UK, Ireland, Australia, and New Zealand. Those located outside of these countries will not see work or assessments available on our site at this time.\n\n#INDCODSTN\n\nJob Type: Contract\n\nPay: $50.00 - $100.00 per hour\n\nBenefits:\n\nFlexible schedule\nWork Location: Remote\n\n&nbsp;";
+  $('jdInput').value = SAMPLE_JD;
+  $('charCount').textContent = SAMPLE_JD.length.toLocaleString();
+  $('companyName').value = 'DataAnnotation';
+  $('roleTitle').value = 'Staff Software Engineer - AI Trainer';
+  $('jdInput').focus();
+  // Brief visual feedback that something happened
+  const btn = $('sampleBtn');
+  const original = btn.textContent;
+  btn.textContent = 'Loaded ✓';
+  setTimeout(() => { btn.textContent = original; }, 1500);
 });
 
 $('clearBtn').addEventListener('click', () => {
