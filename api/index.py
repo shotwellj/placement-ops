@@ -1176,23 +1176,68 @@ For each must-have skill, generate 2-4 functional alternatives. An alternative i
 For each alternative, include:
   - alternative: the tool/technology name (proper-noun, common industry name)
   - context: 1 sentence on WHERE/WHY this alternative gets used instead
-  - transferability: "high" (>80% skills overlap, candidate is fully qualified),
-                     "medium" (50-80% overlap, worth a phone screen),
-                     "low" (25-50% overlap, candidate could ramp but isn't ready day 1)
+  - transferability: "high" (>80% skills overlap, candidate is fully qualified
+                     day 1, drop-in replacement),
+                     "medium" (50-80% overlap, worth a phone screen — solid
+                     transfer but candidate will need 1-2 weeks to ramp),
+                     "low" (25-50% overlap, candidate could ramp but isn't
+                     ready day 1 — needs 30-60 days)
+
+──────────────────────────────────────────────────────────
+DISTRIBUTION CALIBRATION — REQUIRED
+──────────────────────────────────────────────────────────
+
+Real-world skill alternative distributions cluster around:
+  - ~30% high (genuine drop-in replacements)
+  - ~50% medium (worth a phone screen, will need ramp)
+  - ~20% low (transferable foundation, longer ramp)
+
+If you mark 80%+ of your alternatives as "high", you are inflating the
+ratings. This destroys the recruiters ability to triage candidates —
+everything looks equally great, so nothing is actually prioritized.
+
+GOOD CALIBRATION RULES:
+
+A "high" alternative is rare. It means the candidates resume could
+literally have one tool name swapped for another and they would still
+do the job equivalently from day 1. Examples that genuinely qualify:
+  - PostgreSQL <-> MySQL (for app-layer dev — both relational, similar SQL)
+  - React <-> Preact (near-identical APIs, same mental model)
+  - Apache Kafka <-> Apache Pulsar (similar pub/sub semantics at scale)
+
+Most cross-stack moves are "medium". The candidate has the right mental
+model and 50-80% of the tooling, but will spend their first 1-2 weeks
+learning the specific quirks of the target stack:
+  - Apache Spark -> Snowpark (different runtime, same PySpark-ish API)
+  - PyTorch -> TensorFlow (both DL, but different ergonomics)
+  - Kubernetes -> ECS (both containers, but very different control planes)
+  - Datadog -> New Relic (same APM category, different query languages)
+
+"Low" alternatives are valuable but require real ramp:
+  - Pinecone -> FAISS (vector search but different abstraction level)
+  - PostgreSQL -> Cassandra (relational vs wide-column — paradigm shift)
+  - REST APIs -> gRPC (different mental model, different tooling)
 
 Skip alternatives below 25% overlap. Skip generic synonyms ("PyTorch" -> "Torch"
 isn't an alternative, that's the same thing). Focus on STACK SUBSTITUTIONS.
 
-Examples of good alternatives:
-  - Apache Spark -> [Snowpark (high), Databricks DLT (high), Trino (medium), Polars (low)]
-  - Pinecone -> [pgvector (high), Weaviate (high), Milvus (medium), FAISS (low)]
+Examples of good calibrated alternatives (note the distribution):
+  - Apache Spark -> [Snowpark (medium), Databricks DLT (high), Trino (medium), Polars (low)]
+  - Pinecone -> [pgvector (medium), Weaviate (medium), Milvus (medium), FAISS (low)]
   - Kubernetes -> [ECS (medium), Nomad (medium), bare-metal w/ systemd (low)]
-  - PyTorch -> [JAX (medium), TensorFlow (medium - if model serving matters)]
+  - PyTorch -> [JAX (medium), TensorFlow (medium)]
+  - PostgreSQL -> [MySQL (high), CockroachDB (medium), Cassandra (low)]
+
+Notice: across these 5 examples, only 2 of 17 alternatives are "high".
+That is the realistic distribution. Most cross-stack candidates need
+a phone screen and a ramp period; the "high" rating should be used
+sparingly for genuine drop-in replacements.
 
 Examples of BAD alternatives (do not include these patterns):
   - Generic synonyms ("AWS" -> "Amazon Web Services")
   - Complete category swaps ("PyTorch" -> "scikit-learn" — different problem space)
   - Overly broad ("any Python framework" — too vague to be useful)
+  - Inflating ratings to "high" when the candidate genuinely needs ramp time
 
 Skip skills that don't have meaningful alternatives. A skill like "U.S. Citizenship"
 or "Active Secret Clearance" has no alternative — just omit it from output.
@@ -1446,15 +1491,72 @@ For each phase, produce:
     companies and watering holes provided, don't be generic)
   - message_style: 1-sentence description of the voice and angle
   - first_move: the ONE specific action to take on day 1 of this phase.
-    Has to be concrete. Not "reach out to candidates" — "Send InMail to
-    the 8-12 Fluke and Keysight embedded engineers who posted on
-    lore.kernel.org in the last 90 days, leading with their Signed-off-by
-    tags on relevant drivers."
+    Has to be concrete in SHAPE but NEVER fabricate specific candidate
+    details. Bad: "message Sarah Chen about her power-sequencing PR".
+    Good: "send InMail to 8-12 Tier 1 embedded engineers who have merged
+    PRs in the OpenBMC repo in the last 90 days, leading with the specific
+    repo area their commits touched (fan control, sensor monitoring, or
+    power sequencing)". The shape is concrete; the candidate-specific
+    detail stays a placeholder for the recruiter to fill in.
   - expected_response_rate: string ("30-50%", "8-15%", etc.)
 
 Make it specific to THIS role, company, and watering holes. Generic
 advice fails. Reference the Tier 1 companies and watering holes that
 were passed in.
+
+──────────────────────────────────────────────────────────
+TRUTHFULNESS RULES — MANDATORY
+──────────────────────────────────────────────────────────
+
+A first_move that contains an INVENTED candidate detail is worse than no
+first_move at all. The recruiter will paste it into outreach, the candidate
+asks "how did you find my PR on X?" — and the recruiter is exposed because
+that PR doesnt exist.
+
+You may ONLY reference facts that fit one of these categories:
+
+  ALLOWED — facts visible in the parsed JD context:
+    - Tier 1 / Tier 2 company names from the JD parser output
+    - Watering hole venues from the watering_holes list provided
+    - Role title, level, location, industry from the parsed JD
+    - Skills explicitly mentioned in the JD
+
+  ALLOWED — universally true industry knowledge:
+    - "Most LR-based searches Tuesday-Thursday outperform Monday or Friday"
+    - "OpenBMC mailing list traffic peaks mid-week"
+    - "FAANG L5 engineers respond more to comp + scope than equity hooks"
+
+  FORBIDDEN — DO NOT INVENT any of the following, ever:
+    - Specific candidate names ("Sarah Chen", "Jian Wei")
+    - Specific candidate work products ("their fan control PR",
+      "their JTAG debugging talk", "their patent on power sequencing")
+    - Specific recent events at named companies that you did not see
+      in the JD ("Intels recent firmware reorg", "AMDs Austin layoffs")
+    - Internal Discord channels, Slack workspaces, or alumni networks
+      not literally named in the watering_holes input
+    - University names not in the parsed JD or watering holes
+    - Technical conference dates / locations / agendas
+
+When you would otherwise fabricate, GENERALIZE. Instead of:
+  "Reference Sarah Chens fan control PR from August"
+write:
+  "Reference a recent commit they made to a relevant subsystem in the
+   OpenBMC repo (fan control, sensor monitoring, power sequencing, etc)
+   if their author history shows one"
+
+Instead of:
+  "Mention Intels recent layoffs in the firmware org"
+write:
+  "If a Tier 2 company has had recent public news (layoffs, reorg,
+   acquisition) in the last 90 days, reference it as a re-engagement hook"
+
+The second versions describe a SHAPE of action. The recruiter fills in the
+specific detail before sending. This is the difference between a useful
+playbook and a fabrication that destroys credibility on the first reply.
+
+Apply this rule to BOTH first_move AND message_style. Phrases like
+"reference their recent OSS commit" are fine; "reference their kernel
+patch on i2c-mux from October" is invention.
 
 Return STRICT JSON only:
 
