@@ -4170,3 +4170,427 @@ async def signatures_stats(user: dict = Depends(get_current_user)):
             "ready_for_clustering": total >= 30,
         },
     }
+
+# ---------- JD SIGNATURE CLUSTERING (Phase B3 Part B) ----------
+#
+# Pure-Python connected-components clustering on Jaccard similarity over
+# (canonical_skills + adjacent_crossover) features. No sklearn dependency.
+#
+# Performance: O(N²) pairwise distance + O(N + E) connected components.
+# At N=30: <50ms total. At N=500: ~3 seconds. At N=5000: 5 minutes
+# (we'd swap to MinHash/LSH approximation before then).
+#
+# The algorithm:
+#   1. For each signature, build a feature set = {canonical_skill_names}
+#      + {adjacent_crossover_titles}
+#   2. For each pair (i, j), compute Jaccard = |A ∩ B| / |A ∪ B|
+#   3. Build undirected graph: edge if Jaccard >= threshold (default 0.30)
+#   4. Find connected components → those are the clusters
+#   5. For each cluster, identify "defining skills" = skills appearing in
+#      ≥50% of cluster members AND in <20% of non-cluster members
+#   6. Singletons (no edges to anyone) are the "potentially emerging"
+#      bucket — these are roles the current taxonomy doesn't have a
+#      coherent pattern for yet.
+
+def _signature_features(sig_row: dict) -> set:
+    """Build the feature set for one signature.
+
+    Combines canonical skill names + adjacent crossover role titles.
+    Lowercased for case-insensitive matching ("Senior" vs "senior").
+    Skills with severity 'blocker' get an extra weight by being added
+    twice (so cluster membership weighs them more).
+    """
+    features = set()
+
+    try:
+        for c in json.loads(sig_row.get("canonical_skills_json") or "[]"):
+            name = (c.get("name") or "").lower().strip()
+            if name:
+                features.add(f"skill:{name}")
+                if c.get("severity") == "blocker":
+                    # Blockers are higher signal — represent twice
+                    features.add(f"blocker:{name}")
+    except Exception:
+        pass
+
+    try:
+        for c in json.loads(sig_row.get("adjacent_crossover_json") or "[]"):
+            title = (c.get("title") or "").lower().strip()
+            if title:
+                features.add(f"crossover:{title}")
+    except Exception:
+        pass
+
+    return features
+
+
+def _jaccard(a: set, b: set) -> float:
+    """Standard Jaccard similarity. Returns 0.0 if both sets are empty."""
+    if not a and not b:
+        return 0.0
+    intersection = len(a & b)
+    union = len(a | b)
+    return intersection / union if union else 0.0
+
+
+def _connected_components(n: int, edges: list) -> list:
+    """Union-find to find connected components.
+
+    Returns list of components, each a list of indices.
+    Components sorted by size (largest first).
+    """
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px != py:
+            parent[px] = py
+
+    for i, j in edges:
+        union(i, j)
+
+    # Group by root
+    components = {}
+    for i in range(n):
+        root = find(i)
+        components.setdefault(root, []).append(i)
+
+    return sorted(components.values(), key=lambda c: -len(c))
+
+
+def _cluster_defining_features(
+    cluster_indices: list,
+    all_features: list,
+    min_in_cluster_pct: float = 0.50,
+    max_out_cluster_pct: float = 0.20,
+) -> list:
+    """Find the features that DEFINE this cluster.
+
+    A defining feature appears in >= min_in_cluster_pct of cluster members
+    AND in < max_out_cluster_pct of non-cluster members. These are the
+    features that distinguish this cluster from the rest of the corpus.
+
+    Returns list of (feature, in_cluster_count, out_cluster_count) tuples
+    sorted by lift (in_pct / out_pct).
+    """
+    in_set = set(cluster_indices)
+    n_in = len(cluster_indices)
+    n_out = len(all_features) - n_in
+    if n_in == 0:
+        return []
+
+    # Count feature occurrences
+    feature_counts_in = {}
+    feature_counts_out = {}
+    for i, feats in enumerate(all_features):
+        for f in feats:
+            if i in in_set:
+                feature_counts_in[f] = feature_counts_in.get(f, 0) + 1
+            else:
+                feature_counts_out[f] = feature_counts_out.get(f, 0) + 1
+
+    defining = []
+    for f, in_count in feature_counts_in.items():
+        in_pct = in_count / n_in if n_in else 0
+        out_count = feature_counts_out.get(f, 0)
+        out_pct = out_count / n_out if n_out else 0
+
+        if in_pct >= min_in_cluster_pct and out_pct < max_out_cluster_pct:
+            # Lift score: how much more common in this cluster vs out
+            lift = in_pct / max(out_pct, 0.01)
+            defining.append({
+                "feature": f,
+                "in_cluster_count": in_count,
+                "in_cluster_pct": round(in_pct, 3),
+                "out_cluster_count": out_count,
+                "out_cluster_pct": round(out_pct, 3),
+                "lift": round(lift, 2),
+            })
+
+    return sorted(defining, key=lambda x: -x["lift"])
+
+
+def _suggest_cluster_name(defining_features: list, member_role_titles: list) -> str:
+    """Suggest a human-readable name for the cluster.
+
+    Strategy:
+      1. If a single role title appears in >50% of members, use it
+      2. Else if defining skills include a clear domain marker
+         ('embedded', 'firmware', 'frontend'), use that + level
+      3. Else fall back to top 2 defining skills concatenated
+      4. Else 'Unnamed cluster'
+    """
+    # Strategy 1: dominant role title
+    if member_role_titles:
+        title_counts = {}
+        for t in member_role_titles:
+            if t:
+                # Normalize whitespace and strip seniority words to find pattern
+                tl = (t or "").lower().strip()
+                title_counts[tl] = title_counts.get(tl, 0) + 1
+        if title_counts:
+            top_title, top_count = max(title_counts.items(), key=lambda x: x[1])
+            if top_count / len(member_role_titles) >= 0.5:
+                # Use the original-case version of the dominant title
+                for t in member_role_titles:
+                    if t and t.lower().strip() == top_title:
+                        return t
+
+    # Strategy 2/3: top defining skills
+    if defining_features:
+        # Strip the type prefix for display
+        top = []
+        for d in defining_features[:3]:
+            f = d["feature"]
+            if ":" in f:
+                _type, name = f.split(":", 1)
+                top.append(name.title())
+        if top:
+            return " + ".join(top)
+
+    return "Unnamed cluster"
+
+
+async def _run_clustering(similarity_threshold: float = 0.30) -> dict:
+    """Run the clustering algorithm against current jd_signatures.
+
+    Returns the full results dict (also persisted to cluster_runs).
+    """
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT req_id, role_title, level, industry, company,
+                      canonical_skills_json, adjacent_crossover_json,
+                      blocker_skills_json, parsed_at
+               FROM jd_signatures"""
+        )
+
+    sigs = []
+    for row in rs.rows:
+        sigs.append({
+            "req_id": row[0],
+            "role_title": row[1],
+            "level": row[2],
+            "industry": row[3],
+            "company": row[4],
+            "canonical_skills_json": row[5],
+            "adjacent_crossover_json": row[6],
+            "blocker_skills_json": row[7],
+            "parsed_at": row[8],
+        })
+
+    n = len(sigs)
+    if n < 2:
+        return {
+            "n_signatures": n,
+            "n_clusters": 0,
+            "n_noise": n,
+            "clusters": [],
+            "noise_signatures": [{"req_id": s["req_id"], "role_title": s["role_title"]} for s in sigs],
+            "warning": "Not enough signatures for clustering (need >=2)",
+        }
+
+    # Build feature sets
+    all_features = [_signature_features(s) for s in sigs]
+
+    # Skip signatures with no features (can't be clustered meaningfully)
+    valid_indices = [i for i, f in enumerate(all_features) if f]
+    if len(valid_indices) < 2:
+        return {
+            "n_signatures": n,
+            "n_clusters": 0,
+            "n_noise": n,
+            "clusters": [],
+            "noise_signatures": [{"req_id": s["req_id"], "role_title": s["role_title"]} for s in sigs],
+            "warning": f"Only {len(valid_indices)} signatures have feature data — most have empty canonical_skills",
+        }
+
+    # Pairwise Jaccard, build edges above threshold
+    edges = []
+    for i in valid_indices:
+        for j in valid_indices:
+            if i >= j:
+                continue
+            sim = _jaccard(all_features[i], all_features[j])
+            if sim >= similarity_threshold:
+                edges.append((i, j))
+
+    # Connected components
+    components = _connected_components(n, edges)
+
+    # Separate clusters (size >= 2) from noise (singletons)
+    clusters = [c for c in components if len(c) >= 2]
+    noise = [c[0] for c in components if len(c) == 1]
+
+    # Build cluster output with defining features + names
+    cluster_results = []
+    for cluster_indices in clusters:
+        defining = _cluster_defining_features(cluster_indices, all_features)
+        member_titles = [sigs[i]["role_title"] for i in cluster_indices]
+
+        # Pairwise similarities WITHIN cluster (cohesion measure)
+        if len(cluster_indices) >= 2:
+            sims = []
+            for ii, idx_a in enumerate(cluster_indices):
+                for idx_b in cluster_indices[ii+1:]:
+                    sims.append(_jaccard(all_features[idx_a], all_features[idx_b]))
+            avg_cohesion = sum(sims) / len(sims) if sims else 0.0
+        else:
+            avg_cohesion = 0.0
+
+        cluster_results.append({
+            "size": len(cluster_indices),
+            "suggested_name": _suggest_cluster_name(defining, member_titles),
+            "avg_cohesion": round(avg_cohesion, 3),
+            "defining_features": defining[:8],  # top 8 most distinguishing
+            "members": [
+                {
+                    "req_id": sigs[i]["req_id"],
+                    "role_title": sigs[i]["role_title"],
+                    "level": sigs[i]["level"],
+                    "industry": sigs[i]["industry"],
+                    "company": sigs[i]["company"],
+                }
+                for i in cluster_indices
+            ],
+        })
+
+    noise_results = [
+        {
+            "req_id": sigs[i]["req_id"],
+            "role_title": sigs[i]["role_title"],
+            "level": sigs[i]["level"],
+            "industry": sigs[i]["industry"],
+            "company": sigs[i]["company"],
+            "n_features": len(all_features[i]),
+        }
+        for i in noise
+    ]
+
+    return {
+        "n_signatures": n,
+        "similarity_threshold": similarity_threshold,
+        "n_edges_above_threshold": len(edges),
+        "n_clusters": len(clusters),
+        "n_noise": len(noise),
+        "clusters": cluster_results,
+        "noise_signatures": noise_results,
+        "interpretation_notes": [
+            "Clusters with high avg_cohesion (>0.5) are tight role patterns.",
+            "Noise signatures are roles that don't fit any current cluster — these are where emerging archetypes live.",
+            "Defining features with high lift (>5) are skills that strongly distinguish this cluster from the rest of the corpus.",
+            f"Run on N={n} signatures. Reliability of cluster discovery improves significantly past N=100.",
+        ],
+    }
+
+
+@app.post("/api/admin/cluster-signatures")
+async def cluster_signatures(user: dict = Depends(get_current_user)):
+    """Run clustering on current jd_signatures and persist to cluster_runs.
+
+    Idempotent in the sense that re-running with same data + threshold
+    produces same output, but each run gets its own row (so we have a
+    timeline of how clustering evolves as data grows).
+    """
+    if user.get("plan") != "pro":
+        raise HTTPException(403, "Admin endpoint — Pro tier required")
+
+    threshold = 0.30  # Tunable via query param later if needed
+    results = await _run_clustering(similarity_threshold=threshold)
+
+    # Persist
+    run_id = str(uuid.uuid4())
+    try:
+        async with db() as client:
+            await client.execute(
+                """INSERT INTO cluster_runs (
+                    id, algorithm, n_signatures, similarity_threshold,
+                    n_clusters, n_noise, results_json
+                ) VALUES (?, 'jaccard-cc-v1', ?, ?, ?, ?, ?)""",
+                [
+                    run_id,
+                    results["n_signatures"],
+                    threshold,
+                    results["n_clusters"],
+                    results["n_noise"],
+                    json.dumps(results),
+                ],
+            )
+        results["run_id"] = run_id
+        results["persisted"] = True
+    except Exception as e:
+        print(f"[cluster-run persist FAIL] {type(e).__name__}: {str(e)[:200]}")
+        results["run_id"] = run_id
+        results["persisted"] = False
+        results["persist_error"] = str(e)[:200]
+
+    return results
+
+
+@app.get("/api/admin/cluster-results")
+async def latest_cluster_results(user: dict = Depends(get_current_user)):
+    """Return the most recent cluster run (no recompute)."""
+    if user.get("plan") != "pro":
+        raise HTTPException(403, "Admin endpoint — Pro tier required")
+
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT id, run_at, algorithm, n_signatures, similarity_threshold,
+                      n_clusters, n_noise, results_json
+               FROM cluster_runs
+               ORDER BY run_at DESC
+               LIMIT 1"""
+        )
+
+    if not rs.rows:
+        return {"message": "No cluster runs yet. POST /api/admin/cluster-signatures to create one."}
+
+    row = rs.rows[0]
+    return {
+        "run_id": row[0],
+        "run_at": row[1],
+        "algorithm": row[2],
+        "n_signatures": row[3],
+        "similarity_threshold": row[4],
+        "n_clusters": row[5],
+        "n_noise": row[6],
+        "results": json.loads(row[7]),
+    }
+
+
+@app.get("/api/admin/cluster-history")
+async def cluster_history(user: dict = Depends(get_current_user)):
+    """List all historical cluster runs (summary only, not full results).
+
+    Useful for tracking how the cluster landscape evolves as data grows.
+    """
+    if user.get("plan") != "pro":
+        raise HTTPException(403, "Admin endpoint — Pro tier required")
+
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT id, run_at, n_signatures, similarity_threshold,
+                      n_clusters, n_noise
+               FROM cluster_runs
+               ORDER BY run_at DESC"""
+        )
+
+    return {
+        "n_runs": len(rs.rows),
+        "runs": [
+            {
+                "run_id": r[0],
+                "run_at": r[1],
+                "n_signatures": r[2],
+                "similarity_threshold": r[3],
+                "n_clusters": r[4],
+                "n_noise": r[5],
+            }
+            for r in rs.rows
+        ],
+    }
