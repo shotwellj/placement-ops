@@ -1988,6 +1988,150 @@ class CandidateEvalRequest(BaseModel):
     source: Optional[str] = None  # where you found them: "linkedin", "github", "referral", etc.
 
 
+
+# ---------- EMAIL HELPERS ----------
+
+async def _send_email(to: str, subject: str, html: str) -> bool:
+    """Send a transactional email via Resend. Returns True on success.
+
+    Used by intake-completion retention emails (and future flows). Magic-link
+    sending stays inline in /api/auth/magic-link because that flow has more
+    elaborate error handling around login_attempts logging.
+
+    Caller policy: this helper SWALLOWS errors after logging them. Intake
+    emails are best-effort; a Resend hiccup must NEVER break a successful
+    intake response. If you need send-or-fail semantics, write a different
+    helper.
+    """
+    if not RESEND_API_KEY:
+        print(f"[email] SKIP to={to} reason=no-resend-key")
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+                json={
+                    "from": "SourcingNav <hello@sourcingnav.com>",
+                    "to": to,
+                    "subject": subject,
+                    "html": html,
+                },
+            )
+        if r.status_code >= 400:
+            print(f"[email FAIL] to={to} status={r.status_code} body={r.text[:200]}")
+            return False
+        print(f"[email OK] to={to} subject={subject[:60]}")
+        return True
+    except Exception as e:
+        print(f"[email ERROR] to={to} type={type(e).__name__} err={str(e)[:200]}")
+        return False
+
+
+def _build_intake_completion_email(
+    parsed: dict,
+    booleans: dict,
+    req_id: str,
+) -> tuple[str, str]:
+    """Build (subject, html) for the post-intake retention email.
+
+    Goal: give the user something USEFUL in their inbox they can act on
+    without logging back in. Specifically:
+      - Subject names the role + company (search-from-inbox handle)
+      - Body shows the top 3 most-likely-to-be-used strings
+      - Closes with a 'next move' nudge from mentor_notes
+      - Direct link back to the req for the full output
+
+    All inputs come from the same `parsed` and `booleans` dicts the API
+    response returns, so we know the shape; defensive .get() everywhere
+    in case the JD parser produced an unusual shape.
+    """
+    core = parsed.get("core", {}) or {}
+    role = core.get("role_title") or "your search"
+    company = core.get("company") or "this role"
+
+    # Subject — specific, useful as an inbox handle later
+    subject = f"Sourcing kit ready: {role} at {company}"
+
+    # Pull the three highest-leverage strings:
+    #   1. LR sniper (tightest match — what they'll run first)
+    #   2. GitHub X-ray (highest signal for technical archetypes)
+    #   3. Best watering-hole (the unique-to-this-role insight)
+    #
+    # If anything is missing, the section just doesn't render — better to
+    # ship a slightly thinner email than to put placeholder text in front
+    # of the user.
+    lr_strings = booleans.get("linkedin_recruiter") or []
+    sniper = next((s for s in lr_strings if (s.get("tier") or "").lower() == "sniper"), None)
+
+    xrays = booleans.get("xray_searches") or []
+    github_xray = next((x for x in xrays if "github" in (x.get("platform") or "").lower()), None)
+
+    holes = parsed.get("watering_holes") or []
+    top_hole = holes[0] if holes else None
+
+    # Pull the mentor note's first tip — that's the 'do this first' nudge
+    mentor = booleans.get("mentor_notes") or {}
+    next_move = (
+        mentor.get("best_xray_to_start")
+        or mentor.get("pro_tip")
+        or "Run the GitHub X-ray first — public commits are the highest signal for technical roles."
+    )
+
+    req_url = f"https://sourcingnav.com/app/pipeline.html?req={req_id}"
+
+    # HTML — minimal styling, mobile-readable, no images (better deliverability)
+    parts = []
+    parts.append(f"""
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1a1a1a;">
+      <h2 style="margin:0 0 8px 0;font-size:20px;color:#1a1a1a;">Your sourcing kit for <span style="color:#2d7eb8;">{role}</span></h2>
+      <p style="margin:0 0 24px 0;color:#666;font-size:14px;">at {company}. Here are the three strings worth running first.</p>
+    """)
+
+    if sniper and sniper.get("string"):
+        parts.append(f"""
+      <div style="margin:0 0 18px 0;padding:14px;background:#f6f8fa;border-left:3px solid #2d7eb8;border-radius:4px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#2d7eb8;margin-bottom:6px;">LinkedIn Recruiter — Sniper (start here)</div>
+        <div style="font-family:Menlo,Consolas,monospace;font-size:12px;color:#1a1a1a;word-break:break-word;line-height:1.5;">{sniper["string"]}</div>
+      </div>
+        """)
+
+    if github_xray and github_xray.get("string"):
+        parts.append(f"""
+      <div style="margin:0 0 18px 0;padding:14px;background:#f6f8fa;border-left:3px solid #4a9d4a;border-radius:4px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#4a9d4a;margin-bottom:6px;">GitHub X-ray — public code, highest signal</div>
+        <div style="font-family:Menlo,Consolas,monospace;font-size:12px;color:#1a1a1a;word-break:break-word;line-height:1.5;">{github_xray["string"]}</div>
+      </div>
+        """)
+
+    if top_hole and top_hole.get("how_to_use"):
+        venue = top_hole.get("venue", "specialty venue")
+        parts.append(f"""
+      <div style="margin:0 0 18px 0;padding:14px;background:#f6f8fa;border-left:3px solid #b85e2d;border-radius:4px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#b85e2d;margin-bottom:6px;">Watering hole — {venue}</div>
+        <div style="font-family:Menlo,Consolas,monospace;font-size:12px;color:#1a1a1a;word-break:break-word;line-height:1.5;">{top_hole["how_to_use"]}</div>
+      </div>
+        """)
+
+    parts.append(f"""
+      <div style="margin:24px 0 18px 0;padding:14px;background:#fff8e1;border:1px solid #f0d97a;border-radius:6px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#996600;margin-bottom:6px;">What to run first</div>
+        <div style="font-size:14px;color:#5a4500;line-height:1.5;">{next_move}</div>
+      </div>
+
+      <div style="margin:32px 0 0 0;text-align:center;">
+        <a href="{req_url}" style="display:inline-block;padding:12px 24px;background:#2d7eb8;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">View the full sourcing kit →</a>
+      </div>
+
+      <div style="margin:32px 0 0 0;padding-top:20px;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center;">
+        Sent because you ran an intake on SourcingNav. <a href="https://sourcingnav.com/app/settings.html" style="color:#999;">Manage emails</a>
+      </div>
+    </div>
+    """)
+
+    return subject, "".join(parts)
+
+
 # ---------- PRODUCTION ROUTES ----------
 
 @app.post("/api/auth/magic-link")
@@ -2777,6 +2921,22 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         await increment_cap(user["id"], "intake")
     except Exception:
         pass  # silently swallow — the work is done, accounting is best-effort
+
+    # Step 6: fire-and-forget retention email.
+    # asyncio.create_task() schedules the send AFTER we return, so the user
+    # gets their intake response immediately and the email goes out in
+    # background. The helper itself swallows all errors — a Resend hiccup
+    # must NEVER break a successful intake response.
+    #
+    # We deliberately email even on first-intake users (no opt-in) because:
+    #   1. They actively pasted a JD and ran an intake — clear engagement signal
+    #   2. The email is content-rich (their booleans), not promotional
+    #   3. Footer has a manage-emails link for opt-out (TODO: build the unsub flow)
+    try:
+        subject, html = _build_intake_completion_email(parsed, booleans, req_id)
+        asyncio.create_task(_send_email(user["email"], subject, html))
+    except Exception as e:
+        print(f"[intake-email schedule FAIL] type={type(e).__name__} err={str(e)[:200]}")
 
     return {
         "req_id": req_id,
