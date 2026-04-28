@@ -112,6 +112,61 @@
   .narrative-callout strong { color: var(--accent); }
 
   .loading { padding: 4rem 2rem; text-align: center; color: var(--text-dim); }
+
+  /* ─── Print stylesheet (PDF export) ───
+     Triggered when user hits "Download PDF" button which calls window.print().
+     Reformats the page for paper / PDF: white background, dark text, no nav,
+     no buttons, page-break-friendly layout. */
+  @media print {
+    body { background: white !important; color: #0a0e1a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; background-image: none !important; }
+    .nav, .toolbar, .footer-note { display: none !important; }
+    .page { padding: 0 !important; max-width: 100% !important; }
+    .page-title { color: #0a0e1a !important; font-size: 1.6rem; }
+    .page-title em { background: none !important; -webkit-text-fill-color: #0a0e1a !important; color: #0a0e1a !important; font-style: italic; }
+    .page-kicker { color: #2eb8b5 !important; }
+    .page-desc { color: #4a5568 !important; }
+
+    .card, .kpi { background: white !important; border: 1px solid #cbd5e0 !important; box-shadow: none !important; page-break-inside: avoid; }
+    .card-title, .card-kicker, .kpi-label, .kpi-sub { color: #2d3748 !important; }
+    .card-narrative { color: #4a5568 !important; }
+    .kpi-value { color: #2eb8b5 !important; }
+
+    .cluster { background: #f7fafc !important; border: 1px solid #cbd5e0 !important; page-break-inside: avoid; }
+    .cluster-name, .member-title, .noise-title { color: #0a0e1a !important; }
+    .member-co, .noise-co, .cluster-section-label, .noise-feat { color: #4a5568 !important; }
+
+    .skill-pill { background: white !important; border: 1px solid #cbd5e0 !important; color: #2d3748 !important; }
+    .skill-pill.blocker { border-color: #fc8181 !important; color: #c53030 !important; }
+    .skill-pill.crossover { border-color: #63b3ed !important; color: #2c5282 !important; }
+    .skill-pill .lift { color: #2eb8b5 !important; }
+
+    .chip-size { background: rgba(46, 184, 181, 0.12) !important; color: #2eb8b5 !important; }
+    .chip-cohesion-tight { background: rgba(72, 187, 120, 0.12) !important; color: #2f855a !important; }
+    .chip-cohesion-loose { background: rgba(237, 137, 54, 0.12) !important; color: #c05621 !important; }
+
+    .bar-track { background: #edf2f7 !important; }
+    .bar-fill { background: linear-gradient(135deg, #2eb8b5, #4299e1) !important; }
+    .bar-label, .bar-count { color: #2d3748 !important; }
+
+    .narrative-callout { background: #f7fafc !important; color: #2d3748 !important; border-left-color: #2eb8b5 !important; page-break-inside: avoid; }
+    .narrative-callout strong { color: #2eb8b5 !important; }
+
+    /* Add a print header so the PDF identifies itself */
+    .page::before {
+      content: "SourcingNav Market Intel · Internal Snapshot";
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: #718096;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #e2e8f0;
+      margin-bottom: 1.5rem;
+    }
+
+    @page { margin: 0.6in 0.5in; }
+  }
 </style>
 </head>
 <body>
@@ -140,6 +195,7 @@
   <div class="toolbar">
     <button id="recluster" class="btn btn-primary">Re-run clustering</button>
     <button id="refresh" class="btn btn-ghost">Refresh data</button>
+    <button id="exportPdf" class="btn btn-ghost" title="Open browser print dialog with PDF-optimized styles. Pick 'Save as PDF' as the destination.">Download PDF</button>
     <span id="lastRun" class="last-run"></span>
   </div>
 
@@ -432,6 +488,13 @@ document.getElementById('recluster').addEventListener('click', async () => {
     btn.disabled = false;
     btn.textContent = 'Re-run clustering';
   }
+});
+
+document.getElementById('exportPdf').addEventListener('click', () => {
+  // Browser-native print-to-PDF. The @media print stylesheet handles
+  // formatting; user picks "Save as PDF" in their browser's print dialog.
+  // No external libraries needed — works in every modern browser.
+  window.print();
 });
 
 document.getElementById('refresh').addEventListener('click', loadAndRender);

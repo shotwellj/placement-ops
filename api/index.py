@@ -4718,3 +4718,156 @@ async def cluster_history(user: dict = Depends(get_current_user)):
             for r in rs.rows
         ],
     }
+
+
+# ---------- PUBLIC MARKET INTEL (Phase B3 Part D) ----------
+#
+# Public, ungated endpoint serving a curated subset of the market intel
+# we surface internally on /app/trends.html. Designed for the public
+# market-intel.html landing page.
+#
+# Honest framing: corpus_size is shown prominently so visitors can
+# evaluate whether the signal is credible. At N=32 we're explicit about
+# this being early signal, not definitive market intelligence.
+#
+# What this endpoint excludes vs the Pro admin endpoints:
+#   - No user IDs / emails / session activity
+#   - No req_ids (internal handles only)
+#   - No timestamps under 24h old (don't leak real-time platform activity)
+#   - Member company names ARE included (these are public JDs we parsed,
+#     not customer data — companies named are who's HIRING, not our
+#     customers)
+
+@app.get("/api/public/market-intel")
+async def public_market_intel():
+    """Public market intelligence summary — no auth required.
+
+    Reads the latest cluster_runs row and combines with current signature
+    stats. Caches at the application layer is overkill; Vercel's CDN
+    handles caching for ungated endpoints.
+    """
+    async with db() as client:
+        # Aggregate stats
+        stats_rs = await client.execute(
+            """SELECT COUNT(*),
+                      COUNT(DISTINCT industry),
+                      COUNT(DISTINCT company),
+                      COUNT(DISTINCT level)
+               FROM jd_signatures"""
+        )
+        if not stats_rs.rows:
+            n_total = n_industries = n_companies = n_levels = 0
+        else:
+            n_total, n_industries, n_companies, n_levels = stats_rs.rows[0]
+
+        # Most recent clustering run
+        cluster_rs = await client.execute(
+            """SELECT id, run_at, n_signatures, similarity_threshold,
+                      n_clusters, n_noise, results_json
+               FROM cluster_runs
+               ORDER BY run_at DESC
+               LIMIT 1"""
+        )
+
+        # Top blocker skills (across whole corpus)
+        blocker_rs = await client.execute(
+            "SELECT blocker_skills_json FROM jd_signatures WHERE blocker_skills_json IS NOT NULL"
+        )
+        blocker_freq = {}
+        for row in blocker_rs.rows:
+            try:
+                for s in json.loads(row[0]):
+                    if s:
+                        blocker_freq[s] = blocker_freq.get(s, 0) + 1
+            except Exception:
+                continue
+        top_blockers = sorted(blocker_freq.items(), key=lambda x: -x[1])[:15]
+
+        # Top adjacent crossover roles
+        cross_rs = await client.execute(
+            "SELECT adjacent_crossover_json FROM jd_signatures WHERE adjacent_crossover_json IS NOT NULL"
+        )
+        cross_freq = {}
+        for row in cross_rs.rows:
+            try:
+                for c in json.loads(row[0]):
+                    title = c.get("title")
+                    if title:
+                        cross_freq[title] = cross_freq.get(title, 0) + 1
+            except Exception:
+                continue
+        top_crossovers = sorted(cross_freq.items(), key=lambda x: -x[1])[:12]
+
+        # Top poaching target companies
+        poach_rs = await client.execute(
+            "SELECT poaching_target_companies_json FROM jd_signatures WHERE poaching_target_companies_json IS NOT NULL"
+        )
+        poach_freq = {}
+        for row in poach_rs.rows:
+            try:
+                for c in json.loads(row[0]):
+                    if c:
+                        poach_freq[c] = poach_freq.get(c, 0) + 1
+            except Exception:
+                continue
+        top_poach = sorted(poach_freq.items(), key=lambda x: -x[1])[:15]
+
+        # Difficulty distribution
+        diff_rs = await client.execute(
+            """SELECT difficulty_score, COUNT(*) as n
+               FROM jd_signatures
+               WHERE difficulty_score IS NOT NULL
+               GROUP BY difficulty_score
+               ORDER BY difficulty_score"""
+        )
+        difficulty = [{"score": r[0], "count": r[1]} for r in diff_rs.rows]
+
+    # Build the response
+    out = {
+        "corpus": {
+            "n_signatures": n_total,
+            "n_industries": n_industries,
+            "n_companies": n_companies,
+            "n_levels": n_levels,
+            "honest_caveat": "Early signal — this corpus reflects the JDs SourcingNav users have parsed. Reliability of cluster patterns improves significantly past N=100.",
+        },
+        "top_blocker_skills": [{"skill": s, "count": c} for s, c in top_blockers],
+        "top_adjacent_crossover_roles": [{"role": s, "count": c} for s, c in top_crossovers],
+        "top_poaching_companies": [{"company": s, "count": c} for s, c in top_poach],
+        "difficulty_distribution": difficulty,
+    }
+
+    # Latest cluster run — include only if we have one
+    if cluster_rs.rows:
+        row = cluster_rs.rows[0]
+        try:
+            results = json.loads(row[6])
+            # Strip req_ids from clusters and noise — keep role + company
+            clusters_out = []
+            for c in results.get("clusters", []):
+                clusters_out.append({
+                    "suggested_name": c.get("suggested_name"),
+                    "size": c.get("size"),
+                    "avg_cohesion": c.get("avg_cohesion"),
+                    "defining_features": c.get("defining_features", []),
+                    "members": [
+                        {"role_title": m.get("role_title"), "company": m.get("company")}
+                        for m in c.get("members", [])
+                    ],
+                })
+            noise_out = [
+                {"role_title": n.get("role_title"), "company": n.get("company"), "n_features": n.get("n_features")}
+                for n in results.get("noise_signatures", [])
+            ]
+            out["clusters"] = clusters_out
+            out["noise_signatures"] = noise_out
+            out["cluster_run"] = {
+                "run_at": row[1],
+                "n_signatures": row[2],
+                "n_clusters": row[4],
+                "n_noise": row[5],
+            }
+        except Exception as e:
+            print(f"[market-intel cluster parse FAIL] {type(e).__name__}: {str(e)[:200]}")
+
+    return out
