@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loading export...</title>
+<style>
+  /* ==========================================================================
+     Print-optimized stylesheet for SourcingNav requisition export.
+     Goals: clean on paper, page-break aware, identical readable output across
+     letter and A4 paper sizes, no interactive elements.
+     ========================================================================== */
+  :root {
+    --text: #1a1a1a;
+    --text-dim: #4a5568;
+    --text-mute: #718096;
+    --border: #cbd5e0;
+    --border-light: #e2e8f0;
+    --accent: #2c7a7b;
+    --accent-bg: #e6fffa;
+    --good: #2f855a;
+    --good-bg: #f0fff4;
+    --warn: #b7791f;
+    --warn-bg: #fffaf0;
+    --danger: #c53030;
+    --danger-bg: #fff5f5;
+    --bg-soft: #f7fafc;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: white;
+    color: var(--text);
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 10pt;
+    line-height: 1.5;
+  }
+  body { padding: 0.5in 0.6in; max-width: 7.5in; margin: 0 auto; }
+
+  h1 { font-size: 22pt; font-weight: 700; margin: 0 0 0.4rem; line-height: 1.15; }
+  h2 { font-size: 14pt; font-weight: 700; margin: 1.6rem 0 0.6rem; padding-top: 0.3rem; border-top: 2px solid var(--text); page-break-after: avoid; }
+  h3 { font-size: 11pt; font-weight: 700; margin: 1rem 0 0.4rem; page-break-after: avoid; }
+  h4 { font-size: 10pt; font-weight: 700; margin: 0.7rem 0 0.3rem; page-break-after: avoid; }
+  p { margin: 0 0 0.6rem; }
+  ul { margin: 0 0 0.6rem; padding-left: 1.2rem; }
+  li { margin-bottom: 0.25rem; }
+
+  .meta-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin: 0.6rem 0 1.5rem;
+    padding: 0.6rem;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    page-break-inside: avoid;
+  }
+  .meta-cell .label { font-size: 7.5pt; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .meta-cell .value { font-size: 10pt; font-weight: 600; color: var(--text); margin-top: 0.15rem; }
+
+  .header {
+    border-bottom: 3px solid var(--text);
+    padding-bottom: 0.7rem;
+    margin-bottom: 1rem;
+  }
+  .header .source-badge { font-size: 8pt; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; margin-bottom: 0.3rem; }
+  .header .role-line { font-size: 12pt; color: var(--text-dim); margin-top: 0.3rem; }
+
+  .section { page-break-inside: auto; margin-bottom: 0.8rem; }
+  .subsection { margin-bottom: 1rem; padding-left: 0.5rem; border-left: 2px solid var(--border-light); }
+
+  /* Tier and severity badges (printed as inline-block colored boxes) */
+  .badge { display: inline-block; padding: 0.08rem 0.4rem; border-radius: 3px; font-size: 7.5pt; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle; }
+  .badge-blocker { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+  .badge-preferred { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+  .badge-good { background: var(--good-bg); color: var(--good); border: 1px solid var(--good); }
+  .badge-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+  .badge-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+  .badge-mute { background: var(--bg-soft); color: var(--text-dim); border: 1px solid var(--border); }
+  .badge-tier1 { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+  .badge-tier2 { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+  .badge-tier3 { background: var(--good-bg); color: var(--good); border: 1px solid var(--good); }
+
+  /* Skill rows in tables/lists */
+  .skill-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .skill-row:last-child { border-bottom: none; }
+  .skill-row .skill-main { flex: 1; }
+  .skill-row .skill-name { font-weight: 600; }
+  .skill-row .skill-rationale { font-size: 9pt; color: var(--text-dim); margin-top: 0.15rem; }
+
+  /* Boolean string blocks (monospace, indented) */
+  .boolean-block {
+    background: var(--bg-soft);
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    padding: 0.5rem 0.7rem;
+    margin: 0.4rem 0 0.7rem;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 8.5pt;
+    line-height: 1.45;
+    word-break: break-all;
+    white-space: pre-wrap;
+    page-break-inside: avoid;
+  }
+  .boolean-label { font-size: 8pt; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 0.2rem; }
+
+  /* Chip lists for things like company tiers, skills, platforms */
+  .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.3rem 0; }
+  .chip {
+    display: inline-block;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    padding: 0.15rem 0.5rem;
+    font-size: 9pt;
+    font-weight: 500;
+  }
+
+  /* Tier-grouped lists like skill substitutions */
+  .tier-group { margin-bottom: 1rem; page-break-inside: auto; }
+  .tier-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    margin-bottom: 0.4rem;
+    border-radius: 3px;
+    font-size: 9pt;
+    font-weight: 700;
+    page-break-after: avoid;
+  }
+  .tier-group-header.high { background: var(--good-bg); color: var(--good); border: 1px solid var(--good); }
+  .tier-group-header.medium { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+  .tier-group-header.low { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+  .tier-group-header .count { margin-left: auto; font-family: monospace; }
+
+  .tier-row {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    margin-bottom: 0.3rem;
+    page-break-inside: avoid;
+  }
+  .tier-row .name { font-weight: 600; margin-bottom: 0.2rem; }
+  .tier-row .rationale { font-size: 9pt; color: var(--text-dim); }
+  .tier-row .source { font-size: 8.5pt; color: var(--text-mute); font-style: italic; margin-top: 0.3rem; padding-top: 0.3rem; border-top: 1px dashed var(--border-light); }
+
+  /* Phase blocks for sourcing sequence */
+  .phase {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.7rem;
+    background: var(--bg-soft);
+    page-break-inside: avoid;
+  }
+  .phase-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 0.3rem;
+  }
+  .phase-num { background: var(--text); color: white; border-radius: 50%; width: 1.4rem; height: 1.4rem; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 9pt; margin-right: 0.4rem; }
+  .phase-title { font-weight: 700; font-size: 11pt; }
+  .phase-meta { font-size: 8.5pt; color: var(--text-mute); }
+
+  /* Objection blocks */
+  .objection-block {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.7rem;
+    background: var(--bg-soft);
+    page-break-inside: avoid;
+  }
+  .objection-quote {
+    font-style: italic;
+    color: var(--text-dim);
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--accent);
+    margin: 0.4rem 0;
+  }
+  .objection-counter {
+    font-size: 9.5pt;
+    margin-top: 0.4rem;
+    padding: 0.5rem;
+    background: var(--accent-bg);
+    border-radius: 3px;
+  }
+
+  /* Watering-hole entries */
+  .venue {
+    padding: 0.5rem 0.6rem;
+    border-left: 3px solid var(--accent);
+    background: var(--bg-soft);
+    margin-bottom: 0.5rem;
+    page-break-inside: avoid;
+  }
+  .venue-name { font-weight: 700; font-size: 10pt; }
+  .venue-type { font-size: 8pt; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.05em; }
+  .venue-signal { font-size: 9pt; color: var(--text-dim); margin: 0.2rem 0; }
+  .venue-tip { font-size: 9pt; }
+
+  /* Loading + error states (browser only, not seen in print) */
+  .status-msg {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-dim);
+    font-size: 12pt;
+  }
+  .footer { margin-top: 2rem; padding-top: 0.7rem; border-top: 1px solid var(--border); font-size: 8pt; color: var(--text-mute); text-align: center; }
+
+  /* Print-specific overrides */
+  @page {
+    size: letter;
+    margin: 0.5in 0.6in;
+  }
+  @media print {
+    body { padding: 0; max-width: none; }
+    .no-print { display: none !important; }
+    h2 { page-break-after: avoid; }
+    .skill-row, .boolean-block, .tier-row, .phase, .objection-block, .venue { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <div id="content"><div class="status-msg">Loading export…</div></div>
+
+  <div class="no-print" style="position: fixed; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; background: white; padding: 0.5rem; border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 100;">
+    <button onclick="window.print()" style="background: var(--text); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; font-size: 10pt; font-weight: 600; cursor: pointer;">Save as PDF / Print</button>
+    <button onclick="window.close()" style="background: transparent; color: var(--text-dim); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 4px; font-size: 10pt; cursor: pointer;">Close</button>
+  </div>
+
+<script>
+// ============================================================================
+// Print view renderer
+// ----------------------------------------------------------------------------
+// Reads req_id from URL query, fetches the export endpoint with the auth token
+// (which was stashed in sessionStorage by the source page), renders all sections
+// inline (no collapsibles, no interactive states), and auto-triggers
+// window.print() once the DOM is settled.
+//
+// Why fetch instead of reading the whole payload from sessionStorage:
+// reliability. sessionStorage can hit size limits (~5MB) for big requisitions
+// with full Pro output. The endpoint reads from the canonical DB record.
+// CI data is not persisted server-side, so if the source page wants CI in the
+// export, it stashes that specific blob in sessionStorage as a fallback.
+// ============================================================================
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch { return iso; }
+}
+
+function tierBadgeClass(severity) {
+  const m = { blocker: 'badge-blocker', preferred: 'badge-preferred', nice: 'badge-mute' };
+  return m[severity] || 'badge-mute';
+}
+
+// ============================================================================
+// Section renderers — each returns an HTML string
+// ============================================================================
+
+function renderHeader(data) {
+  const p = data.parsed || {};
+  const core = p.core || {};
+  const market = p.market_dynamics || {};
+  const comp = p.comp_snapshot || {};
+  return `
+    <div class="header">
+      <div class="source-badge">SourcingNav · Requisition Export</div>
+      <h1>${escapeHtml(core.role_title || data.title || 'Untitled')}</h1>
+      <div class="role-line">${escapeHtml(core.company || '—')} · ${escapeHtml(core.location || '—')} · ${escapeHtml(core.industry || '—')}</div>
+    </div>
+    <div class="meta-bar">
+      <div class="meta-cell"><div class="label">Level</div><div class="value">${escapeHtml(core.level || '—')}</div></div>
+      <div class="meta-cell"><div class="label">Remote</div><div class="value">${escapeHtml(core.remote_policy || '—')}</div></div>
+      <div class="meta-cell"><div class="label">Difficulty</div><div class="value">${market.difficulty_score ? market.difficulty_score + '/10' : '—'}</div></div>
+      <div class="meta-cell"><div class="label">Comp</div><div class="value">${escapeHtml(comp.base_range || comp.total_comp_range || '—')}</div></div>
+      <div class="meta-cell"><div class="label">Exported</div><div class="value">${fmtDate(data.exported_at)}</div></div>
+      <div class="meta-cell"><div class="label">Created</div><div class="value">${fmtDate(data.opened_at)}</div></div>
+      <div class="meta-cell"><div class="label">Plan</div><div class="value">${escapeHtml((data.plan || 'free').toUpperCase())}</div></div>
+      <div class="meta-cell"><div class="label">Req ID</div><div class="value" style="font-family: monospace; font-size: 8pt;">${escapeHtml((data.req_id || '').slice(0, 8))}</div></div>
+    </div>
+  `;
+}
+
+function renderExecBrief(p) {
+  const eb = p.executive_brief || {};
+  if (!eb.summary && !(eb.recommended_first_moves || []).length) return '';
+  const moves = eb.recommended_first_moves || [];
+  return `
+    <section class="section">
+      <h2>Executive brief</h2>
+      ${eb.summary ? `<p>${escapeHtml(eb.summary)}</p>` : ''}
+      ${moves.length ? `<h4>Recommended first moves</h4><ul>${moves.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>` : ''}
+      ${eb.market_temperature ? `<p style="font-size: 9pt; color: var(--text-dim);"><strong>Market temperature:</strong> ${escapeHtml(eb.market_temperature)}</p>` : ''}
+    </section>
+  `;
+}
+
+function renderComp(p) {
+  const c = p.comp_snapshot || {};
+  if (!c.base_range && !c.total_comp_range && !c.equity_notes) return '';
+  return `
+    <section class="section">
+      <h2>Compensation</h2>
+      ${c.base_range ? `<p><strong>Base range:</strong> ${escapeHtml(c.base_range)}</p>` : ''}
+      ${c.total_comp_range ? `<p><strong>Total comp range:</strong> ${escapeHtml(c.total_comp_range)}</p>` : ''}
+      ${c.equity_notes ? `<p><strong>Equity:</strong> ${escapeHtml(c.equity_notes)}</p>` : ''}
+      ${c.negotiation_notes ? `<p><strong>Negotiation:</strong> ${escapeHtml(c.negotiation_notes)}</p>` : ''}
+    </section>
+  `;
+}
+
+function renderSkills(p) {
+  const must = p.must_have_skills || [];
+  const nice = p.nice_to_have_skills || [];
+  if (!must.length && !nice.length) return '';
+  const renderSkill = (s) => `
+    <li class="skill-row">
+      <span class="badge ${tierBadgeClass(s.severity)}">${escapeHtml(s.severity || 'blocker')}</span>
+      <div class="skill-main">
+        <div class="skill-name">${escapeHtml(s.skill || '')}</div>
+        ${s.rationale ? `<div class="skill-rationale">${escapeHtml(s.rationale)}</div>` : ''}
+      </div>
+    </li>
+  `;
+  return `
+    <section class="section">
+      <h2>Required skills</h2>
+      ${must.length ? `<ul style="list-style: none; padding: 0;">${must.map(renderSkill).join('')}</ul>` : ''}
+      ${nice.length ? `<h3>Nice to have</h3><ul style="list-style: none; padding: 0;">${nice.map(renderSkill).join('')}</ul>` : ''}
+    </section>
+  `;
+}
+
+function renderBooleans(b) {
+  if (!b || typeof b !== 'object') return '';
+  const renderTier = (label, str) => str ? `
+    <div>
+      <div class="boolean-label">${escapeHtml(label)}</div>
+      <div class="boolean-block">${escapeHtml(str)}</div>
+    </div>
+  ` : '';
+  const lr = b.linkedin_recruiter || {};
+  const xrays = b.xray_strings || b.xrays || {};
+  const xrayHtml = Object.keys(xrays).map(k => renderTier(`X-ray: ${k}`, xrays[k])).join('');
+  return `
+    <section class="section">
+      <h2>Boolean strings</h2>
+      ${renderTier('LinkedIn Recruiter · Sniper', lr.sniper)}
+      ${renderTier('LinkedIn Recruiter · Precision', lr.precision)}
+      ${renderTier('LinkedIn Recruiter · Expanded', lr.expanded)}
+      ${xrayHtml}
+      ${(b.mentor_notes || []).length ? `
+        <h3>Mentor notes</h3>
+        <ul>${(b.mentor_notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+      ` : ''}
+    </section>
+  `;
+}
+
+function renderCompanies(b, p) {
+  const cc = b.company_clusters || {};
+  const tier1 = cc.tier_1_direct_competitors || cc.tier_1 || [];
+  const tier2 = cc.tier_2_adjacent || cc.tier_2 || [];
+  if (!tier1.length && !tier2.length) return '';
+  return `
+    <section class="section">
+      <h2>Company clusters</h2>
+      ${tier1.length ? `<h4>Tier 1 · Direct competitors</h4><div class="chips">${tier1.map(c => `<span class="chip">${escapeHtml(c)}</span>`).join('')}</div>` : ''}
+      ${tier2.length ? `<h4>Tier 2 · Adjacent</h4><div class="chips">${tier2.map(c => `<span class="chip">${escapeHtml(c)}</span>`).join('')}</div>` : ''}
+    </section>
+  `;
+}
+
+function renderAltTitles(p) {
+  const a = p.alt_titles || {};
+  const levels = a.level_progression || (a.ic_junior !== undefined ? a : null);
+  const functional = a.functional_aliases || [];
+  const adjacent = a.adjacent_crossover || [];
+  if (!levels && !functional.length && !adjacent.length) return '';
+  const levelsHtml = levels ? Object.keys(levels).filter(k => Array.isArray(levels[k])).map(k => `
+    <div style="margin-bottom: 0.4rem;">
+      <strong style="font-size: 9pt;">${escapeHtml(k.replace(/_/g, ' '))}:</strong>
+      <span class="chips">${(levels[k] || []).map(t => `<span class="chip">${escapeHtml(t)}</span>`).join('')}</span>
+    </div>
+  `).join('') : '';
+  return `
+    <section class="section">
+      <h2>Alternate titles</h2>
+      ${levelsHtml ? `<h4>Level progression</h4>${levelsHtml}` : ''}
+      ${functional.length ? `<h4>Functional aliases</h4><div class="chips">${functional.map(t => `<span class="chip">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+      ${adjacent.length ? `<h4>Adjacent crossover</h4><div class="chips">${adjacent.map(t => `<span class="chip">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+    </section>
+  `;
+}
+
+function renderSkillAlts(alternatives) {
+  if (!alternatives || typeof alternatives !== 'object') return '';
+  const flat = [];
+  for (const skill of Object.keys(alternatives)) {
+    for (const a of (alternatives[skill] || [])) {
+      if (!a.alternative) continue;
+      flat.push({ ...a, sourceSkill: skill });
+    }
+  }
+  if (!flat.length) return '';
+  const tierMeta = [
+    { key: 'high',   label: 'HIGH FIT',     subtitle: 'day-1 ready' },
+    { key: 'medium', label: 'PHONE SCREEN', subtitle: 'worth a call' },
+    { key: 'low',    label: 'RAMP-UP',      subtitle: 'will need 30-60 days' },
+  ];
+  const groups = tierMeta.map(m => {
+    const rows = flat.filter(f => (f.transferability || '').toLowerCase() === m.key);
+    if (!rows.length) return '';
+    return `
+      <div class="tier-group">
+        <div class="tier-group-header ${m.key}">
+          <span>${m.label}</span>
+          <span style="font-weight: 400; font-size: 8.5pt;">${m.subtitle}</span>
+          <span class="count">${rows.length}</span>
+        </div>
+        ${rows.map(r => `
+          <div class="tier-row">
+            <div class="name">${escapeHtml(r.alternative)}</div>
+            <div class="rationale">${escapeHtml(r.context || '')}</div>
+            <div class="source">From JD: ${escapeHtml(r.sourceSkill)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }).join('');
+  return `<section class="section"><h2>Skill substitutions</h2>${groups}</section>`;
+}
+
+function renderWateringHoles(p) {
+  const holes = p.watering_holes || [];
+  if (!holes.length) return '';
+  return `
+    <section class="section">
+      <h2>Watering holes</h2>
+      ${holes.map(h => `
+        <div class="venue">
+          <div><span class="venue-name">${escapeHtml(h.venue || h.name || '')}</span> <span class="venue-type">${escapeHtml(h.venue_type || h.type || '')}</span></div>
+          ${h.signal ? `<div class="venue-signal">${escapeHtml(h.signal)}</div>` : ''}
+          ${h.tip || h.how_to ? `<div class="venue-tip"><strong>How:</strong> ${escapeHtml(h.tip || h.how_to)}</div>` : ''}
+        </div>
+      `).join('')}
+    </section>
+  `;
+}
+
+function renderObjections(p) {
+  const ops = p.objection_playbook || [];
+  if (!ops.length) return '';
+  return `
+    <section class="section">
+      <h2>Objection playbook</h2>
+      ${ops.map(o => `
+        <div class="objection-block">
+          <h4>${escapeHtml(o.category || o.objection_type || 'Objection')} <span class="badge badge-mute">${escapeHtml(o.likelihood || 'medium')} likelihood</span></h4>
+          ${o.what_theyll_say ? `<div class="objection-quote">${escapeHtml(o.what_theyll_say)}</div>` : ''}
+          ${o.your_pre_empt ? `<div class="objection-counter"><strong>Your counter:</strong> ${escapeHtml(o.your_pre_empt)}</div>` : ''}
+        </div>
+      `).join('')}
+    </section>
+  `;
+}
+
+function renderSequence(p) {
+  const phases = p.sequenced_play || [];
+  if (!phases.length) return '';
+  return `
+    <section class="section">
+      <h2>21-day sourcing sequence</h2>
+      ${phases.map((ph, i) => `
+        <div class="phase">
+          <div class="phase-header">
+            <span><span class="phase-num">${i + 1}</span><span class="phase-title">${escapeHtml(ph.phase_name || ph.name || '')}</span></span>
+            <span class="phase-meta">${escapeHtml(ph.days || '')} · ${escapeHtml(ph.expected_response_rate || '')}</span>
+          </div>
+          ${(ph.channels || []).length ? `<ul>${(ph.channels || []).map(c => `<li>${escapeHtml(c)}</li>`).join('')}</ul>` : ''}
+          ${ph.voice_and_angle ? `<p style="font-size: 9pt;"><strong>Voice:</strong> ${escapeHtml(ph.voice_and_angle)}</p>` : ''}
+          ${ph.day_1_action ? `<p style="font-size: 9pt;"><strong>Day 1:</strong> ${escapeHtml(ph.day_1_action)}</p>` : ''}
+        </div>
+      `).join('')}
+    </section>
+  `;
+}
+
+function renderProBriefing(p) {
+  const briefing = p.pro_skill_briefing || [];
+  const archetypes = p.career_switcher_archetypes || [];
+  if (!briefing.length && !archetypes.length) return '';
+  const tierClass = (t) => ({ 1: 'badge-tier1', 2: 'badge-tier2', 3: 'badge-tier3' }[t] || 'badge-mute');
+  const briefingHtml = briefing.length ? `
+    <h3>Skill triage</h3>
+    ${briefing.map(b => `
+      <div class="tier-row">
+        <div><span class="badge ${tierClass(b.tier)}">Tier ${b.tier} · ${escapeHtml(b.tier_label || '')}</span> <span class="badge badge-mute">${escapeHtml((b.interview_stage || '').replace(/_/g, ' '))}</span></div>
+        <div class="name" style="margin-top: 0.3rem;">${escapeHtml(b.skill || '')}</div>
+        ${b.rationale ? `<div class="rationale">${escapeHtml(b.rationale)}</div>` : ''}
+        ${b.pushback_guidance ? `<div style="margin-top: 0.4rem; padding: 0.4rem; background: var(--bg-soft); border-left: 2px solid var(--accent); font-size: 9pt;"><strong>Pushback:</strong> ${escapeHtml(b.pushback_guidance)}</div>` : ''}
+        ${(b.acceptable_substitutions || []).length ? `<div style="margin-top: 0.3rem; font-size: 9pt;"><strong>Subs:</strong> ${b.acceptable_substitutions.map(s => `<span class="chip">${escapeHtml(s)}</span>`).join(' ')}</div>` : ''}
+      </div>
+    `).join('')}
+  ` : '';
+  const archetypesHtml = archetypes.length ? `
+    <h3>Career switcher archetypes</h3>
+    ${archetypes.map(a => `
+      <div class="tier-row">
+        <div class="name">${escapeHtml(a.from_role || '')} → ${escapeHtml(a.to_role || '')} <span class="badge badge-mute">${escapeHtml(a.transition_difficulty || '')}</span></div>
+        ${a.pitch_angle ? `<div class="rationale" style="margin-top: 0.3rem;"><strong>Pitch:</strong> ${escapeHtml(a.pitch_angle)}</div>` : ''}
+        ${(a.transferable_skills || []).length ? `<div style="margin-top: 0.3rem; font-size: 9pt;"><strong>Transferable:</strong> ${a.transferable_skills.map(s => `<span class="chip">${escapeHtml(s)}</span>`).join(' ')}</div>` : ''}
+        ${(a.where_to_find || []).length ? `<div style="margin-top: 0.3rem; font-size: 9pt;"><strong>Where:</strong> <ul style="margin: 0.2rem 0 0;">${a.where_to_find.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul></div>` : ''}
+      </div>
+    `).join('')}
+  ` : '';
+  return `<section class="section"><h2>Pro skill briefing</h2>${briefingHtml}${archetypesHtml}</section>`;
+}
+
+function renderProBooleans(p) {
+  const ext = p.pro_boolean_extensions || {};
+  if (!ext || !Object.keys(ext).length) return '';
+  const lr = ext.lr_rationale || {};
+  const dragnet = ext.lr_dragnet || {};
+  const targeted = ext.lr_company_targeted || {};
+  const cluster = ext.company_cluster_rationale || {};
+  const xrays = ext.pro_xrays || [];
+  const pools = ext.hidden_talent_pools || [];
+  const notes = ext.extended_mentor_notes || [];
+  return `
+    <section class="section">
+      <h2>Pro boolean extensions</h2>
+      ${Object.keys(lr).filter(k => lr[k]).length ? `
+        <h3>Rationale on existing tiers</h3>
+        ${['sniper', 'precision', 'expanded'].map(k => lr[k] ? `<p><strong>${k}:</strong> ${escapeHtml(lr[k])}</p>` : '').join('')}
+      ` : ''}
+      ${dragnet.string ? `<h3>Dragnet</h3><div class="boolean-block">${escapeHtml(dragnet.string)}</div>${dragnet.rationale ? `<p style="font-size: 9pt;">${escapeHtml(dragnet.rationale)}</p>` : ''}` : ''}
+      ${targeted.string ? `<h3>Company-targeted</h3><div class="boolean-block">${escapeHtml(targeted.string)}</div>${targeted.rationale ? `<p style="font-size: 9pt;">${escapeHtml(targeted.rationale)}</p>` : ''}` : ''}
+      ${(cluster.tier_1 || []).length ? `<h3>Tier 1 cluster rationale</h3><ul>${cluster.tier_1.map(c => `<li><strong>${escapeHtml(c.company)}:</strong> ${escapeHtml(c.rationale || '')}</li>`).join('')}</ul>` : ''}
+      ${(cluster.tier_2 || []).length ? `<h3>Tier 2 cluster rationale</h3><ul>${cluster.tier_2.map(c => `<li><strong>${escapeHtml(c.company)}:</strong> ${escapeHtml(c.rationale || '')}</li>`).join('')}</ul>` : ''}
+      ${xrays.length ? `<h3>Pro X-rays</h3>${xrays.map(x => `
+        <div style="margin-bottom: 0.6rem;">
+          <div><strong>${escapeHtml(x.venue_name || '')}</strong> <span class="badge badge-mute">${escapeHtml(x.venue_type || '')}</span></div>
+          <div class="boolean-block">${escapeHtml(x.xray_string || '')}</div>
+          ${x.signal ? `<div style="font-size: 9pt; color: var(--text-dim);">${escapeHtml(x.signal)}</div>` : ''}
+        </div>
+      `).join('')}` : ''}
+      ${pools.length ? `<h3>Hidden talent pools</h3>${pools.map(p => `
+        <div class="tier-row">
+          <div class="name">${escapeHtml(p.pool_name || '')}</div>
+          ${p.why_target ? `<div class="rationale">${escapeHtml(p.why_target)}</div>` : ''}
+          ${(p.platforms || []).length ? `<div style="margin-top: 0.3rem; font-size: 9pt;"><strong>Platforms:</strong> ${p.platforms.map(pl => `<span class="chip">${escapeHtml(pl)}</span>`).join(' ')}</div>` : ''}
+          ${p.search_tips ? `<div style="margin-top: 0.3rem; font-size: 9pt;"><strong>Tips:</strong> ${escapeHtml(p.search_tips)}</div>` : ''}
+        </div>
+      `).join('')}` : ''}
+      ${notes.length ? `<h3>Extended mentor notes</h3><ul>${notes.map(n => `<li><strong>${escapeHtml(n.label || '')}:</strong> ${escapeHtml(n.note || '')}</li>`).join('')}</ul>` : ''}
+    </section>
+  `;
+}
+
+function renderCI(ci) {
+  if (!ci || !Array.isArray(ci.companies) || !ci.companies.length) return '';
+  return `
+    <section class="section">
+      <h2>Competitive intelligence</h2>
+      ${ci.companies.map(c => `
+        <div class="objection-block">
+          <h4>${escapeHtml(c.company || '')} <span class="badge badge-mute">${escapeHtml((c.tier || '').toString())}</span></h4>
+          ${c.hiring_velocity ? `<p style="font-size: 9pt;"><strong>Hiring velocity:</strong> ${escapeHtml(c.hiring_velocity)}</p>` : ''}
+          ${c.salary_range ? `<p style="font-size: 9pt;"><strong>Salary:</strong> ${escapeHtml(c.salary_range)} (confidence: ${escapeHtml(c.salary_confidence || '?')})</p>` : ''}
+          ${c.poaching_difficulty ? `<p style="font-size: 9pt;"><strong>Difficulty:</strong> ${escapeHtml(c.poaching_difficulty)}</p>` : ''}
+          ${c.recruiting_angle ? `<p style="font-size: 9pt;"><strong>Angle:</strong> ${escapeHtml(c.recruiting_angle)}</p>` : ''}
+        </div>
+      `).join('')}
+      ${ci.market_summary ? `<p style="margin-top: 0.7rem; font-size: 9pt; color: var(--text-dim);"><strong>Market summary:</strong> ${escapeHtml(ci.market_summary.comp_vs_jd || ci.market_summary.summary || '')}</p>` : ''}
+    </section>
+  `;
+}
+
+// ============================================================================
+// Main render orchestration
+// ============================================================================
+
+async function loadAndRender() {
+  const params = new URLSearchParams(window.location.search);
+  const reqId = params.get('req_id');
+  if (!reqId) {
+    document.getElementById('content').innerHTML = '<div class="status-msg">No requisition ID in URL.</div>';
+    return;
+  }
+
+  // Auth: try session token, then bearer in localStorage. The source page
+  // (app/index.html) stores the auth token in localStorage as 'sn_token'.
+  const token = localStorage.getItem('sn_token') || sessionStorage.getItem('sn_token');
+  if (!token) {
+    document.getElementById('content').innerHTML = '<div class="status-msg">Not signed in. Please return to the main app and sign in first.</div>';
+    return;
+  }
+
+  let data;
+  try {
+    const r = await fetch(`/api/req/${encodeURIComponent(reqId)}/export`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      document.getElementById('content').innerHTML = `<div class="status-msg">Could not load requisition (${r.status}). ${escapeHtml(errText.slice(0, 300))}</div>`;
+      return;
+    }
+    data = await r.json();
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="status-msg">Network error: ${escapeHtml(String(e))}</div>`;
+    return;
+  }
+
+  // CI is not persisted server-side. If the source page stashed it in
+  // sessionStorage under the key `ci_${req_id}`, splice it into data here.
+  try {
+    const ciStashed = sessionStorage.getItem(`ci_${reqId}`);
+    if (ciStashed) data.competitive_intel = JSON.parse(ciStashed);
+  } catch {}
+
+  const p = data.parsed || {};
+  const b = data.booleans || {};
+
+  document.title = `${(p.core && p.core.role_title) || data.title || 'Requisition'} - SourcingNav Export`;
+
+  document.getElementById('content').innerHTML = [
+    renderHeader(data),
+    renderExecBrief(p),
+    renderComp(p),
+    renderSkills(p),
+    renderBooleans(b),
+    renderCompanies(b, p),
+    renderAltTitles(p),
+    renderSkillAlts(p.skill_alternatives || data.skill_alternatives),
+    renderWateringHoles(p),
+    renderObjections(p),
+    renderSequence(p),
+    renderProBriefing(p),
+    renderProBooleans(p),
+    renderCI(data.competitive_intel),
+    `<div class="footer">Generated by SourcingNav · ${escapeHtml(fmtDate(data.exported_at))} · sourcingnav.com</div>`,
+  ].filter(Boolean).join('');
+
+  // Auto-trigger print dialog after a brief render delay so layout settles
+  // and fonts load. User can close the dialog if they just wanted to view.
+  setTimeout(() => {
+    try { window.print(); } catch (e) {}
+  }, 600);
+}
+
+loadAndRender();
+</script>
+</body>
+</html>

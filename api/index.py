@@ -3439,6 +3439,72 @@ async def save_byok_key(req: ByokRequest, user: dict = Depends(get_current_user)
     )
 
 
+# ---------- REQ EXPORT (read-only, owner-gated) ----------
+#
+# Returns the full data payload for a single requisition so the client-side
+# print view (/app/print.html) can render an expert-shareable report. The
+# print view auto-triggers window.print() so the user gets the browser's
+# native "Save as PDF" dialog without any server-side PDF library.
+#
+# Why a separate endpoint and not /api/intake/{id}: intake is the create
+# action; this is a read for export. Keeping them separate makes the auth
+# story simpler — export is a pure read with owner verification, while
+# intake has cap-checking, AI calls, and storage logic.
+@app.get("/api/req/{req_id}/export")
+async def export_req(req_id: str, user: dict = Depends(get_current_user)):
+    """Return the full req payload for client-side print/PDF rendering.
+
+    Auth: bearer token required. Owner check: req.user_id must match the
+    authenticated user, OR they must be in the same org as the req's owner.
+    Same-org access matches the existing dashboard behavior.
+
+    Returns: {
+      req_id, title, jd_text, parsed, booleans, competitive_intel,
+      plan (the requesting user's plan, drives Pro section visibility in
+      the print view), exported_at (ISO timestamp for the report header).
+    }
+    """
+    try:
+        async with db() as client:
+            rs = await client.execute(
+                """SELECT id, title, jd_raw, parsed_json, boolean_strings_json,
+                          user_id, org_id, opened_at
+                   FROM requisitions
+                   WHERE id = ?""",
+                [req_id],
+            )
+            if not rs.rows:
+                raise HTTPException(404, "Requisition not found")
+            r = rs.rows[0]
+            # Owner OR same-org access. Mirrors dashboard policy.
+            if r[5] != user["id"] and r[6] != user.get("org_id"):
+                raise HTTPException(403, "Not authorized to export this requisition")
+            # Get user's plan for Pro section visibility
+            plan_rs = await client.execute(
+                "SELECT plan FROM users WHERE id = ?", [user["id"]]
+            )
+            plan = plan_rs.rows[0][0] if plan_rs.rows else "free"
+            # Note: competitive_intel is NOT included in the export today because
+            # CI results are not persisted to a column (CI is generated on demand).
+            # If the caller wants CI in the print view, they pass it client-side
+            # via sessionStorage. Future work: cache CI to a column and include here.
+            return {
+                "req_id": r[0],
+                "title": r[1],
+                "jd_text": r[2] or "",
+                "parsed": json.loads(r[3]) if r[3] else {},
+                "booleans": json.loads(r[4]) if r[4] else {},
+                "competitive_intel": None,
+                "plan": plan,
+                "opened_at": r[7],
+                "exported_at": datetime.now(timezone.utc).isoformat(),
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[export] {type(e).__name__}: {str(e)[:200]}")
+
+
 @app.post("/api/intake")
 async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     """Paste JD → parsed analysis + Boolean strings. Saves as a requisition.

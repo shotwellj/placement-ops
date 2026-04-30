@@ -334,6 +334,7 @@
       <p style="color: var(--text-dim); margin-bottom: 1rem;">Full analysis is now in your pipeline. Next: add candidates and score them against this role.</p>
       <div class="btn-row">
         <a id="pipelineLink" href="/app/pipeline.html" class="btn btn-primary">View in Pipeline</a>
+        <button id="exportPdfBtn" class="btn btn-ghost" title="Open a print-formatted view of this requisition. Use your browser's Save as PDF option in the print dialog.">Export PDF</button>
         <button id="newIntake" class="btn btn-ghost">New Intake</button>
       </div>
     </section>
@@ -2171,6 +2172,28 @@ renderResults = function(data) {
   }
 
   $('pipelineLink').href = `/app/pipeline.html?req=${data.req_id}`;
+
+  // Export PDF button (Stage 1.6, 2026-04-30): opens /app/print.html in a new
+  // window with the print-formatted view. The print page auto-fires
+  // window.print() so the user gets the browser's Save-as-PDF dialog.
+  // CI data is not server-persisted, so we stash it in sessionStorage under
+  // a per-req key so the print page can pick it up.
+  const exportBtn = $('exportPdfBtn');
+  if (exportBtn && data.req_id) {
+    exportBtn.onclick = () => {
+      try {
+        // Stash CI data if it was generated this session
+        const ciCard = document.querySelector('.ci-card');
+        if (ciCard && ciCard.dataset.ciPayload) {
+          sessionStorage.setItem(`ci_${data.req_id}`, ciCard.dataset.ciPayload);
+        }
+      } catch (e) {
+        console.warn('Could not stash CI data for export:', e);
+      }
+      window.open(`/app/print.html?req_id=${encodeURIComponent(data.req_id)}`, '_blank');
+    };
+  }
+
   $('results').classList.add('active');
   $('results').scrollIntoView({ behavior: 'smooth' });
 };
