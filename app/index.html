@@ -99,6 +99,13 @@
   .collapsible-body { padding: 1.5rem 2rem 2rem; }
   .collapsible-body > section.card { padding: 0; border: none; margin-bottom: 0; background: transparent; }
 
+  /* Skill-alternatives row collapsibles (Stage 1.5 rework, 2026-04-30).
+     Native <details> rows inside the Skill Intelligence section. Same
+     pattern as the page-level collapsibles but smaller/denser. */
+  .skill-alt-row > summary::-webkit-details-marker { display: none; }
+  .skill-alt-row > summary:hover { background: var(--bg-elev); }
+  .skill-alt-row[open] .skill-alt-icon { transform: rotate(180deg); }
+
   /* Section navigation sticky bar */
   .section-nav {
     position: sticky;
@@ -728,44 +735,113 @@ function renderAltTitlesCard(alt) {
 }
 
 function renderSkillAlternativesCard(alternatives) {
-  // alternatives is a dict: {skill_name: [{alternative, context, transferability}, ...]}
+  // Stage 1.5 visual rework (2026-04-30): tier-grouped layout instead of
+  // skill-grouped. The previous design (skill-keyed groups, all rationales
+  // visible) made recruiters read every "If JD says..." paragraph before
+  // they could find the day-1-ready substitutions. New design groups by
+  // transferability tier so a recruiter scanning for HIGH FIT can zero in
+  // on those rows immediately. Each row is collapsed by default with name +
+  // truncated rationale; click expands to show full context + source skill.
+  //
+  // Data shape (unchanged):
+  //   alternatives = {skill_name: [{alternative, context, transferability}, ...]}
+  // Transferability values: 'high' | 'medium' | 'low'
   if (!alternatives || typeof alternatives !== 'object') return '';
   const skillNames = Object.keys(alternatives).filter(k => (alternatives[k] || []).length);
   if (!skillNames.length) return '';
 
-  const transferPill = (t) => {
-    const colors = {
-      high:   ['rgba(74, 222, 128, 0.12)', 'var(--good)',   'HIGH FIT'],
-      medium: ['rgba(255, 183, 77, 0.12)', 'var(--warn)',   'PHONE SCREEN'],
-      low:    ['rgba(255, 107, 107, 0.08)', 'var(--danger)', 'RAMP-UP'],
-    };
-    const [bg, fg, label] = colors[(t || '').toLowerCase()] || ['rgba(139,155,179,0.12)', 'var(--text-dim)', 'UNKNOWN'];
-    return `<span style="display: inline-block; padding: 0.18rem 0.5rem; background: ${bg}; color: ${fg}; border-radius: 4px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; margin-left: 0.4rem;">${label}</span>`;
+  // Flatten {skill_name: [alts]} into [{alt, context, tier, sourceSkill}]
+  // so we can re-group by tier instead of by source skill.
+  const flat = [];
+  for (const skill of skillNames) {
+    for (const a of (alternatives[skill] || [])) {
+      const tier = (a.transferability || '').toLowerCase();
+      if (!a.alternative) continue;
+      flat.push({
+        alternative: a.alternative,
+        context: a.context || '',
+        tier: tier,
+        sourceSkill: skill,
+      });
+    }
+  }
+  if (!flat.length) return '';
+
+  // Tier metadata. Order matters — HIGH FIT first because that's what
+  // recruiters scan for. Color tokens match the existing transferPill scheme.
+  const tierMeta = [
+    { key: 'high',   label: 'HIGH FIT',     subtitle: 'day-1 ready',           bgWeak: 'rgba(74, 222, 128, 0.06)',  bgStrong: 'rgba(74, 222, 128, 0.18)',  fg: 'var(--good)',   borderColor: 'rgba(74, 222, 128, 0.3)' },
+    { key: 'medium', label: 'PHONE SCREEN', subtitle: 'worth a call',          bgWeak: 'rgba(255, 183, 77, 0.06)',  bgStrong: 'rgba(255, 183, 77, 0.18)',  fg: 'var(--warn)',   borderColor: 'rgba(255, 183, 77, 0.3)' },
+    { key: 'low',    label: 'RAMP-UP',      subtitle: 'will need 30-60 days', bgWeak: 'rgba(255, 107, 107, 0.04)', bgStrong: 'rgba(255, 107, 107, 0.18)', fg: 'var(--danger)', borderColor: 'rgba(255, 107, 107, 0.3)' },
+  ];
+
+  // Counts per tier — driven by real data, not hardcoded
+  const counts = { high: 0, medium: 0, low: 0 };
+  for (const f of flat) { if (counts[f.tier] !== undefined) counts[f.tier]++; }
+
+  // Header summary chips: one per tier showing live count
+  const summaryChips = tierMeta.map(m => `
+    <span style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.7rem; background: ${m.bgWeak}; border: 1px solid ${m.borderColor}; border-radius: 6px; font-size: 0.8rem;">
+      <span style="font-weight: 700; color: ${m.fg}; letter-spacing: 0.03em;">${m.label}</span>
+      <span style="font-weight: 700; color: var(--text); font-family: var(--font-mono); font-size: 0.85rem;">${counts[m.key]}</span>
+      <span style="color: var(--text-dim); font-size: 0.78rem;">${m.subtitle}</span>
+    </span>
+  `).join('');
+
+  // Truncate context to ~90 chars for the collapsed-row preview. Ends on
+  // a word boundary so we don't cut mid-word. If shorter than the limit,
+  // we just show the full string and skip the ellipsis.
+  const truncate = (s, n) => {
+    if (!s || s.length <= n) return { preview: s || '', wasTruncated: false };
+    const slice = s.slice(0, n);
+    const lastSpace = slice.lastIndexOf(' ');
+    const cut = lastSpace > n * 0.6 ? slice.slice(0, lastSpace) : slice;
+    return { preview: cut, wasTruncated: true };
   };
 
-  const skillBlocks = skillNames.map(skill => {
-    const alts = alternatives[skill];
+  // Render one row as a <details>/<summary>: collapsed shows alternative
+  // name + truncated rationale. Open shows full rationale + source skill.
+  const renderRow = (row) => {
+    const { preview, wasTruncated } = truncate(row.context, 90);
     return `
-      <div class="sub-section">
-        <div class="sub-section-title" style="font-size: 0.95rem; color: var(--text);">
-          If JD says <span style="font-family: var(--font-mono); color: var(--accent);">${escapeHtml(skill)}</span>, also search for:
+      <details class="skill-alt-row" style="border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); margin-bottom: 0.55rem; overflow: hidden;">
+        <summary style="cursor: pointer; padding: 0.85rem 1rem; list-style: none; display: flex; align-items: center; gap: 0.85rem; user-select: none;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 700; color: var(--text); font-size: 0.9rem; margin-bottom: 0.2rem; word-break: break-word;">${escapeHtml(row.alternative)}</div>
+            <div style="font-size: 0.82rem; color: var(--text-dim); line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${escapeHtml(preview)}${wasTruncated ? '…' : ''}
+            </div>
+          </div>
+          <div style="flex-shrink: 0; color: var(--text-mute); transition: transform 0.2s; font-size: 0.8rem;" class="skill-alt-icon">▾</div>
+        </summary>
+        <div style="padding: 0 1rem 1rem; border-top: 1px solid var(--border); padding-top: 0.85rem;">
+          <div style="font-size: 0.88rem; line-height: 1.6; color: var(--text); margin-bottom: 0.85rem;">
+            ${escapeHtml(row.context)}
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 0.3rem;">Source skill in JD</div>
+          <div style="font-size: 0.82rem; color: var(--text-dim); font-style: italic; padding: 0.5rem 0.7rem; background: var(--bg-elev); border-left: 2px solid var(--border); border-radius: 4px;">
+            ${escapeHtml(row.sourceSkill)}
+          </div>
         </div>
-        <ul class="assess-list" style="margin-top: 0.5rem;">
-          ${alts.map(a => `
-            <li class="assess-item">
-              <span style="display: inline-block; padding: 0.25rem 0.6rem; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; font-weight: 600; font-family: var(--font-mono); min-width: 110px; text-align: center;">${escapeHtml(a.alternative || '')}</span>
-              <div>
-                <div class="assess-text">
-                  ${escapeHtml(a.context || '')}
-                  ${transferPill(a.transferability)}
-                </div>
-              </div>
-            </li>
-          `).join('')}
-        </ul>
+      </details>
+    `;
+  };
+
+  // Render one tier group: header + all rows. Skip empty tiers.
+  const renderTierGroup = (meta) => {
+    const rows = flat.filter(f => f.tier === meta.key);
+    if (!rows.length) return '';
+    return `
+      <div style="margin-bottom: 1.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.7rem; padding: 0.65rem 0.9rem; background: ${meta.bgStrong}; border-radius: 6px; margin-bottom: 0.85rem;">
+          <span style="font-weight: 700; color: ${meta.fg}; font-size: 0.78rem; letter-spacing: 0.05em;">${meta.label}</span>
+          <span style="color: var(--text-dim); font-size: 0.78rem;">${meta.subtitle}</span>
+          <span style="margin-left: auto; color: var(--text); font-weight: 700; font-family: var(--font-mono); font-size: 0.82rem;">${rows.length}</span>
+        </div>
+        ${rows.map(renderRow).join('')}
       </div>
     `;
-  }).join('');
+  };
 
   return `
     <section class="card">
@@ -776,13 +852,13 @@ function renderSkillAlternativesCard(alternatives) {
         knows the same person at peer companies might use different tools that produce
         equivalent outcomes. Add these to your search universe.
       </p>
-      <div style="display: flex; gap: 0.5rem; align-items: center; padding: 0.6rem 0.8rem; background: var(--bg-elev); border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.78rem; color: var(--text-dim);">
-        <span style="font-weight: 700;">Transferability key:</span>
-        <span style="color: var(--good);">HIGH FIT</span> = day-1 ready ·
-        <span style="color: var(--warn);">PHONE SCREEN</span> = worth a call ·
-        <span style="color: var(--danger);">RAMP-UP</span> = will need 30-60 days
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+        ${summaryChips}
       </div>
-      ${skillBlocks}
+      <p style="color: var(--text-mute); font-size: 0.8rem; margin-bottom: 1.25rem; font-style: italic;">
+        Click any row to see the full reasoning and the JD skill it substitutes for.
+      </p>
+      ${tierMeta.map(renderTierGroup).join('')}
     </section>
   `;
 }
