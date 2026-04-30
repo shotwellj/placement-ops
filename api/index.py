@@ -1788,6 +1788,61 @@ process"), return an empty array and note in pushback_guidance that there
 genuinely is no substitute.
 
 ──────────────────────────────────────────────────────────
+CAREER SWITCHER ARCHETYPES — non-obvious source pools
+──────────────────────────────────────────────────────────
+
+After classifying the must-have skills, identify 3-5 ROLE-TO-ROLE TRANSITIONS
+that produce viable candidates for THIS specific role. These are people who
+DO NOT currently hold the target role title but whose existing skills make
+them plausible candidates with minimal training.
+
+This is the "where to find non-obvious candidates" pass. A junior recruiter
+only sources people whose current title matches the JD title. A senior
+recruiter knows that:
+
+  - Hardware engineers who code in their hobby projects often make excellent
+    embedded software engineers
+  - Quant developers transition cleanly into ML engineering at fintech firms
+  - Sysadmins who picked up Python and Terraform are SREs in waiting
+  - Data analysts with a year of Python and a portfolio of real ETL work
+    are junior data engineers
+
+For each archetype, write:
+
+  from_role: the role title these candidates currently hold (be specific —
+             "Hardware Engineer (FPGA/RTL)" not just "Engineer")
+  to_role:   the target role title (use the JD's exact role_title)
+  transferable_skills: 3-5 skills the from_role candidates already have
+                       that map onto the canonical_skills of the target role.
+                       These must be REAL transfers — not vague claims like
+                       "problem solving" but specific ones like "C++ in
+                       embedded contexts" or "PyTorch model training"
+  where_to_find: 2-4 specific platforms / communities / company types where
+                 these candidates concentrate. Be concrete: "Apple Silicon
+                 LinkedIn group" not "tech professionals."
+  pitch_angle: 1-2 sentences the recruiter would say in an outreach to make
+               the role appealing to this candidate type. Specific to their
+               career trajectory. Not generic ("we're hiring great talent")
+               but specific ("you've spent 4 years optimizing power management
+               in silicon — this role lets you ship that work into actual
+               flying drones").
+  transition_difficulty: "easy" | "moderate" | "hard"
+
+HONESTY RULES — MANDATORY:
+
+  - Do NOT fabricate success rate percentages. The CandidatIQ implementation
+    of this had hardcoded "70% success rate" claims with no evidence. Do
+    not include any percentage claim unless you have specific industry data.
+  - Each archetype's transferable_skills must intersect with the target's
+    canonical_skills meaningfully. A "marketing manager → embedded engineer"
+    archetype is wrong because no skills transfer.
+  - If a from_role would require 2+ years of retraining, mark it "hard"
+    and put it last. The recruiter needs to triage by speed-to-productivity.
+  - Maximum 5 archetypes. If you genuinely cannot find 3 non-obvious source
+    pools for this role, return fewer (the role is niche enough that only
+    direct-match candidates will work, which itself is useful information).
+
+──────────────────────────────────────────────────────────
 OUTPUT SCHEMA — RETURN ONLY THIS JSON
 ──────────────────────────────────────────────────────────
 
@@ -1807,11 +1862,24 @@ OUTPUT SCHEMA — RETURN ONLY THIS JSON
       ],
       "safe_to_paste_verbatim": true
     }}
+  ],
+  "career_switcher_archetypes": [
+    {{
+      "from_role": "Hardware Engineer (FPGA/RTL)",
+      "to_role": "exact JD role_title",
+      "transferable_skills": ["VHDL", "C++ in embedded contexts", "Timing closure"],
+      "where_to_find": ["IEEE Solid-State Circuits society", "FPGA-focused subreddits", "DesignCon attendees"],
+      "pitch_angle": "1-2 sentences specific to this archetype's trajectory",
+      "transition_difficulty": "moderate"
+    }}
   ]
 }}
 
 Every must_have_list entry must appear in pro_skill_briefing exactly once.
 No skipping. No duplicates.
+
+3-5 entries in career_switcher_archetypes (or fewer if the role is niche
+enough that no plausible career-switcher pools exist).
 
 No em dashes. No code fences. JSON only.
 """
@@ -1928,6 +1996,57 @@ hit_volume=high, signal_to_noise=low. The recruiter needs to know
 what they're getting into.
 
 ──────────────────────────────────────────────────────────
+HIDDEN TALENT POOLS (4-6 non-obvious source categories)
+──────────────────────────────────────────────────────────
+
+Beyond direct-match LinkedIn searches and watering-hole X-rays, identify
+4-6 NON-OBVIOUS pools where qualified candidates concentrate. These are
+sources a junior sourcer would not think to check.
+
+Examples (do NOT reuse verbatim — generate role-specific pools):
+
+  - Open-source contributors to projects in the role's tech stack
+  - Recently acquired startups whose engineers are about to vest
+  - Layoff-affected teams from companies in the role's industry
+  - Bootcamp graduates with portfolio projects matching the role
+  - Conference speakers (recent talks at relevant events)
+  - Hardware engineers who code in their hobby projects (for embedded/firmware roles)
+  - Defense contractors with active clearances when role can sponsor
+  - Returning-to-work parents with prior senior experience
+  - International transfers from EU/Asia where local market is saturated
+
+For each pool, write:
+
+  pool_name: short label (e.g., "Recently Laid-Off Cruise Engineers",
+             "Active OpenBMC Maintainers", "Bootcamp Grads with ML
+             Production Experience")
+  why_target: 1-2 sentences on WHY this pool is a defensible source for
+              THIS specific role. Be specific — not "they have skills"
+              but "they shipped autonomous driving stacks to production
+              and are job-hunting after the December layoffs"
+  platforms: 2-4 specific platforms / communities / lists where this pool
+             concentrates. Be concrete: "Layoffs.fyi cruise.com listings",
+             "openbmc-discuss mailing list subscribers", not "LinkedIn".
+  search_tips: 1-2 sentences on how to actually FIND people in this pool.
+               If a runnable boolean / X-ray fits, include it (with
+               the same Google syntax rules as the other X-rays).
+
+HONESTY RULES — MANDATORY:
+
+  - Do NOT fabricate response rate percentages. The CandidatIQ
+    implementation of this had hardcoded "25-35% response rate" claims
+    with no evidence. Do not include any percentage claim.
+  - Each pool's why_target must be specific to the role's canonical_skills
+    and industry. Generic "open source contributors" without naming
+    relevant projects is wrong. "Active contributors to PX4 and ArduPilot"
+    is right for a drone firmware role.
+  - Maximum 6 pools. If the role is so niche that only 4 plausible pools
+    exist, return 4. Better fewer-and-specific than more-and-vague.
+  - Pools must NOT overlap with the existing pro_xrays. If you'd
+    suggest "openbmc.dev maintainers" and there's already a pro_xray
+    for openbmc.dev, that's redundant — choose a different pool.
+
+──────────────────────────────────────────────────────────
 EXTENDED MENTOR NOTES (5-8 tactical tips)
 ──────────────────────────────────────────────────────────
 
@@ -1977,6 +2096,14 @@ RETURN ONLY THIS JSON
       "signal": "Active OpenBMC maintainers — patch submissions = real production-grade contribution",
       "hit_volume": "low",
       "signal_to_noise": "high"
+    }}
+  ],
+  "hidden_talent_pools": [
+    {{
+      "pool_name": "Active OpenBMC Maintainers",
+      "why_target": "1-2 sentences on why this pool is a defensible source for THIS role",
+      "platforms": ["openbmc-discuss mailing list", "OCP Summit BMC track speakers"],
+      "search_tips": "1-2 sentences on how to find people in this pool — runnable X-ray if applicable"
     }}
   ],
   "extended_mentor_notes": [
@@ -3532,12 +3659,21 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                     must_have_list=must_have_text,
                     jd_excerpt=req.jd_text[:2000],
                 ),
-                max_tokens=3500,
+                max_tokens=7000,  # bumped 2026-04-28: career_switcher_archetypes adds ~2K tokens
             )
-            return parse_json_strict(text).get("pro_skill_briefing") or []
+            # Returns a dict containing both pro_skill_briefing (per-skill rows)
+            # AND career_switcher_archetypes (3-5 role-to-role transition pools).
+            # The single AI call produces both fields by design — combining them
+            # gives the model the full context (skill tier + archetype) instead
+            # of forcing two parallel AI calls that don't see each other's reasoning.
+            parsed_response = parse_json_strict(text)
+            return {
+                "briefing": parsed_response.get("pro_skill_briefing") or [],
+                "archetypes": parsed_response.get("career_switcher_archetypes") or [],
+            }
         except Exception as e:
             print(f"[ai-pro-skill-briefing FAIL] type={type(e).__name__} err={str(e)[:200]}")
-            return []
+            return {"briefing": [], "archetypes": []}
 
 
     async def _run_pro_boolean_extensions():
@@ -3583,7 +3719,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                     existing_booleans=json.dumps(booleans, indent=2)[:3000],
                     watering_holes_list=holes_str,
                 ),
-                max_tokens=3500,
+                max_tokens=7000,  # bumped 2026-04-28: hidden_talent_pools adds ~2K tokens
             )
             return parse_json_strict(text) or {}
         except Exception as e:
@@ -3607,7 +3743,8 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
           f"(skill_alts={'ok' if skill_alternatives else 'empty'}, "
           f"objections={len(objection_playbook) if isinstance(objection_playbook, list) else 'err'}, "
           f"seq_play={len(sequenced_play) if isinstance(sequenced_play, list) else 'err'}, "
-          f"pro_briefing={len(pro_skill_briefing) if isinstance(pro_skill_briefing, list) else 'skip/err'}, "
+          f"pro_briefing={len(pro_skill_briefing.get('briefing', [])) if isinstance(pro_skill_briefing, dict) else 'skip/err'}, "
+          f"pro_archetypes={len(pro_skill_briefing.get('archetypes', [])) if isinstance(pro_skill_briefing, dict) else 'skip/err'}, "
           f"pro_boolean={'ok' if pro_boolean_extensions else 'skip/empty'} plan={user.get('plan')})")
 
     # Step 4: save to DB + compliance records
@@ -3660,8 +3797,15 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                 parsed["objection_playbook"] = objection_playbook
             if sequenced_play:
                 parsed["sequenced_play"] = sequenced_play
-            if pro_skill_briefing:
-                parsed["pro_skill_briefing"] = pro_skill_briefing
+            if pro_skill_briefing and isinstance(pro_skill_briefing, dict):
+                # pro_skill_briefing is a dict {briefing: [...], archetypes: [...]}
+                # since the prompt change on 2026-04-28. Store both fields under
+                # their canonical names so the frontend renderer reads them where
+                # it expects.
+                if pro_skill_briefing.get("briefing"):
+                    parsed["pro_skill_briefing"] = pro_skill_briefing["briefing"]
+                if pro_skill_briefing.get("archetypes"):
+                    parsed["career_switcher_archetypes"] = pro_skill_briefing["archetypes"]
             if pro_boolean_extensions:
                 parsed["pro_boolean_extensions"] = pro_boolean_extensions
             await client.execute(

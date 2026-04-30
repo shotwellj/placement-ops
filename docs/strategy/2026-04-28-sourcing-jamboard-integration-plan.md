@@ -2,11 +2,141 @@
 
 **Author:** Jason Shotwell
 **Date:** 2026-04-28
-**Status:** Plan only — Day 1 build pauses for review
+**Status:** RETIRED — superseded by Path C redistribution (see header note below)
 **Predecessor:** `2026-04-28-talent-os-flywheel-roadmap-v2.md` (Days 1-30 sequencing item)
 **Sibling:** `2026-04-28-competitive-intelligence-integration-plan.md` (same shape, just shipped)
 
 ---
+
+## RETIREMENT NOTE (added 2026-04-28, end of session)
+
+This plan was written, reviewed, and then explicitly retired in the same
+session. The retirement decision and the rationale are worth preserving
+because they're a non-obvious product judgment.
+
+### Why this plan was retired
+
+After Jason reviewed the plan, he flagged that the proposed 11-section
+Sourcing Jamboard would overlap heavily with existing tools:
+
+- 7 of 11 sections overlapped HEAVILY or TOTALLY with what we already ship:
+  alternate_titles (totally duplicates JD parser alt_titles), skills_adjacency
+  (totally duplicates transferable_skill_clusters), geographic_opportunities
+  (totally duplicates market360.talent_hotspots), creative_boolean_strings
+  (totally duplicates Boolean Builder), platform_strategies and
+  underutilized_channels (heavy overlap with watering_holes and pro_xrays),
+  passive_candidate_triggers (partial overlap with objection_playbook).
+- Building a 6th Pro tab (after Briefing, Booleans, CI, Discovery future,
+  and Jamboard) would have created a "kitchen sink" feel that erodes
+  customer trust in the product's focus.
+- Tab proliferation reduces concentration of value. When a feature is its
+  own tab, only customers who click see it. When it's added to an existing
+  tab, every user of that tab sees it.
+
+Three options were considered:
+
+  Path A — Build Jamboard as planned (11 sections, ignore overlap)
+  Path B — Build Jamboard as 4-5 net-new sections only
+  Path C — Distribute the net-new ideas into existing tools, no new tab
+
+Jason chose Path C.
+
+### Where each net-new idea went
+
+| Original Jamboard section | Final destination |
+|---|---|
+| dei_strategies | Standalone DEI Strategy integration (Days 1-30 in v2 roadmap, separate work) |
+| career_switchers | Augmented Pro Skill Briefing as `career_switcher_archetypes` field — Pro tier |
+| hidden_talent_pools | Augmented Pro Boolean Extensions as `hidden_talent_pools` field — Pro tier |
+| passive_candidate_triggers | Parked for Stage 2 (Engage / Outreach) |
+| timing_strategies | Parked for Stage 2 (Engage / Outreach) |
+
+### What actually shipped from this plan
+
+In the same session as plan retirement, Jason and Claude executed Path C:
+
+1. **PRO_INTAKE_PROMPT** extended with a "CAREER SWITCHER ARCHETYPES" section
+   and a `career_switcher_archetypes` field in the JSON schema. Prompt instructs
+   the model to identify 3-5 role-to-role transitions (from_role, to_role,
+   transferable_skills, where_to_find, pitch_angle, transition_difficulty)
+   with strict honesty rules (no fabricated success rate %, transferable_skills
+   must intersect canonical_skills, max 5 archetypes).
+
+2. **PRO_BOOLEAN_PROMPT** extended with a "HIDDEN TALENT POOLS" section and
+   a `hidden_talent_pools` field in the JSON schema. 4-6 non-obvious source
+   categories (pool_name, why_target, platforms, search_tips) with strict
+   no-overlap rule against existing pro_xrays and no fabricated response rate %.
+
+3. **`_run_pro_skill_briefing`** consumer code updated to return a dict
+   `{briefing: [...], archetypes: [...]}` instead of just the briefing list.
+   Endpoint storage block updated to persist both fields under their canonical
+   names (`parsed.pro_skill_briefing` and `parsed.career_switcher_archetypes`).
+
+4. **`renderProSkillBriefingCard`** updated to accept a third `archetypes`
+   argument and render a new "Non-obvious source pools" section after the
+   skill rows when archetypes are present. Visual treatment: bordered cards
+   with difficulty badge (easy/moderate/hard), from-role → to-role title,
+   pitch angle in accent-bordered callout, transferable skills as green
+   chips, where-to-find as bordered list.
+
+5. **`renderProBooleanExtensionsCard`** extended to read `ext.hidden_talent_pools`
+   and render a new "Hidden talent pools" section between pro_xrays and
+   extended_mentor_notes. Visual treatment: bordered cards with pool_name
+   header, why_target rationale, platforms as blue chips, search_tips in
+   monospace accent-bordered code-style block.
+
+6. **max_tokens caps bumped** from 3500 → 7000 on both PRO_INTAKE and
+   PRO_BOOLEAN endpoints because smoke testing showed the augmented prompts
+   produce ~5300 (PRO_INTAKE) and ~6100 (PRO_BOOLEAN) output tokens.
+   Without the bump, both prompts would have truncated mid-output and
+   returned malformed JSON.
+
+### Smoke-test verification
+
+Both prompts were smoke-tested against the Skydio req
+(`a9783797-79c5-4808-a138-037874d81057`) with real Haiku 4.5 calls before
+UI work. Results:
+
+  career_switcher_archetypes: 5/5 archetypes returned, all role-specific,
+  zero fabricated stats, all from_role values specific (not generic
+  "Engineer"), all transferable_skills meaningfully intersect canonical_skills,
+  all where_to_find values name concrete companies/communities.
+
+  hidden_talent_pools: 6/6 pools returned, all role-specific, zero fabricated
+  response rate %, zero overlap with pro_xrays venues, all platforms
+  specific (not generic "LinkedIn"), search_tips include runnable booleans.
+
+Quality issues at deploy: 0.
+
+### What got NOT shipped
+
+- No new endpoint (no `/api/intake/sourcing-jamboard`)
+- No new UI tab or card
+- No `requisitions.jamboard_json` cache (the column stays provisioned but
+  unused — it might still be valuable later if a different feature wants
+  per-req caching)
+- No DEI Strategy section (separate planned integration, not part of Path C)
+- No timing_strategies section (parked for Stage 2)
+- No passive_candidate_triggers section (parked for Stage 2)
+
+### Diff vs the original plan in this doc
+
+The plan below describes the standalone-feature approach Jason rejected.
+It's preserved verbatim because:
+
+1. The architectural research (that the CandidatIQ "9.5/10 prompt" was
+   actually hardcoded Python with mock-data fallback) is reusable next time
+   we audit a CandidatIQ asset.
+2. The overlap audit framework is reusable for future feature decisions.
+3. The fact that 4 of 11 sections were already produced natively by the
+   JD parser is an underappreciated architectural strength of SourcingNav
+   that should be documented somewhere.
+
+The plan IS the historical record, not a forward-looking artifact.
+
+---
+
+## ORIGINAL PLAN BELOW (RETIRED — preserved for reference)
 
 ## TL;DR — what changed during research
 

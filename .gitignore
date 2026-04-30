@@ -38,3 +38,4 @@ venv/
 
 # Vercel
 .vercel
+.env*.local

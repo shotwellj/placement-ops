@@ -864,6 +864,7 @@ function renderProBooleanExtensionsCard(ext, isProUser) {
   const companyTargeted = ext.lr_company_targeted || {};
   const clusterRationale = ext.company_cluster_rationale || {};
   const proXrays = ext.pro_xrays || [];
+  const hiddenPools = ext.hidden_talent_pools || [];
   const extendedNotes = ext.extended_mentor_notes || [];
 
   const volumeBadge = (v) => {
@@ -993,6 +994,45 @@ function renderProBooleanExtensionsCard(ext, isProUser) {
         </div>
       ` : ''}
 
+      ${hiddenPools.length ? `
+        <h3 style="font-size: 1rem; color: var(--text); margin-bottom: 0.4rem; font-weight: 700;">Hidden talent pools</h3>
+        <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.88rem; line-height: 1.55;">
+          Non-obvious source categories beyond direct-match LinkedIn searches.
+          Each pool is role-specific and named with concrete platforms where
+          these candidates concentrate.
+        </p>
+        <div style="margin-bottom: 1.5rem;">
+          ${hiddenPools.map(p => {
+            const platforms = (p.platforms || []).filter(Boolean);
+            return `
+              <div style="border: 1px solid var(--border); border-radius: 10px; padding: 1.05rem 1.15rem; margin-bottom: 0.85rem; background: var(--bg-card);">
+                <div style="font-weight: 700; color: var(--text); font-size: 0.95rem; margin-bottom: 0.5rem;">${escapeHtml(p.pool_name || '')}</div>
+                ${p.why_target ? `
+                  <div style="margin-bottom: 0.85rem;">
+                    <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; font-weight: 700;">Why target this pool</div>
+                    <div style="font-size: 0.88rem; line-height: 1.6; color: var(--text-dim);">${escapeHtml(p.why_target)}</div>
+                  </div>
+                ` : ''}
+                ${platforms.length ? `
+                  <div style="margin-bottom: 0.85rem;">
+                    <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; font-weight: 700;">Platforms</div>
+                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                      ${platforms.map(plat => `<span style="display: inline-block; padding: 0.3rem 0.65rem; background: rgba(74, 158, 255, 0.08); color: var(--blue); border: 1px solid rgba(74, 158, 255, 0.25); border-radius: 5px; font-size: 0.78rem; font-weight: 600;">${escapeHtml(plat)}</span>`).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+                ${p.search_tips ? `
+                  <div>
+                    <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; font-weight: 700;">How to find them</div>
+                    <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text); padding: 0.65rem 0.8rem; background: var(--bg-elev); border-radius: 6px; border-left: 3px solid var(--accent); font-family: var(--mono, monospace);">${escapeHtml(p.search_tips)}</div>
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
+
       ${extendedNotes.length ? `
         <h3 style="font-size: 1rem; color: var(--text); margin-bottom: 0.85rem; font-weight: 700;">Extended mentor notes</h3>
         <div>
@@ -1008,7 +1048,7 @@ function renderProBooleanExtensionsCard(ext, isProUser) {
   `;
 }
 
-function renderProSkillBriefingCard(briefing, isProUser) {
+function renderProSkillBriefingCard(briefing, isProUser, archetypes) {
   // Free-tier path: show a locked placeholder with the SHAPE of the value
   // (3 fake skill rows with realistic structure but obvious placeholder
   // content). Server never sent us real Pro content if user is free.
@@ -1132,6 +1172,66 @@ function renderProSkillBriefingCard(briefing, isProUser) {
     `;
   }).join('');
 
+  // Career switcher archetypes (added 2026-04-28 — Path C, replaces Sourcing
+  // Jamboard's career_switchers section). Renders 3-5 role-to-role transition
+  // pools with from/to roles, transferable skills, where to find them, and a
+  // pitch angle. Only shows if archetypes were generated.
+  const archetypesBlock = (archetypes && Array.isArray(archetypes) && archetypes.length) ? `
+    <div style="margin-top: 2rem; padding-top: 1.75rem; border-top: 1px solid var(--border);">
+      <div style="font-size: 0.72rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; font-weight: 700;">Career switcher archetypes</div>
+      <h3 style="font-size: 1.05rem; color: var(--text); margin: 0 0 0.55rem; font-weight: 700;">Non-obvious source pools</h3>
+      <p style="color: var(--text-dim); margin-bottom: 1.25rem; font-size: 0.9rem; line-height: 1.55;">
+        Junior recruiters source people whose current title matches the JD.
+        Senior recruiters know which adjacent roles produce viable candidates
+        with minimal training. ${archetypes.length} role-to-role transitions
+        for this requisition.
+      </p>
+      ${archetypes.map(a => {
+        const diff = (a.transition_difficulty || '').toLowerCase();
+        const diffMap = {
+          easy: ['rgba(74, 222, 128, 0.12)', 'var(--good)'],
+          moderate: ['rgba(255, 183, 77, 0.12)', 'var(--warn)'],
+          hard: ['rgba(255, 107, 107, 0.12)', 'var(--danger)'],
+        };
+        const [diffBg, diffFg] = diffMap[diff] || diffMap.moderate;
+        const skills = (a.transferable_skills || []).filter(Boolean);
+        const where = (a.where_to_find || []).filter(Boolean);
+        return `
+          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.15rem; margin-bottom: 1rem; background: var(--bg-card);">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem;">
+              <span style="display: inline-block; padding: 0.22rem 0.6rem; background: ${diffBg}; color: ${diffFg}; border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${escapeHtml(diff || 'moderate')} transition</span>
+            </div>
+            <div style="font-weight: 700; color: var(--text); font-size: 0.98rem; margin-bottom: 0.55rem;">
+              ${escapeHtml(a.from_role || '')} <span style="color: var(--text-mute); font-weight: 500;">→</span> ${escapeHtml(a.to_role || '')}
+            </div>
+            ${a.pitch_angle ? `
+              <div style="margin-bottom: 0.85rem;">
+                <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; font-weight: 700;">Pitch angle</div>
+                <div style="font-size: 0.9rem; line-height: 1.6; color: var(--text); padding: 0.7rem 0.85rem; background: var(--bg-elev); border-radius: 6px; border-left: 3px solid var(--accent);">${escapeHtml(a.pitch_angle)}</div>
+              </div>
+            ` : ''}
+            ${skills.length ? `
+              <div style="margin-bottom: 0.8rem;">
+                <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; font-weight: 700;">Transferable skills</div>
+                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                  ${skills.map(s => `<span style="display: inline-block; padding: 0.3rem 0.65rem; background: rgba(74, 222, 128, 0.08); color: var(--good); border: 1px solid rgba(74, 222, 128, 0.25); border-radius: 5px; font-size: 0.78rem; font-weight: 600;">${escapeHtml(s)}</span>`).join('')}
+                </div>
+              </div>
+            ` : ''}
+            ${where.length ? `
+              <div>
+                <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; font-weight: 700;">Where to find them</div>
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.3rem;">
+                  ${where.map(w => `<li style="font-size: 0.84rem; color: var(--text-dim); padding: 0.4rem 0.65rem; background: var(--bg-elev); border-radius: 4px; border-left: 2px solid var(--border); line-height: 1.5;">${escapeHtml(w)}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  ` : '';
+
   return `
     <section class="card" style="position: relative;">
       <div style="position: absolute; top: 1.25rem; right: 1.25rem; padding: 0.3rem 0.7rem; background: linear-gradient(135deg, rgba(61,217,214,0.18), rgba(74,158,255,0.18)); color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Pro</div>
@@ -1145,6 +1245,7 @@ function renderProSkillBriefingCard(briefing, isProUser) {
         so you don't auto-filter strong candidates with the wrong keyword.
       </p>
       ${rows}
+      ${archetypesBlock}
     </section>
   `;
 }
@@ -1678,7 +1779,7 @@ renderResults = function(data) {
       // with the structure visible (the SHAPE of the value) but content blocked
       // out. Pro users get the real briefing. Server never sends real Pro content
       // to free users (gated server-side via user.plan == 'pro').
-      renderProSkillBriefingCard(data.pro_skill_briefing || _p.pro_skill_briefing, user && user.plan === 'pro'),
+      renderProSkillBriefingCard(data.pro_skill_briefing || _p.pro_skill_briefing, user && user.plan === 'pro', data.career_switcher_archetypes || _p.career_switcher_archetypes),
       renderProBooleanExtensionsCard(data.pro_boolean_extensions || _p.pro_boolean_extensions, user && user.plan === 'pro'),
       // Competitive Intelligence — click-to-run for Pro users (separate AI call,
       // not auto-chained to keep cost under user's control). Free users see a
