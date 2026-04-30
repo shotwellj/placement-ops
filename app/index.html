@@ -1149,6 +1149,356 @@ function renderProSkillBriefingCard(briefing, isProUser) {
   `;
 }
 
+// ---------- COMPETITIVE INTELLIGENCE CARD ----------
+//
+// Day 2 of the CI rollout (per docs/strategy/2026-04-28-competitive-intelligence-
+// integration-plan.md). Click-to-run UX: free users see locked placeholder,
+// Pro users see "Run Competitive Intelligence" button that fires a separate AI
+// call to /api/intake/competitive-intel and re-renders the card with results.
+//
+// State machine: idle (button) -> loading (spinner) -> success (insights) | error (retry).
+// State lives on the .ci-card container as data-state. Re-render swaps outerHTML.
+
+function renderCompetitiveIntelCard(reqId, isProUser) {
+  // Free path: locked card with 2 fake company rows + upgrade CTA.
+  if (!isProUser) {
+    const lockedRow = (companyName, tierLabel) => `
+      <div style="border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.15rem; margin-bottom: 1rem; background: var(--bg-card);">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem;">
+          <span style="display: inline-block; padding: 0.22rem 0.6rem; background: rgba(74, 158, 255, 0.12); color: var(--blue); border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${tierLabel}</span>
+          <span style="display: inline-block; padding: 0.15rem 0.5rem; background: rgba(255, 183, 77, 0.12); color: var(--warn); border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">Aggressive hiring</span>
+        </div>
+        <div style="font-weight: 700; color: var(--text); font-size: 0.95rem; margin-bottom: 0.6rem;">${escapeHtml(companyName)}</div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; margin-bottom: 0.7rem;">
+          <div>
+            <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; font-weight: 700;">Salary range</div>
+            <div style="background: var(--text-mute); color: var(--text-mute); border-radius: 3px; padding: 0 6px; display: inline-block; font-size: 0.85rem;">$███K-███K + ████ equity</div>
+          </div>
+          <div>
+            <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; font-weight: 700;">Time to fill</div>
+            <div style="background: var(--text-mute); color: var(--text-mute); border-radius: 3px; padding: 0 6px; display: inline-block; font-size: 0.85rem;">██-██ days</div>
+          </div>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-dim); line-height: 1.55; margin-bottom: 0.6rem;">
+          <span style="display: inline-block; background: var(--text-mute); color: var(--text-mute); border-radius: 3px; padding: 0 6px;">████████ ███████ ██ █████ ██ ███████████████. ██████ ████ ██████ ███ ██ ██████ ██████.</span>
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-mute); padding: 0.3rem 0.55rem; background: var(--bg-elev); border-radius: 4px; border-left: 2px solid var(--border); display: inline-block;">Recruiting angle: ████ ████ ████ ████</div>
+      </div>
+    `;
+    return `
+      <section class="card ci-card" data-state="locked" style="position: relative;">
+        <div style="position: absolute; top: 1.25rem; right: 1.25rem; padding: 0.3rem 0.7rem; background: linear-gradient(135deg, rgba(255,183,77,0.18), rgba(245,158,11,0.18)); color: var(--warn); border: 1px solid var(--warn); border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Pro</div>
+        <div class="card-label">Competitive Intelligence</div>
+        <h2 class="card-title">Per-company hiring intel</h2>
+        <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.92rem;">
+          Pro Competitive Intelligence runs a senior-recruiter analysis pass
+          on every tier-1 and tier-2 company the Boolean Builder identified.
+          Gets you hiring velocity, salary range with confidence flags
+          (no fake FAANG numbers for defense contractors), poaching difficulty,
+          recruiting angles, and 5 ready-to-run boolean strategies per company.
+          Single click after intake. Roughly 10 seconds, one credit.
+        </p>
+        ${lockedRow('Sample Competitor 1', 'Tier 1 — Direct competitor')}
+        ${lockedRow('Sample Competitor 2', 'Tier 2 — Adjacent industry')}
+        <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(61,217,214,0.06), rgba(74,158,255,0.06)); border: 1px solid rgba(61,217,214,0.3); border-radius: 10px;">
+          <div style="font-weight: 700; color: var(--text); font-size: 1rem; margin-bottom: 0.5rem;">Unlock Competitive Intelligence</div>
+          <p style="color: var(--text-dim); font-size: 0.9rem; line-height: 1.55; margin-bottom: 1rem;">
+            Pro Competitive Intelligence gives you what Gem charges $5K-25K/year
+            for: per-company hiring intel auto-chained from your Boolean Builder
+            output. Honest salary confidence flags. Industry-weighted analysis
+            (defense gets clearance focus, startups get equity focus).
+          </p>
+          <a href="mailto:hello@sourcingnav.com?subject=Upgrade%20to%20SourcingNav%20Pro&body=Hi%2C%20I'd%20like%20to%20upgrade%20my%20account%20to%20Pro.%20My%20account%20email%20is%3A%20" class="btn btn-primary" style="font-size: 0.92rem; padding: 0.7rem 1.4rem; text-decoration: none; display: inline-block;">Email to upgrade →</a>
+        </div>
+      </section>
+    `;
+  }
+
+  // Pro path, idle state: button to trigger the AI call.
+  return `
+    <section class="card ci-card" data-state="idle" data-req-id="${escapeHtml(reqId || '')}" style="position: relative;">
+      <div style="position: absolute; top: 1.25rem; right: 1.25rem; padding: 0.3rem 0.7rem; background: linear-gradient(135deg, rgba(61,217,214,0.18), rgba(74,158,255,0.18)); color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Pro</div>
+      <div class="card-label">Competitive Intelligence</div>
+      <h2 class="card-title">Per-company hiring intel</h2>
+      <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.92rem;">
+        Run a senior-recruiter analysis pass on every tier-1 and tier-2 company
+        the Boolean Builder identified. You'll get hiring velocity, honest
+        salary range with confidence flags, poaching difficulty, recruiting
+        angles, and 5 ready-to-run boolean strategies per company.
+      </p>
+      <div style="padding: 1.25rem; background: linear-gradient(135deg, rgba(61,217,214,0.04), rgba(74,158,255,0.04)); border: 1px solid var(--border); border-radius: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+          <div>
+            <div style="font-weight: 700; color: var(--text); font-size: 0.95rem; margin-bottom: 0.3rem;">Ready when you are</div>
+            <div style="font-size: 0.85rem; color: var(--text-dim);">~10 seconds. Counts as 1 intake credit. Auto-chains from your Boolean Builder output.</div>
+          </div>
+          <button class="btn btn-primary ci-run-btn" style="font-size: 0.92rem; padding: 0.7rem 1.4rem; white-space: nowrap;">Run Competitive Intelligence</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+// Render the Pro success state (after AI call returns).
+function renderCompetitiveIntelSuccess(reqId, payload) {
+  const insights = payload.insights || [];
+  const summary = payload.market_summary || {};
+
+  const velocityBadge = (v) => {
+    const map = {
+      aggressive: ['rgba(255, 107, 107, 0.12)', 'var(--danger)', 'Aggressive'],
+      moderate:   ['rgba(255, 183, 77, 0.12)', 'var(--warn)',   'Moderate'],
+      slow:       ['rgba(74, 158, 255, 0.12)', 'var(--blue)',   'Slow'],
+    };
+    const [bg, fg, label] = map[(v || '').toLowerCase()] || map.moderate;
+    return `<span style="display: inline-block; padding: 0.22rem 0.6rem; background: ${bg}; color: ${fg}; border-radius: 5px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${label} hiring</span>`;
+  };
+
+  const confidenceBadge = (c) => {
+    const map = {
+      high:   ['rgba(74, 222, 128, 0.12)', 'var(--good)',  'High confidence'],
+      medium: ['rgba(255, 183, 77, 0.12)', 'var(--warn)',  'Medium confidence'],
+      low:    ['rgba(139, 155, 179, 0.12)', 'var(--text-dim)', 'Low confidence'],
+    };
+    const [bg, fg, label] = map[(c || '').toLowerCase()] || map.low;
+    return `<span style="display: inline-block; padding: 0.15rem 0.5rem; background: ${bg}; color: ${fg}; border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${label}</span>`;
+  };
+
+  const difficultyBadge = (d) => {
+    const map = {
+      high:     ['rgba(255, 107, 107, 0.12)', 'var(--danger)', 'Hard to poach'],
+      moderate: ['rgba(255, 183, 77, 0.12)', 'var(--warn)',   'Moderate poach'],
+      low:      ['rgba(74, 222, 128, 0.12)', 'var(--good)',   'Easy to poach'],
+    };
+    const [bg, fg, label] = map[(d || '').toLowerCase()] || map.moderate;
+    return `<span style="display: inline-block; padding: 0.15rem 0.5rem; background: ${bg}; color: ${fg}; border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">${label}</span>`;
+  };
+
+  const fmtSalary = (sr) => {
+    if (!sr || (sr.min == null && sr.max == null)) return '—';
+    const fmt = (n) => n != null ? '$' + Math.round(n / 1000) + 'K' : '?';
+    const range = `${fmt(sr.min)}-${fmt(sr.max)}`;
+    const equity = sr.equity ? ` + ${escapeHtml(sr.equity)}` : '';
+    return range + equity;
+  };
+
+  const insightCards = insights.map(ins => {
+    const sr = ins.salary_range || {};
+    const bs = ins.boolean_strategies || {};
+    const strategyKeys = Object.keys(bs).filter(k => bs[k]);
+    return `
+      <div style="border: 1px solid var(--border); border-radius: 10px; padding: 1.15rem 1.2rem; margin-bottom: 1rem; background: var(--bg-card);">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem;">
+          ${velocityBadge(ins.hiring_velocity)}
+          ${ins.tier ? `<span style="display: inline-block; padding: 0.15rem 0.5rem; background: rgba(74, 158, 255, 0.12); color: var(--blue); border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;">Tier ${ins.tier}</span>` : ''}
+          ${difficultyBadge(ins.poaching_difficulty)}
+        </div>
+        <div style="font-weight: 700; color: var(--text); font-size: 1.02rem; margin-bottom: 0.7rem;">${escapeHtml(ins.company || '—')}</div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.7rem; margin-bottom: 0.9rem;">
+          <div>
+            <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; font-weight: 700;">Salary range</div>
+            <div style="font-size: 0.88rem; color: var(--text); margin-bottom: 0.3rem;">${fmtSalary(sr)}</div>
+            ${confidenceBadge(sr.salary_confidence)}
+          </div>
+          <div>
+            <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; font-weight: 700;">Engineering count</div>
+            <div style="font-size: 0.88rem; color: var(--text);">${escapeHtml(ins.estimated_engineering_count || '—')}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; font-weight: 700;">Time to fill</div>
+            <div style="font-size: 0.88rem; color: var(--text);">${escapeHtml(ins.avg_time_to_fill || '—')}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; font-weight: 700;">Remote policy</div>
+            <div style="font-size: 0.88rem; color: var(--text);">${escapeHtml(ins.remote_policy || '—')}</div>
+          </div>
+        </div>
+
+        ${sr.salary_basis ? `
+          <div style="font-size: 0.78rem; color: var(--text-mute); margin-bottom: 0.8rem; font-style: italic;">
+            ${escapeHtml(sr.salary_basis)}
+          </div>
+        ` : ''}
+
+        ${ins.key_recruiting_angle ? `
+          <div style="margin-bottom: 0.8rem;">
+            <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; font-weight: 700;">Recruiting angle</div>
+            <div style="font-size: 0.9rem; line-height: 1.6; color: var(--text); padding: 0.7rem 0.85rem; background: var(--bg-elev); border-radius: 6px; border-left: 3px solid var(--accent);">${escapeHtml(ins.key_recruiting_angle)}</div>
+          </div>
+        ` : ''}
+
+        ${ins.poaching_rationale ? `
+          <div style="margin-bottom: 0.8rem;">
+            <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem; font-weight: 700;">Poaching rationale</div>
+            <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text-dim);">${escapeHtml(ins.poaching_rationale)}</div>
+          </div>
+        ` : ''}
+
+        ${(ins.common_skills_for_this_role && ins.common_skills_for_this_role.length) ? `
+          <div style="margin-bottom: 0.8rem;">
+            <div style="font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; font-weight: 700;">Common skills for this role</div>
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+              ${ins.common_skills_for_this_role.map(s => `<span style="display: inline-block; padding: 0.25rem 0.55rem; background: rgba(74, 158, 255, 0.08); color: var(--blue); border: 1px solid rgba(74, 158, 255, 0.2); border-radius: 5px; font-size: 0.78rem; font-weight: 600;">${escapeHtml(s)}</span>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${strategyKeys.length ? `
+          <details style="margin-top: 0.8rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.85rem; background: var(--bg-elev);">
+            <summary style="cursor: pointer; font-size: 0.82rem; color: var(--text); font-weight: 700;">5 ready-to-run boolean strategies</summary>
+            <div style="margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.7rem;">
+              ${strategyKeys.map(k => `
+                <div>
+                  <div style="font-size: 0.68rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; font-weight: 700;">${escapeHtml(k)}</div>
+                  <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                    <code style="flex: 1; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text); background: var(--bg-card); padding: 0.5rem 0.7rem; border-radius: 4px; border: 1px solid var(--border); word-break: break-all; line-height: 1.5;">${escapeHtml(bs[k])}</code>
+                    <button class="bool-copy" data-copy="${escapeHtml(bs[k])}" style="font-size: 0.72rem; padding: 0.4rem 0.7rem; background: var(--bg-card); color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; white-space: nowrap;">Copy</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </details>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const summarySection = (summary.competitive_intensity || summary.comp_benchmark_vs_jd || (summary.top_recruiting_angles || []).length) ? `
+    <div style="padding: 1.25rem; background: linear-gradient(135deg, rgba(61,217,214,0.06), rgba(74,158,255,0.06)); border: 1px solid rgba(61,217,214,0.3); border-radius: 10px; margin-bottom: 1.5rem;">
+      <div style="font-weight: 700; color: var(--text); font-size: 0.95rem; margin-bottom: 0.7rem;">Market summary</div>
+      ${summary.competitive_intensity ? `
+        <div style="margin-bottom: 0.5rem;">
+          <span style="font-size: 0.78rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;">Competitive intensity:</span>
+          <span style="font-size: 0.88rem; color: var(--text); margin-left: 0.4rem; font-weight: 600;">${escapeHtml(summary.competitive_intensity)}</span>
+          ${summary.competitive_intensity_rationale ? `<div style="font-size: 0.82rem; color: var(--text-dim); margin-top: 0.3rem; line-height: 1.55;">${escapeHtml(summary.competitive_intensity_rationale)}</div>` : ''}
+        </div>
+      ` : ''}
+      ${summary.comp_benchmark_vs_jd ? `
+        <div style="margin-bottom: 0.5rem;">
+          <span style="font-size: 0.78rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;">Comp vs JD offer:</span>
+          <div style="font-size: 0.85rem; color: var(--text); margin-top: 0.3rem; line-height: 1.55;">${escapeHtml(summary.comp_benchmark_vs_jd)}</div>
+        </div>
+      ` : ''}
+      ${(summary.top_recruiting_angles || []).length ? `
+        <div>
+          <div style="font-size: 0.78rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 0.4rem;">Top recruiting angles</div>
+          <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.3rem;">
+            ${summary.top_recruiting_angles.map(a => `<li style="font-size: 0.82rem; color: var(--text); padding: 0.4rem 0.7rem; background: var(--bg-card); border-radius: 4px; border-left: 2px solid var(--accent);">${escapeHtml(a)}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+    </div>
+  ` : '';
+
+  return `
+    <section class="card ci-card" data-state="success" data-req-id="${escapeHtml(reqId || '')}" style="position: relative;">
+      <div style="position: absolute; top: 1.25rem; right: 1.25rem; padding: 0.3rem 0.7rem; background: linear-gradient(135deg, rgba(61,217,214,0.18), rgba(74,158,255,0.18)); color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Pro</div>
+      <div class="card-label">Competitive Intelligence</div>
+      <h2 class="card-title">${escapeHtml(payload.role_title || 'Per-company hiring intel')}</h2>
+      <p style="color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.88rem;">
+        ${escapeHtml(payload.honesty_caveat || 'Estimates derived from public hiring patterns. Confidence varies by company specificity.')}
+      </p>
+      ${summarySection}
+      ${insightCards}
+    </section>
+  `;
+}
+
+// Render the Pro error state (AI call failed).
+function renderCompetitiveIntelError(reqId, errMessage) {
+  return `
+    <section class="card ci-card" data-state="error" data-req-id="${escapeHtml(reqId || '')}" style="position: relative;">
+      <div style="position: absolute; top: 1.25rem; right: 1.25rem; padding: 0.3rem 0.7rem; background: linear-gradient(135deg, rgba(61,217,214,0.18), rgba(74,158,255,0.18)); color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Pro</div>
+      <div class="card-label">Competitive Intelligence</div>
+      <h2 class="card-title">Per-company hiring intel</h2>
+      <div style="padding: 1.25rem; background: rgba(255, 107, 107, 0.06); border: 1px solid rgba(255, 107, 107, 0.3); border-radius: 10px; margin-bottom: 1.25rem;">
+        <div style="font-weight: 700; color: var(--danger); font-size: 0.92rem; margin-bottom: 0.5rem;">Something went sideways</div>
+        <div style="font-size: 0.85rem; color: var(--text-dim); line-height: 1.55; margin-bottom: 1rem;">${escapeHtml(errMessage || 'The AI call failed. Your credit was not charged.')}</div>
+        <button class="btn btn-primary ci-run-btn" style="font-size: 0.88rem; padding: 0.6rem 1.2rem;">Try again</button>
+      </div>
+    </section>
+  `;
+}
+
+// Render the Pro loading state (AI call in flight).
+function renderCompetitiveIntelLoading(reqId) {
+  return `
+    <section class="card ci-card" data-state="loading" data-req-id="${escapeHtml(reqId || '')}" style="position: relative;">
+      <div style="position: absolute; top: 1.25rem; right: 1.25rem; padding: 0.3rem 0.7rem; background: linear-gradient(135deg, rgba(61,217,214,0.18), rgba(74,158,255,0.18)); color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Pro</div>
+      <div class="card-label">Competitive Intelligence</div>
+      <h2 class="card-title">Per-company hiring intel</h2>
+      <div style="padding: 2rem 1.25rem; background: linear-gradient(135deg, rgba(61,217,214,0.04), rgba(74,158,255,0.04)); border: 1px solid var(--border); border-radius: 10px; text-align: center;">
+        <div style="display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: ci-spin 0.8s linear infinite; margin-bottom: 1rem;"></div>
+        <div style="font-weight: 700; color: var(--text); font-size: 0.95rem; margin-bottom: 0.4rem;">Analyzing competitors...</div>
+        <div style="font-size: 0.82rem; color: var(--text-dim);">Roughly 10 seconds. Senior recruiter analysis pass on each company.</div>
+      </div>
+      <style>@keyframes ci-spin { to { transform: rotate(360deg); } }</style>
+    </section>
+  `;
+}
+
+// Click handler: fires the AI call and re-renders the card based on response.
+async function runCompetitiveIntel(card) {
+  const reqId = card.dataset.reqId;
+  if (!reqId) {
+    console.error('[ci] no reqId on card');
+    return;
+  }
+  // Swap to loading state
+  const loadingHtml = renderCompetitiveIntelLoading(reqId);
+  card.outerHTML = loadingHtml;
+  // Get the new card reference (outerHTML invalidated the old one)
+  const loadingCard = document.querySelector('.ci-card[data-state="loading"]');
+
+  try {
+    const res = await fetch('/api/intake/competitive-intel', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ req_id: reqId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const msg = data.detail || `Request failed (${res.status})`;
+      const errCard = renderCompetitiveIntelError(reqId, msg);
+      loadingCard.outerHTML = errCard;
+      wireCompetitiveIntelCard();
+      return;
+    }
+    const successCard = renderCompetitiveIntelSuccess(reqId, data);
+    loadingCard.outerHTML = successCard;
+    wireCompetitiveIntelCard();
+  } catch (e) {
+    console.error('[ci] fetch failed', e);
+    const errCard = renderCompetitiveIntelError(reqId, 'Network error. Check your connection and try again.');
+    loadingCard.outerHTML = errCard;
+    wireCompetitiveIntelCard();
+  }
+}
+
+// Wire the Run button (and any Copy buttons inside boolean strategies) on
+// the current CI card. Safe to call multiple times — uses fresh querySelector.
+function wireCompetitiveIntelCard() {
+  const card = document.querySelector('.ci-card');
+  if (!card) return;
+  const btn = card.querySelector('.ci-run-btn');
+  if (btn) {
+    btn.addEventListener('click', () => runCompetitiveIntel(card), { once: true });
+  }
+  // Copy buttons inside boolean strategy details
+  card.querySelectorAll('.bool-copy').forEach(b => {
+    b.addEventListener('click', () => {
+      navigator.clipboard.writeText(b.dataset.copy || '');
+      const orig = b.textContent;
+      b.textContent = 'Copied';
+      setTimeout(() => { b.textContent = orig; }, 1500);
+    });
+  });
+}
+
 function renderResults(data) {
   const p = data.parsed;
   const b = data.boolean_strings;
@@ -1330,6 +1680,11 @@ renderResults = function(data) {
       // to free users (gated server-side via user.plan == 'pro').
       renderProSkillBriefingCard(data.pro_skill_briefing || _p.pro_skill_briefing, user && user.plan === 'pro'),
       renderProBooleanExtensionsCard(data.pro_boolean_extensions || _p.pro_boolean_extensions, user && user.plan === 'pro'),
+      // Competitive Intelligence — click-to-run for Pro users (separate AI call,
+      // not auto-chained to keep cost under user's control). Free users see a
+      // locked placeholder. data.req_id is passed so the click handler knows
+      // which requisition to analyze.
+      renderCompetitiveIntelCard(data.req_id, user && user.plan === 'pro'),
     ].filter(Boolean).join('');
     // Wire Copy buttons on the objection playbook counter blocks
     grand.querySelectorAll('.bool-copy').forEach(btn => {
@@ -1341,6 +1696,9 @@ renderResults = function(data) {
         setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
       });
     });
+    // Wire the Competitive Intelligence Run button (and Copy buttons inside it,
+    // once results render).
+    wireCompetitiveIntelCard();
   }
 
   $('pipelineLink').href = `/app/pipeline.html?req=${data.req_id}`;
