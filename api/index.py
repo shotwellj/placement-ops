@@ -1988,6 +1988,88 @@ RETURN ONLY THIS JSON
 No em dashes. No code fences. JSON only.
 """
 
+
+COMPETITIVE_INTEL_PROMPT = """You are a senior technical recruiter with 13+ years at FAANG-tier companies analyzing competitor companies for a recruiter who is filling a specific role.
+
+REQUISITION CONTEXT:
+{requisition_context}
+
+COMPETITORS TO ANALYZE (already identified by Boolean Builder as tier-1 direct competitors and tier-2 adjacent companies):
+{competitor_list}
+
+For EACH company in the list, produce a structured intelligence report. Be honest about what you do and don't know. Recruiters trust tools that admit uncertainty more than tools that fabricate confident-sounding numbers.
+
+CRITICAL HONESTY RULES (read these before writing anything):
+
+1. SALARY CONFIDENCE FLAGS ARE MANDATORY.
+   For FAANG-tier companies (Meta, Google, Amazon, Apple, Microsoft, Netflix, Stripe, Airbnb, Uber, Salesforce, Anthropic, OpenAI, Databricks) and other companies with extensively-documented public comp data on Levels.fyi, set "salary_confidence": "high".
+   For mid-size tech companies and well-known startups, set "salary_confidence": "medium".
+   For defense contractors, niche startups, agencies, or any company you don't have specific public comp data on, set "salary_confidence": "low" AND give a wider range or use industry/region benchmarks. NEVER fabricate FAANG-style numbers for non-FAANG companies. A defense contractor in San Diego is NOT paying Meta-level comp.
+
+2. HIRING VELOCITY IS A QUALITATIVE READ.
+   "aggressive" / "moderate" / "slow" should reflect what you genuinely know about the company's recent hiring trajectory. If you genuinely don't know, default to "moderate" and add a note in poaching_rationale that velocity is uncertain.
+
+3. ENGINEERING COUNT IS A RANGE.
+   Do NOT give exact numbers like "247 engineers". Give ranges like "150-300" or "1,000-2,000". For very well-known companies, you can narrow the range. For obscure ones, widen it.
+
+4. INDUSTRY-WEIGHTED INTELLIGENCE.
+   Defense contractors should emphasize clearance requirements, contract stability, and on-site requirements. Equity is usually limited.
+   Early-stage startups should emphasize equity upside, burn rate context, and founder-led culture.
+   Public tech giants should emphasize equity vesting, RTO policy, and total comp transparency.
+   Agencies and consultancies should emphasize bench utilization, project diversity, and billable rate pressure.
+
+5. NEVER INCLUDE THE HIRING COMPANY.
+   If the requisition's hiring company appears in the competitor list (it shouldn't, but check), exclude it from the output. Sourcing from your own client is a non-solicit violation.
+
+6. DO NOT FABRICATE BENEFITS.
+   Only list benefits you have specific knowledge of. "Standard tech benefits" is acceptable for unknown companies. Inventing "$25K relocation" or "Free meals" for a defense contractor is the kind of error that destroys recruiter trust.
+
+OUTPUT JSON SCHEMA (return ONLY valid JSON, no code fences, no prose):
+
+{{
+  "competitors_analyzed": ["Company1", "Company2"],
+  "insights": [
+    {{
+      "company": "Exact company name as provided",
+      "tier": 1,
+      "hiring_velocity": "aggressive|moderate|slow",
+      "velocity_confidence": "high|medium|low",
+      "estimated_engineering_count": "150-300",
+      "estimated_open_positions": "10-30 (estimated based on company size)",
+      "avg_time_to_fill": "45-60 days (estimated)",
+      "common_skills_for_this_role": ["skill1", "skill2", "skill3", "skill4", "skill5"],
+      "salary_range": {{
+        "min": 130000,
+        "max": 180000,
+        "equity": "Limited (defense contractor)",
+        "salary_confidence": "low",
+        "salary_basis": "1-2 sentences on how you derived this. Public Levels.fyi data, regional benchmarks, industry norms, etc."
+      }},
+      "benefits_highlights": ["benefit1", "benefit2"],
+      "remote_policy": "On-site (cleared facility)|Hybrid (3 days office)|Fully remote|Unknown",
+      "growth_stage": "Early|Growth|Mature",
+      "talent_pool_estimate": "small|medium|large with 1 sentence rationale",
+      "poaching_difficulty": "high|moderate|low",
+      "poaching_rationale": "1-2 sentences on why this company is hard or easy to poach from for THIS specific role",
+      "comp_vs_jd_offer": "above|at_market|below with 1 sentence comparing to the requisition's offered range",
+      "key_recruiting_angle": "1-2 sentences: the single most effective recruiter pitch to engineers at this company for this role"
+    }}
+  ],
+  "market_summary": {{
+    "competitive_intensity": "high|moderate|low",
+    "competitive_intensity_rationale": "1-2 sentences",
+    "fastest_to_fill_competitor": "Company name or null",
+    "most_aggressive_hirer": "Company name or null",
+    "comp_benchmark_vs_jd": "1-2 sentences on whether the JD's comp is competitive vs the cluster",
+    "top_recruiting_angles": ["1-line pitch", "1-line pitch", "1-line pitch"]
+  }},
+  "honesty_caveat": "1-sentence reminder that estimates are derived from public hiring patterns and confidence varies by company specificity"
+}}
+
+No em dashes. No code fences. Just JSON.
+"""
+
+
 CANDIDATE_EVAL_PROMPT = """You are an expert technical recruiter with 13+ years of experience evaluating candidates.
 
 You receive two inputs: a parsed job requisition and a raw candidate profile (could be a LinkedIn dump, resume text, or pasted notes).
@@ -2072,6 +2154,18 @@ class CandidateEvalRequest(BaseModel):
     current_title: Optional[str] = None
     current_company: Optional[str] = None
     source: Optional[str] = None  # where you found them: "linkedin", "github", "referral", etc.
+
+
+class CompetitiveIntelRequest(BaseModel):
+    """Request to run Competitive Intelligence analysis on an existing requisition.
+
+    The endpoint pulls competitors from the req's stored Boolean Builder output
+    (tier_1_direct_competitors + tier_2_adjacent) by default. The competitors
+    field is an OPTIONAL override — if provided, it replaces the tier list and
+    is capped at 8 companies to control AI cost.
+    """
+    req_id: str = Field(..., min_length=1)
+    competitors: Optional[list[str]] = Field(default=None, description="Optional override list of competitor names. Capped at 8.")
 
 
 
@@ -2404,6 +2498,163 @@ async def _save_signature(req_id: str, user_id: str, parsed: dict) -> bool:
     except Exception as e:
         print(f"[signature FAIL] req_id={req_id[:8]}... type={type(e).__name__} err={str(e)[:200]}")
         return False
+
+
+# ---------- COMPETITIVE INTELLIGENCE HELPERS ----------
+
+# Programming languages we recognize for GitHub language: filters in
+# competitive boolean strategies. Used by _generate_competitive_boolean_strategies
+# to decide whether to include language-scoped GitHub queries.
+_GITHUB_PROGRAMMING_LANGS = {
+    "Python", "JavaScript", "TypeScript", "Java", "Go", "Ruby", "C++", "C#",
+    "PHP", "Swift", "Kotlin", "Rust", "Scala", "Elixir", "Clojure", "Haskell",
+    "Dart", "R", "MATLAB", "Julia", "Lua", "Perl", "Erlang", "Objective-C",
+}
+
+
+def _generate_competitive_boolean_strategies(
+    company_name: str,
+    role_title: str,
+    jd_skills: list,
+    level: Optional[str] = None,
+) -> dict:
+    """Pure function. Generates 5 boolean search strategies for poaching from a competitor.
+
+    Ported from CandidatIQ's intelligence_engine.py and stripped of the static
+    COMPANY_DATA dependency. Works against any company name, not just FAANG.
+
+    Strategies generated:
+      - macro: wide-net X-ray with "ex-Company" + role/skills
+      - micro_1: hyper-targeted by exact title + company + JD skills + seniority
+      - micro_2: adjacent-role X-ray + company + JD skills
+      - xray: title or adjacent + company + ALL JD skills
+      - github: company + JD programming languages + followers floor
+
+    Returns a dict of {strategy_name: boolean_string}. All strings follow the
+    X-ray constraints documented in BOOLEAN_BUILDER_PROMPT (no literal AND,
+    double-quoted phrases, OR uppercase between alternatives).
+
+    Args:
+        company_name: target competitor (e.g., "Anduril", "AUSGAR Technologies")
+        role_title: requisition title verbatim (e.g., "Senior Embedded Linux Engineer")
+        jd_skills: list of skill strings from parsed.must_have_skills (skill names only)
+        level: optional level hint ("ic_senior", "ic_staff_plus", "manager") to pick seniority filter
+    """
+    # Defensive: skills may come in as dicts {"skill": "...", "severity": "..."} or as plain strings.
+    # Normalize to plain strings.
+    normalized_skills = []
+    for s in (jd_skills or [])[:5]:
+        if isinstance(s, dict):
+            name = s.get("skill") or s.get("name") or ""
+            if name:
+                normalized_skills.append(name)
+        elif isinstance(s, str) and s:
+            normalized_skills.append(s)
+    if not normalized_skills:
+        normalized_skills = ["Python", "SQL", "AWS"]  # generic fallback
+
+    top_three = normalized_skills[:3]
+    skills_or_clause = " OR ".join(f'"{skill}"' for skill in top_three)
+    all_skills_or_clause = " OR ".join(f'"{skill}"' for skill in normalized_skills)
+
+    # Determine seniority filter from level hint or role title
+    role_lower = (role_title or "").lower()
+    is_manager = (
+        (level and "manager" in level.lower())
+        or any(w in role_lower for w in ["manager", "director", "vp", "head of"])
+    )
+    is_senior = (
+        (level and any(x in level.lower() for x in ["senior", "staff", "principal"]))
+        or any(w in role_lower for w in ["senior", "sr", "lead", "principal", "staff"])
+    )
+
+    if is_manager:
+        seniority_filter = '(manager OR director OR "head of" OR vp OR lead)'
+        adjacent_titles = ["director", "head of engineering", "vp of engineering", "engineering lead"]
+    elif is_senior:
+        seniority_filter = "(senior OR sr OR lead OR principal OR staff)"
+        # Strip seniority words from the role to get the base
+        base_role = role_title or "engineer"
+        for word in ("Senior ", "Sr. ", "Sr ", "Lead ", "Principal ", "Staff "):
+            base_role = base_role.replace(word, "")
+        base_role = base_role.strip()
+        adjacent_titles = [
+            f"senior {base_role}",
+            f"lead {base_role}",
+            f"principal {base_role}",
+        ]
+    else:
+        seniority_filter = "(junior OR mid-level OR senior)"
+        adjacent_titles = [role_title or "engineer"]
+
+    # Build the adjacent_or_clause WITHOUT the role_title itself (xray already
+    # has intitle:"role_title", so listing the same string again is redundant
+    # and produces ugly output like (intitle:"X" OR "X")).
+    adjacent_titles_for_clause = [
+        t for t in adjacent_titles[:3]
+        if t.strip().lower() != (role_title or "").strip().lower()
+    ]
+    # If adjacent_or_clause would be empty (e.g., no-seniority branch where
+    # adjacent_titles was just [role_title]), set it to None and the xray/micro_2
+    # builders will skip the OR clause cleanly.
+    adjacent_or_clause = (
+        " OR ".join(f'"{t}"' for t in adjacent_titles_for_clause)
+        if adjacent_titles_for_clause else None
+    )
+    # Macro skills clause: quoted phrases, NOT bare lowercased words.
+    # Google treats `embedded linux` (unquoted) as two AND'd terms, which is
+    # not what we want for multi-word skills. Quoting preserves phrase match.
+    macro_skills_or = " OR ".join(f'"{s}"' for s in top_three)
+
+    # Build the 5 strategies. Note: per BOOLEAN_BUILDER_PROMPT rules, we use
+    # Google syntax (site:, intitle:, OR uppercase, double quotes around phrases,
+    # NO literal AND between terms — a space is implicit AND on Google).
+    macro = (
+        f'site:linkedin.com/in/ ("{company_name}" OR "ex-{company_name}" OR "former {company_name}") '
+        f'(intitle:"{role_title}" OR {macro_skills_or}) {seniority_filter}'
+    )
+    micro_1 = (
+        f'site:linkedin.com/in/ intitle:"{role_title}" "{company_name}" '
+        f'({skills_or_clause}) {seniority_filter}'
+    )
+    micro_2 = (
+        f'site:linkedin.com/in/ ("{company_name}" OR "worked at {company_name}") '
+        f'({adjacent_or_clause}) ({skills_or_clause})'
+        if adjacent_or_clause else
+        f'site:linkedin.com/in/ ("{company_name}" OR "worked at {company_name}") '
+        f'intitle:"{role_title}" ({skills_or_clause})'
+    )
+    xray = (
+        f'site:linkedin.com/in/ (intitle:"{role_title}" OR {adjacent_or_clause}) '
+        f'"{company_name}" ({all_skills_or_clause})'
+        if adjacent_or_clause else
+        f'site:linkedin.com/in/ intitle:"{role_title}" '
+        f'"{company_name}" ({all_skills_or_clause})'
+    )
+
+    # GitHub: only emit language: filters if the JD actually has programming languages.
+    # Otherwise fall back to a profile search using the skill keywords.
+    lang_skills = [s for s in normalized_skills if s in _GITHUB_PROGRAMMING_LANGS]
+    if lang_skills:
+        lang_clause = " OR ".join("language:" + s for s in lang_skills[:3])
+        github = (
+            f'site:github.com ("{company_name}") '
+            f'({lang_clause}) followers:>50'
+        )
+    else:
+        skill_quoted_clause = " OR ".join('"' + s + '"' for s in top_three)
+        github = (
+            f'site:github.com ("{company_name}") '
+            f'({skill_quoted_clause}) followers:>50'
+        )
+
+    return {
+        "macro": macro,
+        "micro_1": micro_1,
+        "micro_2": micro_2,
+        "xray": xray,
+        "github": github,
+    }
 
 
 # ---------- EMAIL HELPERS ----------
@@ -3374,6 +3625,186 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         # When non-null, the UI should show a banner telling the user
         # their typed company was overridden by what the JD actually says.
         "company_override": company_override,
+    }
+
+
+@app.post("/api/intake/competitive-intel")
+async def competitive_intel(req: CompetitiveIntelRequest, user: dict = Depends(get_current_user)):
+    """Run Competitive Intelligence analysis on an existing requisition.
+
+    Auto-chains from Boolean Builder's company clusters (tier_1_direct_competitors
+    + tier_2_adjacent) by default. The recruiter can also pass an explicit list
+    via req.competitors to override.
+
+    Output for each company:
+      - hiring_velocity, time_to_fill, eng_count estimates (with confidence flags)
+      - salary_range with mandatory salary_confidence (high/medium/low)
+      - poaching_difficulty + recruiting_angle
+      - 5 boolean strategies (deterministic, generated by helper, no AI)
+      - market_summary with comp_vs_jd benchmark
+
+    Tier policy: Pro only. Server-side gate BEFORE the AI call so free users
+    don't burn cycles. Free users hitting this endpoint get 402 with an
+    upgrade message, same shape as cap-exhaustion.
+
+    Cap policy: counts against the 'intake' bucket (1 unit per call regardless
+    of competitor count). Cap is checked upfront but only incremented on
+    success — failed AI calls don't burn quota, matching /api/intake pattern.
+    """
+    # Step 0a: Pro tier gate. Returns 402 (Payment Required) so the frontend
+    # can route to upgrade page with the same handler as cap-exhaustion.
+    if user.get("plan") != "pro":
+        raise HTTPException(
+            402,
+            "Competitive Intelligence is a Pro feature. Upgrade to unlock per-company hiring velocity, salary intel, and poaching strategies.",
+        )
+
+    # Step 0b: cap check (does NOT increment)
+    try:
+        await check_cap(user["id"], "intake")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[cap] {type(e).__name__}: {str(e)[:200]}")
+
+    # Step 1: load the requisition (verify ownership AND get parsed + booleans)
+    try:
+        async with db() as client:
+            rs = await client.execute(
+                """SELECT id, title, parsed_json, boolean_strings_json
+                   FROM requisitions WHERE id = ? AND user_id = ?""",
+                [req.req_id, user["id"]],
+            )
+            if not rs.rows:
+                raise HTTPException(404, "Requisition not found")
+            req_row = rs.rows[0]
+            if not req_row[2]:
+                raise HTTPException(400, "Requisition has no parsed data. Re-run the intake first.")
+            parsed = json.loads(req_row[2])
+            booleans = json.loads(req_row[3]) if req_row[3] else {}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"[db-req-load] {type(e).__name__}: {str(e)[:200]}")
+
+    # Step 2: assemble the competitor list. Order of preference:
+    #   (a) explicit override from req.competitors (capped at 8)
+    #   (b) Boolean Builder's company_clusters (tier_1 + tier_2)
+    #   (c) parsed.market360.poaching_targets (fallback if booleans missing)
+    if req.competitors:
+        competitors = [c for c in req.competitors if c and c.strip()][:8]
+    else:
+        company_clusters = booleans.get("company_clusters") or {}
+        tier_1 = company_clusters.get("tier_1_direct_competitors") or []
+        tier_2 = company_clusters.get("tier_2_adjacent") or []
+        competitors = list(dict.fromkeys(tier_1 + tier_2))[:8]  # de-dupe, preserve order
+
+        # Fallback to poaching_targets if Boolean Builder didn't produce clusters
+        if not competitors:
+            poach = (parsed.get("market360") or {}).get("poaching_targets") or []
+            competitors = [
+                p.get("company") for p in poach
+                if isinstance(p, dict) and p.get("company")
+            ][:8]
+
+    if not competitors:
+        raise HTTPException(
+            422,
+            "No competitor companies found for this requisition. Re-run the intake to generate company clusters, or pass an explicit 'competitors' list.",
+        )
+
+    # Step 3: build the requisition context block for the prompt
+    core = parsed.get("core", {}) or {}
+    must_have = parsed.get("must_have_skills") or []
+    skill_names = [
+        s.get("skill", "") for s in must_have
+        if isinstance(s, dict) and s.get("skill")
+    ][:10]
+    comp_snapshot = parsed.get("comp_snapshot", {}) or {}
+
+    requisition_context = json.dumps({
+        "role_title": core.get("role_title"),
+        "level": core.get("level"),
+        "company": core.get("company"),  # the HIRING company (excluded from analysis)
+        "industry": core.get("industry"),
+        "location": core.get("location"),
+        "remote_policy": core.get("remote_policy"),
+        "must_have_skills": skill_names,
+        "offered_comp_base_range": comp_snapshot.get("base_range"),
+        "offered_total_comp_range": comp_snapshot.get("total_comp_range"),
+    }, indent=2)
+
+    competitor_list = "\n".join(f"- {c}" for c in competitors)
+
+    # Step 4: AI call. Errors here do NOT burn quota.
+    try:
+        ai_text = await call_ai(
+            user["id"],
+            COMPETITIVE_INTEL_PROMPT.format(
+                requisition_context=requisition_context,
+                competitor_list=competitor_list,
+            ),
+            max_tokens=6000,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        etype = type(e).__name__
+        print(f"[ai-competitive FAIL] type={etype} req_id={req.req_id[:8]}... competitors={len(competitors)} err={str(e)[:200]}")
+        if "Timeout" in etype or "ConnectError" in etype:
+            raise HTTPException(
+                503,
+                "The AI provider is slow or unreachable right now. Please try again in a moment.",
+            )
+        raise HTTPException(500, f"[ai-competitive] {etype}: {str(e)[:300]}")
+
+    # Step 5: parse the AI JSON response
+    try:
+        intel = parse_json_strict(ai_text)
+    except Exception as e:
+        raise HTTPException(
+            500,
+            f"[json-parse] {type(e).__name__}: {str(e)[:200]}. AI returned: {ai_text[:300]}",
+        )
+
+    # Step 6: attach deterministic boolean strategies to each insight.
+    # The AI does NOT generate boolean strings (those are deterministic,
+    # cheaper, and easier to keep correct via _generate_competitive_boolean_strategies).
+    insights = intel.get("insights") or []
+    for insight in insights:
+        company = insight.get("company")
+        if not company:
+            continue
+        try:
+            insight["boolean_strategies"] = _generate_competitive_boolean_strategies(
+                company_name=company,
+                role_title=core.get("role_title") or "",
+                jd_skills=must_have,
+                level=core.get("level"),
+            )
+        except Exception as e:
+            # If the helper crashes for one company, don't poison the whole response.
+            print(f"[bool-helper FAIL] company={company} err={str(e)[:150]}")
+            insight["boolean_strategies"] = {}
+
+    # Step 7: increment usage NOW that everything succeeded
+    try:
+        await increment_cap(user["id"], "intake")
+    except Exception as e:
+        # Non-fatal: we already produced the result, just log the increment failure.
+        print(f"[cap-increment FAIL] type={type(e).__name__} err={str(e)[:200]}")
+
+    # Step 8: return the assembled response
+    return {
+        "req_id": req.req_id,
+        "role_title": core.get("role_title"),
+        "competitors_analyzed": intel.get("competitors_analyzed") or competitors,
+        "insights": insights,
+        "market_summary": intel.get("market_summary") or {},
+        "honesty_caveat": intel.get("honesty_caveat") or (
+            "Estimates are derived from public hiring patterns. Confidence varies by company specificity."
+        ),
+        "ai_model": "claude-haiku-4-5",
     }
 
 
