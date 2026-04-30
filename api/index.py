@@ -2703,7 +2703,11 @@ def _generate_competitive_boolean_strategies(
     Args:
         company_name: target competitor (e.g., "Anduril", "AUSGAR Technologies")
         role_title: requisition title verbatim (e.g., "Senior Embedded Linux Engineer")
-        jd_skills: list of skill strings from parsed.must_have_skills (skill names only)
+        jd_skills: list of atomic skill strings — should come from parsed.canonical_skills
+                  (clean atomic names like 'PyTorch', 'C++') for best results. The
+                  helper still accepts must_have_skills sentences and runs them
+                  through _extract_atomic_skills as a defensive fallback for older
+                  reqs that pre-date the canonical_skills field in the JD parser.
         level: optional level hint ("ic_senior", "ic_staff_plus", "manager") to pick seniority filter
     """
     # Defensive: skills may come in as dicts {"skill": "...", "severity": "..."} or as plain strings.
@@ -3941,12 +3945,41 @@ async def competitive_intel(req: CompetitiveIntelRequest, user: dict = Depends(g
 
     # Step 3: build the requisition context block for the prompt
     core = parsed.get("core", {}) or {}
-    must_have = parsed.get("must_have_skills") or []
-    skill_names = [
-        s.get("skill", "") for s in must_have
-        if isinstance(s, dict) and s.get("skill")
-    ][:10]
     comp_snapshot = parsed.get("comp_snapshot", {}) or {}
+
+    # Skill source resolution (the right way, finalized 2026-04-28):
+    # The JD parser produces TWO skill fields by intentional design:
+    #   - must_have_skills: prose with rationale, for human-readable UI display
+    #     (e.g. "5+ years embedded systems development (C/C++, RTOS, firmware)")
+    #   - canonical_skills: clean atomic skill names for database/search
+    #     (e.g. "Embedded C/C++", "Real-Time Operating Systems (RTOS)", "Python")
+    #
+    # The boolean strategy generator needs ATOMIC skill names because
+    # they're quoted into Google queries that match against candidate
+    # profiles. Quoting prose like "5+ years embedded..." returns zero
+    # results (no human writes that verbatim in a profile).
+    #
+    # Resolution order:
+    #   1. Use parsed.canonical_skills (clean names, what we want) — 83%
+    #      of reqs as of 2026-04-28
+    #   2. Fall back to parsed.must_have_skills via _extract_atomic_skills
+    #      defensive parser (handles older reqs that pre-date the
+    #      canonical_skills field)
+    canonical = parsed.get("canonical_skills") or []
+    if canonical and isinstance(canonical, list):
+        skill_names = [
+            (c.get("name") or c.get("skill") or "") if isinstance(c, dict) else str(c)
+            for c in canonical
+        ]
+        skill_names = [s for s in skill_names if s][:10]
+    else:
+        # Fallback: derive atomic skills from must_have_skills prose
+        must_have = parsed.get("must_have_skills") or []
+        raw_strings = [
+            s.get("skill", "") for s in must_have
+            if isinstance(s, dict) and s.get("skill")
+        ]
+        skill_names = _extract_atomic_skills(raw_strings)[:10]
 
     requisition_context = json.dumps({
         "role_title": core.get("role_title"),
@@ -3955,7 +3988,7 @@ async def competitive_intel(req: CompetitiveIntelRequest, user: dict = Depends(g
         "industry": core.get("industry"),
         "location": core.get("location"),
         "remote_policy": core.get("remote_policy"),
-        "must_have_skills": skill_names,
+        "must_have_skills": skill_names,  # populated from canonical_skills first
         "offered_comp_base_range": comp_snapshot.get("base_range"),
         "offered_total_comp_range": comp_snapshot.get("total_comp_range"),
     }, indent=2)
