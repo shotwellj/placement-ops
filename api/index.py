@@ -2512,6 +2512,172 @@ _GITHUB_PROGRAMMING_LANGS = {
 }
 
 
+# Generic prefix phrases that JD authors put in front of the actual skill name.
+# Stripping these turns "Proficiency in C/C++ for embedded systems" into
+# "C/C++ for embedded systems" which is closer to a searchable token.
+# Order matters: longer phrases first to avoid partial matches.
+_GENERIC_SKILL_PREFIXES = [
+    "deep experience with",
+    "deep knowledge of",
+    "strong knowledge of",
+    "strong experience with",
+    "extensive experience with",
+    "proven experience",
+    "proven track record",
+    "demonstrated ability",
+    "demonstrated experience",
+    "demonstrated technical",
+    "expert-level",
+    "expert level",
+    "experience with",
+    "experience in",
+    "experience building",
+    "experience architecting",
+    "knowledge of",
+    "knowledge in",
+    "proficiency in",
+    "proficiency with",
+    "expertise in",
+    "expertise with",
+    "fluency in",
+    "fluent in",
+    "familiarity with",
+    "background in",
+    "skills in",
+    "skill in",
+    "ability to",
+]
+
+# Years-of-experience prefix patterns. These are stripped before the skill name.
+# Examples: "5+ years embedded systems development", "8+ years of firmware experience"
+import re as _re_atomic
+_YOE_PREFIX_PATTERN = _re_atomic.compile(
+    r'^\s*\d+\+?\s*(?:to\s+\d+\s*)?(?:years?|yrs?)\s*(?:of\s+)?(?:experience\s+(?:in\s+|with\s+|as\s+)?)?',
+    _re_atomic.IGNORECASE,
+)
+# Trailing phrases that don't add search value
+_TRAILING_PHRASES_PATTERN = _re_atomic.compile(
+    r'\s*(?:with\s+multiple\s+shipped\s+products|for\s+test\s+automation\s+and\s+integration|'
+    r'\s*\(or\s+equivalent[^)]*\)|in\s+production|at\s+scale)\s*$',
+    _re_atomic.IGNORECASE,
+)
+
+
+def _extract_atomic_skills(raw_entries: list) -> list:
+    """Extract atomic skill names from JD-bullet-shaped entries.
+
+    Real JD parsers (including ours) frequently return sentence-shaped
+    requirements rather than atomic skill names. Examples from production data
+    on a Skydio req:
+
+      "5+ years embedded systems development (C/C++, RTOS, firmware)"
+      "U.S. Citizenship and DoD security clearance eligibility"
+      "Proficiency in C/C++ for embedded systems (not just application code)"
+      "RTOS experience (FreeRTOS, VxWorks, QNX, or equivalent real-time operating system)"
+
+    None of these appear verbatim in candidate profiles. This helper extracts:
+
+      "5+ years embedded systems development (C/C++, RTOS, firmware)"
+        -> ["C/C++", "RTOS", "firmware", "embedded systems"]
+      "Proficiency in C/C++ for embedded systems (not just application code)"
+        -> ["C/C++", "embedded systems"]
+      "RTOS experience (FreeRTOS, VxWorks, QNX, or equivalent real-time operating system)"
+        -> ["RTOS", "FreeRTOS", "VxWorks", "QNX"]
+
+    Strategy:
+      1. Pull out parenthetical contents and treat as additional skill candidates
+         (because JD authors put real skill names in parens after generic intros)
+      2. Strip years-of-experience prefixes
+      3. Strip generic prefix phrases like "Proficiency in", "Deep experience with"
+      4. Strip trailing fluff like "(or equivalent)", "with multiple shipped products"
+      5. Split parenthetical contents on commas + " or " + " and "
+      6. For the leftover (post-paren) sentence, only keep it if it's <= 4 words;
+         otherwise drop (we'd rather have fewer real skills than a sentence)
+      7. Dedupe case-insensitively while preserving original casing
+      8. Drop entries that are clearly not skill names (citizenship clauses,
+         "ability to communicate", etc.)
+
+    Returns ordered list of atomic skill strings, deduplicated.
+    """
+    if not raw_entries:
+        return []
+
+    # Bag-of-skills as we extract. Use a list to preserve order, dict for dedup.
+    seen_lower = set()
+    out = []
+
+    def _add(candidate: str) -> None:
+        c = candidate.strip().strip(",.;:")
+        if not c or len(c) < 2:
+            return
+        # Skip clearly-non-skill entries
+        cl = c.lower()
+        non_skill_markers = [
+            "citizenship", "clearance eligibility", "ability to communicate",
+            "must be willing", "must be able", "u.s. citizen", "us citizen",
+            "ability to work", "willing to travel", "must have", "preferred",
+            "nice to have", "bonus points",
+            # Negations and qualifiers — common JD parenthetical noise
+            "not just",
+            "or equivalent",
+            "and beyond",
+        ]
+        if any(m in cl for m in non_skill_markers):
+            return
+        # Skip clauses starting with stop-words that betray sentence-shape
+        if cl.startswith(("not ", "or ", "and ", "the ", "a ", "an ")):
+            return
+        # Skip if still a sentence (more than 4 words) — leftover JD prose
+        if len(c.split()) > 4:
+            return
+        if cl in seen_lower:
+            return
+        seen_lower.add(cl)
+        out.append(c)
+
+    for entry in raw_entries:
+        if not entry or not isinstance(entry, str):
+            continue
+
+        # Step 1: pull out parenthetical contents
+        paren_matches = _re_atomic.findall(r'\(([^)]+)\)', entry)
+        # Sanitize the entry (remove parens for sentence parsing)
+        without_parens = _re_atomic.sub(r'\([^)]*\)', '', entry).strip()
+
+        # Step 2: strip YoE prefix
+        without_yoe = _YOE_PREFIX_PATTERN.sub('', without_parens).strip()
+
+        # Step 3: strip generic prefix phrases (case insensitive)
+        cleaned = without_yoe
+        cleaned_lower = cleaned.lower()
+        for prefix in _GENERIC_SKILL_PREFIXES:
+            if cleaned_lower.startswith(prefix):
+                cleaned = cleaned[len(prefix):].strip()
+                cleaned_lower = cleaned.lower()
+                break  # only strip one prefix
+
+        # Step 4: strip trailing fluff
+        cleaned = _TRAILING_PHRASES_PATTERN.sub('', cleaned).strip(' .,;:')
+
+        # Step 5: process parenthetical contents (split on , + " or " + " and ")
+        for paren_content in paren_matches:
+            # Skip noise like "or equivalent..." which gets caught by the trailing pattern
+            if 'equivalent' in paren_content.lower() and len(paren_content.split()) > 4:
+                continue
+            # Split on commas, " or ", " and "
+            parts = _re_atomic.split(r',|\s+or\s+|\s+and\s+', paren_content)
+            for p in parts:
+                _add(p)
+
+        # Step 6: add the cleaned sentence remainder (only if VERY short — 3 words max).
+        # Anything longer is sentence-shaped JD prose that won't match profiles.
+        # Atomic skill names are 1-3 words ("Python", "C/C++", "embedded systems").
+        if cleaned and len(cleaned.split()) <= 3:
+            _add(cleaned)
+
+    return out
+
+
 def _generate_competitive_boolean_strategies(
     company_name: str,
     role_title: str,
@@ -2541,18 +2707,36 @@ def _generate_competitive_boolean_strategies(
         level: optional level hint ("ic_senior", "ic_staff_plus", "manager") to pick seniority filter
     """
     # Defensive: skills may come in as dicts {"skill": "...", "severity": "..."} or as plain strings.
-    # Normalize to plain strings.
+    # Normalize to plain strings first.
     normalized_skills = []
-    for s in (jd_skills or [])[:5]:
+    for s in (jd_skills or [])[:8]:  # take more upfront since we'll filter
         if isinstance(s, dict):
             name = s.get("skill") or s.get("name") or ""
             if name:
                 normalized_skills.append(name)
         elif isinstance(s, str) and s:
             normalized_skills.append(s)
-    if not normalized_skills:
-        normalized_skills = ["Python", "SQL", "AWS"]  # generic fallback
 
+    # CRITICAL: real JD parsers (including ours, as of 2026-04-28) frequently
+    # return sentence-shaped requirements like "5+ years embedded systems
+    # development (C/C++, RTOS, firmware)" instead of atomic skills. Quoting
+    # those verbatim and OR-ing them produces searches for verbatim sentences
+    # that no candidate writes in their profile -> zero results.
+    #
+    # Extract atomic skill names from each entry. Strategy:
+    #   1. Strip parenthetical content like "(C/C++, RTOS, firmware)" -> "C/C++, RTOS, firmware"
+    #      and treat the contents as additional candidate skills
+    #   2. Drop generic prefix phrases like "X+ years experience with",
+    #      "Proficiency in", "Deep experience with", "Strong knowledge of"
+    #   3. If the result is still > 4 words, it's still a sentence -> drop it
+    #      (better to fall back to a known skill than search for a sentence)
+    atomic_skills = _extract_atomic_skills(normalized_skills)
+
+    if not atomic_skills:
+        atomic_skills = ["Python", "SQL", "AWS"]  # generic fallback
+
+    # Cap at the top 5 atomic skills, take top 3 for the macro strategy
+    normalized_skills = atomic_skills[:5]
     top_three = normalized_skills[:3]
     skills_or_clause = " OR ".join(f'"{skill}"' for skill in top_three)
     all_skills_or_clause = " OR ".join(f'"{skill}"' for skill in normalized_skills)
@@ -2578,6 +2762,14 @@ def _generate_competitive_boolean_strategies(
         for word in ("Senior ", "Sr. ", "Sr ", "Lead ", "Principal ", "Staff "):
             base_role = base_role.replace(word, "")
         base_role = base_role.strip()
+        # Verbose role titles like "Firmware Engineer, Embedded Platform" make
+        # 5+ word adjacent titles when prefixed with "lead" or "principal".
+        # Trim the trailing comma-clause for the OR list so the adjacents are
+        # short enough to actually appear in real LinkedIn profiles. We keep
+        # the FULL role_title for intitle: matches (which Google handles fine)
+        # but use the trimmed version for the OR clause.
+        if "," in base_role:
+            base_role = base_role.split(",", 1)[0].strip()
         adjacent_titles = [
             f"senior {base_role}",
             f"lead {base_role}",
