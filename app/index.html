@@ -58,6 +58,91 @@
   .bool-copy { padding: 0.3rem 0.75rem; background: var(--bg-elev); color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.78rem; transition: all 0.15s; }
   .bool-copy:hover { color: var(--accent); border-color: var(--accent); }
   .bool-copy.copied { color: var(--good); border-color: var(--good); }
+
+  /* ---------- Collapsible card pattern (Stage 1 visual upgrade, 2026-04-30) ----------
+     Uses native <details>/<summary> for zero-JS toggle, full keyboard support,
+     and persistent open state in DOM. Each grandmaster card and the data-dense
+     middle sections (Skills, Booleans, Companies) become collapsible. The
+     dashboard (KPIs + Executive Brief + Comp) stays always-visible.
+  */
+  .card.collapsible { padding: 0; overflow: hidden; }
+  .card.collapsible > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .card.collapsible > summary::-webkit-details-marker { display: none; }
+  .card.collapsible > summary:hover { background: var(--bg-elev); }
+  .card.collapsible[open] > summary { border-bottom: 1px solid var(--border); }
+  .collapsible-head { flex: 1; min-width: 0; }
+  .collapsible-head .card-label { margin-bottom: 0.4rem; }
+  .collapsible-head .card-title { margin-bottom: 0.3rem; font-size: 1.15rem; }
+  .collapsible-summary { color: var(--text-dim); font-size: 0.88rem; line-height: 1.5; margin: 0; }
+  .collapsible-icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-mute);
+    transition: transform 0.2s;
+    font-size: 0.85rem;
+  }
+  .card.collapsible[open] .collapsible-icon { transform: rotate(180deg); }
+  .collapsible-body { padding: 1.5rem 2rem 2rem; }
+  .collapsible-body > section.card { padding: 0; border: none; margin-bottom: 0; background: transparent; }
+
+  /* Section navigation sticky bar */
+  .section-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(10, 14, 26, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    margin: 0 -1.5rem 1.5rem;
+    padding: 0.75rem 1.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .section-nav-inner {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    min-width: max-content;
+  }
+  .section-nav button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font-body);
+  }
+  .section-nav button:hover { color: var(--text); border-color: var(--accent); }
+  .section-nav button.active { background: var(--accent); color: #0a0e1a; border-color: var(--accent); }
+  .section-nav button.pro-only::after {
+    content: 'PRO';
+    margin-left: 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--warn);
+    letter-spacing: 0.05em;
+  }
+  .section-nav button.active.pro-only::after { color: #0a0e1a; }
 </style>
 <style>
   textarea.jd-input { width: 100%; min-height: 320px; padding: 1.25rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.6; resize: vertical; transition: border-color 0.15s; }
@@ -426,6 +511,98 @@ function escapeHtml(s) {
 }
 
 function escapeAttr(s) { return String(s || '').replace(/"/g, '&quot;'); }
+
+// ---------- Collapsible card helper (Stage 1, 2026-04-30) ----------
+//
+// Wraps any card body in a native <details>/<summary> element so the section
+// can be collapsed/expanded by click or keyboard with zero JavaScript. The
+// section header (label, title, 1-line summary) lives in the <summary>; the
+// full body is hidden when collapsed.
+//
+// Why <details> not a custom toggle:
+//   - Native browser support, full keyboard nav (Enter/Space toggles)
+//   - Open state lives in DOM as the `open` attribute, persists across
+//     re-renders without state management
+//   - Mobile-perfect — no JS event handlers to debug
+//
+// Args:
+//   id:      stable ID for the section (used for sticky-nav scroll target)
+//   label:   small uppercase tag like "Sourcer's Notes" or "Pro" (the
+//            existing .card-label visual)
+//   title:   the section name shown to user
+//   summary: 1-line description of what the section contains. Shown in the
+//            collapsed header so the recruiter can decide whether to expand.
+//   body:    the existing render output (raw HTML string)
+//   expanded: if true, render with `open` attribute (default false)
+//   proBadge: if true, show a small PRO badge in the header
+function collapsibleCard(id, label, title, summary, body, expanded, proBadge) {
+  if (!body) return '';
+  const open = expanded ? ' open' : '';
+  const proHtml = proBadge
+    ? `<span style="display: inline-block; padding: 0.2rem 0.55rem; background: linear-gradient(135deg, rgba(255,183,77,0.18), rgba(245,158,11,0.18)); color: var(--warn); border: 1px solid var(--warn); border-radius: 5px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; margin-left: 0.55rem; vertical-align: 1px;">PRO</span>`
+    : '';
+  return `
+    <details class="card collapsible" id="${escapeAttr(id)}"${open}>
+      <summary>
+        <div class="collapsible-head">
+          <div class="card-label">${escapeHtml(label)}${proHtml}</div>
+          <h2 class="card-title">${escapeHtml(title)}</h2>
+          <p class="collapsible-summary">${escapeHtml(summary)}</p>
+        </div>
+        <div class="collapsible-icon" aria-hidden="true">▾</div>
+      </summary>
+      <div class="collapsible-body">${body}</div>
+    </details>
+  `;
+}
+
+// ---------- Section nav builder (Stage 1, 2026-04-30) ----------
+//
+// Builds the sticky horizontal scroll-spy bar from a list of section descriptors.
+// Click on any pill scrolls to that section AND opens it (because a collapsed
+// section's height is small, so scroll-to-id with no open state lands you in
+// the wrong place). Active state updates on scroll via IntersectionObserver
+// in wireSectionNav() below.
+function buildSectionNav(sections) {
+  const items = sections
+    .filter(s => s && s.id && s.label)
+    .map(s => `<button data-target="${escapeAttr(s.id)}"${s.proOnly ? ' class="pro-only"' : ''}>${escapeHtml(s.label)}</button>`)
+    .join('');
+  return `<nav class="section-nav"><div class="section-nav-inner">${items}</div></nav>`;
+}
+
+// Wire up scroll-to + auto-expand on click + active-state-tracking on scroll.
+// Called once after grand.innerHTML is set.
+function wireSectionNav() {
+  const buttons = document.querySelectorAll('.section-nav button');
+  if (!buttons.length) return;
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      if (!target) return;
+      // Open the <details> if it's collapsible
+      if (target.tagName === 'DETAILS') target.open = true;
+      // Scroll into view, accounting for the sticky nav's height (~58px)
+      const y = target.getBoundingClientRect().top + window.scrollY - 70;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    });
+  });
+
+  // Active-state tracking: highlight the nav pill matching the section
+  // currently most-visible in the viewport. Use IntersectionObserver with a
+  // top-rooted margin so a section "becomes active" as it crosses the upper
+  // third of the viewport.
+  const sectionEls = Array.from(buttons).map(b => document.getElementById(b.dataset.target)).filter(Boolean);
+  if (!sectionEls.length || !('IntersectionObserver' in window)) return;
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        buttons.forEach(b => b.classList.toggle('active', b.dataset.target === entry.target.id));
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sectionEls.forEach(el => observer.observe(el));
+}
 </script>
 
 <script>
@@ -1619,13 +1796,35 @@ function renderResults(data) {
   }
 
   $('resultTitle').textContent = `${core.role_title || 'Role'} at ${core.company || 'Unspecified'}`;
+
+  // Stage 1 visual upgrade (2026-04-30): added 2 derived KPI tiles to the strip
+  // so the dashboard surfaces actionable signal at a glance:
+  //   - Fill estimate: heuristic-derived from difficulty score (1-3 = ~2 weeks,
+  //     4-6 = ~30 days, 7-8 = ~60 days, 9-10 = ~90+ days)
+  //   - Tier-1 companies: count of poaching targets at tier 1 (or fallback to
+  //     top_hiring_companies if poaching_targets is empty)
+  // Both gracefully show "—" when data is missing.
+  const difficulty = (p.market_dynamics && p.market_dynamics.difficulty_score) || null;
+  let fillEstimate = '—';
+  if (typeof difficulty === 'number') {
+    if (difficulty <= 3) fillEstimate = '~2 weeks';
+    else if (difficulty <= 6) fillEstimate = '~30 days';
+    else if (difficulty <= 8) fillEstimate = '~60 days';
+    else fillEstimate = '~90+ days';
+  }
+  const market360 = p.market360 || {};
+  const poachTier1 = (market360.poaching_targets || []).filter(t => t && t.tier === 1).length;
+  const tier1Count = poachTier1 || (market360.top_hiring_companies || []).length || '—';
+
   $('coreKpis').innerHTML = `
     <div class="kpi"><div class="kpi-label">Level</div><div class="kpi-value text">${core.level || '—'}</div></div>
     <div class="kpi"><div class="kpi-label">Location</div><div class="kpi-value text">${core.location || '—'}</div></div>
     <div class="kpi"><div class="kpi-label">Remote</div><div class="kpi-value text">${core.remote_policy || '—'}</div></div>
     <div class="kpi"><div class="kpi-label">Industry</div><div class="kpi-value text">${core.industry || '—'}</div></div>
-    <div class="kpi"><div class="kpi-label">Difficulty</div><div class="kpi-value">${(p.market_dynamics && p.market_dynamics.difficulty_score) || '—'}/10</div></div>
+    <div class="kpi"><div class="kpi-label">Difficulty</div><div class="kpi-value">${difficulty || '—'}/10</div></div>
+    <div class="kpi"><div class="kpi-label">Fill Estimate</div><div class="kpi-value text">${fillEstimate}</div></div>
     <div class="kpi"><div class="kpi-label">Market Temp</div><div class="kpi-value text">${(p.executive_brief && p.executive_brief.market_temperature) || '—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Tier 1 Cos.</div><div class="kpi-value">${tier1Count}</div></div>
   `;
 
   $('execSummary').textContent = (p.executive_brief && p.executive_brief.summary) || '';
@@ -1769,24 +1968,115 @@ renderResults = function(data) {
   const _p = data.parsed || {};
   const grand = $('grandmasterCards');
   if (grand) {
+    // Stage 1 visual upgrade (2026-04-30): each grandmaster card now wraps in
+    // a <details>/<summary> collapsible. Sticky section-nav at top lets the
+    // recruiter jump-to-section. Only the first section is expanded by default
+    // so the recruiter sees titles + 1-line summaries instead of a wall of text.
+    //
+    // Section ID convention: "section-<slug>" — also used as scroll target.
+    const isPro = user && user.plan === 'pro';
+    const altTitlesBody = renderAltTitlesCard(_p.alt_titles);
+    const skillAltsBody = renderSkillAlternativesCard(data.skill_alternatives || _p.skill_alternatives);
+    const wateringBody = renderWateringHolesCard(_p.watering_holes);
+    const objectionsBody = renderObjectionPlaybookCard(data.objection_playbook || _p.objection_playbook);
+    const sequenceBody = renderSequencedPlayCard(data.sequenced_play || _p.sequenced_play);
+    const proBriefingBody = renderProSkillBriefingCard(
+      data.pro_skill_briefing || _p.pro_skill_briefing,
+      isPro,
+      data.career_switcher_archetypes || _p.career_switcher_archetypes,
+    );
+    const proBooleanBody = renderProBooleanExtensionsCard(
+      data.pro_boolean_extensions || _p.pro_boolean_extensions,
+      isPro,
+    );
+    const ciBody = renderCompetitiveIntelCard(data.req_id, isPro);
+
+    // Build the sticky nav from sections that actually have content.
+    const sections = [
+      { id: 'section-alt-titles',     label: 'Alt Titles',          present: !!altTitlesBody },
+      { id: 'section-skill-alts',     label: 'Skill Substitutions', present: !!skillAltsBody },
+      { id: 'section-watering-holes', label: 'Watering Holes',      present: !!wateringBody },
+      { id: 'section-objections',     label: 'Objections',          present: !!objectionsBody },
+      { id: 'section-sequence',       label: 'Sourcing Sequence',   present: !!sequenceBody },
+      { id: 'section-pro-briefing',   label: 'Skill Briefing',      present: !!proBriefingBody, proOnly: true },
+      { id: 'section-pro-booleans',   label: 'Boolean Extensions',  present: !!proBooleanBody, proOnly: true },
+      { id: 'section-ci',             label: 'Competitive Intel',   present: !!ciBody, proOnly: true },
+    ].filter(s => s.present);
+
     grand.innerHTML = [
-      renderAltTitlesCard(_p.alt_titles),
-      renderSkillAlternativesCard(data.skill_alternatives || _p.skill_alternatives),
-      renderWateringHolesCard(_p.watering_holes),
-      renderObjectionPlaybookCard(data.objection_playbook || _p.objection_playbook),
-      renderSequencedPlayCard(data.sequenced_play || _p.sequenced_play),
-      // Pro Skill Briefing — always rendered. Free users see a locked placeholder
-      // with the structure visible (the SHAPE of the value) but content blocked
-      // out. Pro users get the real briefing. Server never sends real Pro content
-      // to free users (gated server-side via user.plan == 'pro').
-      renderProSkillBriefingCard(data.pro_skill_briefing || _p.pro_skill_briefing, user && user.plan === 'pro', data.career_switcher_archetypes || _p.career_switcher_archetypes),
-      renderProBooleanExtensionsCard(data.pro_boolean_extensions || _p.pro_boolean_extensions, user && user.plan === 'pro'),
-      // Competitive Intelligence — click-to-run for Pro users (separate AI call,
-      // not auto-chained to keep cost under user's control). Free users see a
-      // locked placeholder. data.req_id is passed so the click handler knows
-      // which requisition to analyze.
-      renderCompetitiveIntelCard(data.req_id, user && user.plan === 'pro'),
+      buildSectionNav(sections),
+      // Each card wrapped in a collapsible. First (Alt Titles) starts expanded
+      // because it's the lightest content and orients the recruiter to what's
+      // available. Everything else starts collapsed.
+      collapsibleCard(
+        'section-alt-titles',
+        'Alternate Titles',
+        'Adjacent and level-progression titles',
+        'Title variants you should also search for — different seniority labels and functionally equivalent role names.',
+        altTitlesBody,
+        true /* expanded */,
+      ),
+      collapsibleCard(
+        'section-skill-alts',
+        'Skill Intelligence',
+        'Functionally equivalent skills',
+        'Skills that produce the same outcome under different names. Lets you accept candidates who use different keywords.',
+        skillAltsBody,
+        false,
+      ),
+      collapsibleCard(
+        'section-watering-holes',
+        'Watering Holes',
+        'Where this talent congregates',
+        'Mailing lists, conferences, GitHub repos, and communities where these candidates already spend time.',
+        wateringBody,
+        false,
+      ),
+      collapsibleCard(
+        'section-objections',
+        'Objection Playbook',
+        "What they'll say no to",
+        'The predictable rejections for this role + comp + location, with pre-written counters.',
+        objectionsBody,
+        false,
+      ),
+      collapsibleCard(
+        'section-sequence',
+        'Sourcing Sequence',
+        '21-day sequenced play',
+        'Day-by-day sourcing strategy: warm channels first, broader cold mid-week, unconventional venues next.',
+        sequenceBody,
+        false,
+      ),
+      collapsibleCard(
+        'section-pro-briefing',
+        'Hiring Manager Briefing',
+        'Pro skill triage + career-switcher archetypes',
+        'Skills re-classified into Tier 1/2/3 with pushback language. Plus 3-5 non-obvious source pools (career switchers).',
+        proBriefingBody,
+        false,
+        true /* proBadge */,
+      ),
+      collapsibleCard(
+        'section-pro-booleans',
+        'Sourcing Strings — Pro extensions',
+        'Boolean strings on steroids',
+        'Extra LR tiers, per-company poach rationale, watering-hole X-rays, and 4-6 hidden talent pools.',
+        proBooleanBody,
+        false,
+        true,
+      ),
+      collapsibleCard(
+        'section-ci',
+        'Competitive Intelligence',
+        'Per-company hiring intel',
+        'Hiring velocity, salary range, poaching difficulty, and 5 boolean strategies per competitor.',
+        ciBody,
+        false,
+        true,
+      ),
     ].filter(Boolean).join('');
+
     // Wire Copy buttons on the objection playbook counter blocks
     grand.querySelectorAll('.bool-copy').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1800,6 +2090,8 @@ renderResults = function(data) {
     // Wire the Competitive Intelligence Run button (and Copy buttons inside it,
     // once results render).
     wireCompetitiveIntelCard();
+    // Wire the sticky section nav (scroll-to + auto-expand + active highlighting)
+    wireSectionNav();
   }
 
   $('pipelineLink').href = `/app/pipeline.html?req=${data.req_id}`;
