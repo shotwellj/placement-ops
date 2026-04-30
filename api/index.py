@@ -2798,29 +2798,63 @@ def _generate_competitive_boolean_strategies(
     # not what we want for multi-word skills. Quoting preserves phrase match.
     macro_skills_or = " OR ".join(f'"{s}"' for s in top_three)
 
+    # ---- LinkedIn URL coverage prefix ----
+    # LinkedIn profiles live at TWO URL shapes:
+    #   linkedin.com/in/<slug>/
+    #   linkedin.com/in/<slug>     (no trailing slash, sub-pages)
+    # The single `site:linkedin.com/in/` (with trailing slash) misses the
+    # sub-pages and some country variants. Combining both with a `-pub.sub`
+    # filter (Jason's working query pattern) catches all profile shapes
+    # while excluding the public-sub-profile pages that pollute results.
+    li = 'site:linkedin.com/in/ OR site:linkedin.com/in -pub.sub'
+
+    # ---- Title matching strategy ----
+    # `intitle:"Senior Firmware Engineer, Embedded Platform"` requires the
+    # WHOLE 6-word phrase to appear in Google's idea of the page title.
+    # LinkedIn page titles get truncated and frequently lose comma-clauses
+    # like "Embedded Platform" -> 0 results.
+    # For verbose titles (commas, slashes, > 4 words) we instead use a
+    # quoted body match which scans the entire profile content.
+    role_title_clean = (role_title or "engineer").strip()
+    is_verbose_title = (
+        ("," in role_title_clean)
+        or ("/" in role_title_clean)
+        or ("&" in role_title_clean)
+        or len(role_title_clean.split()) > 4
+    )
+    # title_match is what we drop into queries where the title is the
+    # primary anchor. quoted_title is just `"role_title"`. intitle_or_quoted
+    # is the more permissive form for the "title OR skills" macro clause.
+    if is_verbose_title:
+        title_match = f'"{role_title_clean}"'                    # body quoted phrase
+        intitle_or_quoted = f'"{role_title_clean}"'              # same — drop intitle:
+    else:
+        title_match = f'intitle:"{role_title_clean}"'            # short title -> intitle: still wins
+        intitle_or_quoted = f'intitle:"{role_title_clean}"'
+
     # Build the 5 strategies. Note: per BOOLEAN_BUILDER_PROMPT rules, we use
     # Google syntax (site:, intitle:, OR uppercase, double quotes around phrases,
     # NO literal AND between terms — a space is implicit AND on Google).
     macro = (
-        f'site:linkedin.com/in/ ("{company_name}" OR "ex-{company_name}" OR "former {company_name}") '
-        f'(intitle:"{role_title}" OR {macro_skills_or}) {seniority_filter}'
+        f'{li} ("{company_name}" OR "ex-{company_name}" OR "former {company_name}") '
+        f'({intitle_or_quoted} OR {macro_skills_or}) {seniority_filter}'
     )
     micro_1 = (
-        f'site:linkedin.com/in/ intitle:"{role_title}" "{company_name}" '
+        f'{li} {title_match} "{company_name}" '
         f'({skills_or_clause}) {seniority_filter}'
     )
     micro_2 = (
-        f'site:linkedin.com/in/ ("{company_name}" OR "worked at {company_name}") '
+        f'{li} ("{company_name}" OR "worked at {company_name}") '
         f'({adjacent_or_clause}) ({skills_or_clause})'
         if adjacent_or_clause else
-        f'site:linkedin.com/in/ ("{company_name}" OR "worked at {company_name}") '
-        f'intitle:"{role_title}" ({skills_or_clause})'
+        f'{li} ("{company_name}" OR "worked at {company_name}") '
+        f'{title_match} ({skills_or_clause})'
     )
     xray = (
-        f'site:linkedin.com/in/ (intitle:"{role_title}" OR {adjacent_or_clause}) '
+        f'{li} ({title_match} OR {adjacent_or_clause}) '
         f'"{company_name}" ({all_skills_or_clause})'
         if adjacent_or_clause else
-        f'site:linkedin.com/in/ intitle:"{role_title}" '
+        f'{li} {title_match} '
         f'"{company_name}" ({all_skills_or_clause})'
     )
 
