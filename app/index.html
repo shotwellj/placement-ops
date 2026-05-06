@@ -305,6 +305,37 @@
   .chip.poaching { border-color: var(--accent-deep); color: var(--accent); }
   .error-banner { display: none; padding: 1rem 1.5rem; background: rgba(255, 107, 107, 0.08); border: 1px solid rgba(255, 107, 107, 0.3); border-radius: 8px; color: var(--danger); font-size: 0.9rem; margin-bottom: 1.5rem; }
   .error-banner.active { display: block; }
+  /* ========================================================================
+     Outcome Logging Modal (Stage 3-B of proactive engine, 2026-05-06)
+     The button on the Saved card opens this modal. Submitting POSTs to
+     /api/req/{id}/outcome which is the Stage 2 endpoint. The form's
+     conditional fields (placed_candidate_company_prev, etc.) show or hide
+     based on the selected outcome value via small JS helpers.
+     ======================================================================== */
+  .outcome-modal { display: none; position: fixed; inset: 0; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 2rem; overflow-y: auto; }
+  .outcome-modal.active { display: flex; }
+  .outcome-box { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 12px; padding: 2rem 2.25rem; max-width: 540px; width: 100%; max-height: calc(100vh - 4rem); overflow-y: auto; }
+  .outcome-box h2 { margin-bottom: 0.5rem; font-size: 1.25rem; }
+  .outcome-box .outcome-subtitle { color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem; }
+  .outcome-form-row { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.1rem; }
+  .outcome-form-row label { font-size: 0.78rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .outcome-form-row .help { font-size: 0.75rem; color: var(--text-mute); margin-top: 0.15rem; }
+  .outcome-form-row select.input-field, .outcome-form-row textarea.input-field { width: 100%; }
+  .outcome-form-row textarea.input-field { font-family: var(--font-body); resize: vertical; min-height: 70px; }
+  .outcome-conditional { display: none; }
+  .outcome-conditional.show { display: flex; }
+  .outcome-actions { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 1.4rem; padding-top: 1.2rem; border-top: 1px solid var(--border); }
+  .outcome-msg { font-size: 0.86rem; padding: 0.6rem 0.8rem; border-radius: 6px; margin-top: 0.6rem; display: none; }
+  .outcome-msg.show { display: block; }
+  .outcome-msg.success { background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76, 175, 80, 0.4); color: var(--good); }
+  .outcome-msg.error { background: rgba(229, 57, 53, 0.1); border: 1px solid rgba(229, 57, 53, 0.4); color: var(--bad); }
+  .outcome-history { margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px solid var(--border); }
+  .outcome-history-title { font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.6rem; }
+  .outcome-history-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .outcome-history-row:last-child { border-bottom: none; }
+  .outcome-history-row .h-outcome { font-weight: 600; text-transform: capitalize; }
+  .outcome-history-row .h-meta { color: var(--text-mute); font-size: 0.78rem; }
+
   .auth-modal { display: none; position: fixed; inset: 0; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 2rem; }
   .auth-modal.active { display: flex; }
   .auth-box { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 12px; padding: 2.5rem; max-width: 440px; width: 100%; }
@@ -453,12 +484,78 @@
       <p style="color: var(--text-dim); margin-bottom: 1rem;">Full analysis is now in your pipeline. Next: add candidates and score them against this role.</p>
       <div class="btn-row">
         <a id="pipelineLink" href="/app/pipeline.html" class="btn btn-primary">View in Pipeline</a>
+        <button id="logOutcomeBtn" class="btn btn-ghost" title="Log what happened with this req: filled, lost, cancelled. Feeds the Live Intelligence Stream's predictive layer.">Log Outcome</button>
         <button id="exportPdfBtn" class="btn btn-ghost" title="Open a print-formatted view of this requisition. Use your browser's Save as PDF option in the print dialog.">Export PDF</button>
         <button id="newIntake" class="btn btn-ghost">New Intake</button>
       </div>
     </section>
   </div>
 </main>
+
+<!--
+  Outcome Logging Modal (Stage 3-B of proactive engine, 2026-05-06).
+  Opened by clicking "Log Outcome" on the Saved card. POSTs to the Stage 2
+  endpoint POST /api/req/{id}/outcome on submit. The conditional fields
+  (placed_candidate_company_prev, placed_candidate_skills, lost_to_company)
+  show or hide based on the selected outcome — only "filled" needs the
+  placed candidate fields, only "lost" needs the lost-to field.
+-->
+<div id="outcomeModal" class="outcome-modal" role="dialog" aria-labelledby="outcomeTitle" aria-hidden="true">
+  <div class="outcome-box">
+    <h2 id="outcomeTitle">Log Outcome</h2>
+    <div class="outcome-subtitle" id="outcomeSubtitle">Recording outcome data feeds the Live Intelligence Stream's predictive layer. The more outcomes you log, the better the predictions on future reqs.</div>
+
+    <div class="outcome-form-row">
+      <label for="outcomeSelect">Outcome</label>
+      <select id="outcomeSelect" class="input-field">
+        <option value="">Select outcome...</option>
+        <option value="filled">Filled — candidate placed</option>
+        <option value="lost">Lost — candidate went elsewhere</option>
+        <option value="cancelled">Cancelled — req closed without filling</option>
+        <option value="fell_off">Fell off — placed but candidate left within guarantee period</option>
+        <option value="reopened">Reopened — restart after a fell_off or cancel</option>
+      </select>
+    </div>
+
+    <!-- Conditional: only shown when outcome=filled -->
+    <div id="outcomeFilledFields" class="outcome-conditional outcome-form-row" style="flex-direction: column;">
+      <label for="outcomePrevCompany">Placed candidate's previous company <span style="color: var(--text-mute); font-weight: 400;">(optional)</span></label>
+      <input id="outcomePrevCompany" class="input-field" type="text" placeholder="e.g. Stripe, Datadog, Booz Allen" />
+      <div class="help">Powers the company-poach-history signal — when you've placed 3+ from the same company, the engine surfaces it as a proven path.</div>
+    </div>
+
+    <div id="outcomeFilledSkillsField" class="outcome-conditional outcome-form-row" style="flex-direction: column;">
+      <label for="outcomePlacedSkills">Placed candidate's skills <span style="color: var(--text-mute); font-weight: 400;">(optional, comma-separated)</span></label>
+      <input id="outcomePlacedSkills" class="input-field" type="text" placeholder="e.g. python, kubernetes, distributed systems" />
+      <div class="help">Powers skill-match-prediction — the engine learns which skill mixes close fastest at your firm.</div>
+    </div>
+
+    <!-- Conditional: only shown when outcome=lost -->
+    <div id="outcomeLostFields" class="outcome-conditional outcome-form-row" style="flex-direction: column;">
+      <label for="outcomeLostTo">Where did they go instead? <span style="color: var(--text-mute); font-weight: 400;">(optional)</span></label>
+      <input id="outcomeLostTo" class="input-field" type="text" placeholder="e.g. Anthropic, OpenAI, internal transfer" />
+      <div class="help">Helps surface repeat losers — if the same competitor wins 3+ times, that's a counter-poach narrative.</div>
+    </div>
+
+    <div class="outcome-form-row">
+      <label for="outcomeNotes">Notes <span style="color: var(--text-mute); font-weight: 400;">(optional)</span></label>
+      <textarea id="outcomeNotes" class="input-field" maxlength="2000" placeholder="Anything that future-you would want to know. E.g. 'Closed in 18 days, candidate was passive, hiring manager was decisive.'"></textarea>
+    </div>
+
+    <div id="outcomeMsg" class="outcome-msg"></div>
+
+    <div class="outcome-actions">
+      <button id="outcomeCancelBtn" class="btn btn-ghost">Cancel</button>
+      <button id="outcomeSubmitBtn" class="btn btn-primary">Save Outcome</button>
+    </div>
+
+    <!-- Outcome history for this req (loaded on modal open via GET /api/req/{id}/outcomes) -->
+    <div id="outcomeHistory" class="outcome-history" style="display: none;">
+      <div class="outcome-history-title">Previous outcomes for this req</div>
+      <div id="outcomeHistoryList"></div>
+    </div>
+  </div>
+</div>
 
 <div id="authModal" class="auth-modal">
   <div class="auth-box">
@@ -2440,6 +2537,15 @@ renderResults = function(data) {
     };
   }
 
+  // Log Outcome button (Stage 3-B, 2026-05-06): opens the outcome modal
+  // wired to POST /api/req/{req_id}/outcome. The modal stays per-render so
+  // it always picks up the most-recent saved req_id - if you re-run intake,
+  // the button will log against the new req, not the old one.
+  const logOutcomeBtn = $('logOutcomeBtn');
+  if (logOutcomeBtn && data.req_id) {
+    logOutcomeBtn.onclick = () => openOutcomeModal(data.req_id);
+  }
+
   $('results').classList.add('active');
   $('results').scrollIntoView({ behavior: 'smooth' });
 
@@ -2449,6 +2555,225 @@ renderResults = function(data) {
   // as they arrive. Empty pipelines render an encouraging empty state.
   initIntelligenceStream();
 };
+
+// ============================================================================
+// Outcome Logging Modal (Stage 3-B of proactive engine, 2026-05-06)
+// ----------------------------------------------------------------------------
+// Wires the "Log Outcome" button on the Saved card to a modal that POSTs
+// to /api/req/{id}/outcome. The endpoint exists since Stage 2; this is the
+// UI surface that turns the predictive layer from theoretical to running.
+//
+// Module-scope state: _outcomeReqId. Set when openOutcomeModal is called,
+// read by submitOutcome. Cleared on close.
+// ============================================================================
+
+let _outcomeReqId = null;
+
+function openOutcomeModal(reqId) {
+  _outcomeReqId = reqId;
+  const modal = $('outcomeModal');
+  if (!modal) return;
+
+  // Reset form state every open - users may log multiple outcomes per session
+  $('outcomeSelect').value = '';
+  $('outcomePrevCompany').value = '';
+  $('outcomePlacedSkills').value = '';
+  $('outcomeLostTo').value = '';
+  $('outcomeNotes').value = '';
+  const msg = $('outcomeMsg');
+  msg.className = 'outcome-msg';
+  msg.textContent = '';
+  // Hide all conditional fields - they re-show via the change handler
+  document.querySelectorAll('.outcome-conditional').forEach(el => el.classList.remove('show'));
+  // Clear any stale history from a previous req
+  $('outcomeHistory').style.display = 'none';
+  $('outcomeHistoryList').innerHTML = '';
+
+  modal.classList.add('active');
+  modal.setAttribute('aria-hidden', 'false');
+
+  // Load this req's outcome history (the user may have logged outcomes
+  // before, e.g. filled then fell_off then reopened). If there's history,
+  // show it so the user has context for what they're adding.
+  loadOutcomeHistory(reqId);
+}
+
+function closeOutcomeModal() {
+  const modal = $('outcomeModal');
+  if (!modal) return;
+  modal.classList.remove('active');
+  modal.setAttribute('aria-hidden', 'true');
+  _outcomeReqId = null;
+}
+
+async function loadOutcomeHistory(reqId) {
+  const token = localStorage.getItem('sn_token');
+  if (!token || !reqId) return;
+  try {
+    const resp = await fetch(`/api/req/${encodeURIComponent(reqId)}/outcomes`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const outcomes = (data && Array.isArray(data.outcomes)) ? data.outcomes : [];
+    if (!outcomes.length) return;
+
+    const list = $('outcomeHistoryList');
+    list.innerHTML = '';
+    outcomes.forEach(o => {
+      const row = document.createElement('div');
+      row.className = 'outcome-history-row';
+      const days = (o.time_to_close_days != null) ? `${o.time_to_close_days}d` : '—';
+      const dt = o.logged_at ? String(o.logged_at).split('T')[0] : '';
+      row.innerHTML = `
+        <span class="h-outcome">${escapeHtml(String(o.outcome || '').replace(/_/g, ' '))}</span>
+        <span class="h-meta">${escapeHtml(days)} · ${escapeHtml(dt)}</span>
+      `;
+      list.appendChild(row);
+    });
+    $('outcomeHistory').style.display = 'block';
+  } catch (e) {
+    console.warn('Failed to load outcome history:', e);
+  }
+}
+
+// Wire the dropdown change handler: show/hide conditional fields based on
+// the selected outcome. Only "filled" surfaces placed-candidate fields,
+// only "lost" surfaces the lost-to field. Everything else just gets notes.
+function updateOutcomeConditionals() {
+  const val = $('outcomeSelect').value;
+  const filledFields = $('outcomeFilledFields');
+  const filledSkillsField = $('outcomeFilledSkillsField');
+  const lostFields = $('outcomeLostFields');
+  filledFields.classList.toggle('show', val === 'filled');
+  filledSkillsField.classList.toggle('show', val === 'filled');
+  lostFields.classList.toggle('show', val === 'lost');
+}
+
+async function submitOutcome() {
+  const token = localStorage.getItem('sn_token');
+  const msg = $('outcomeMsg');
+  msg.className = 'outcome-msg';
+
+  if (!token) {
+    msg.textContent = 'Not signed in. Please sign in and try again.';
+    msg.classList.add('show', 'error');
+    return;
+  }
+  if (!_outcomeReqId) {
+    msg.textContent = 'No req selected. Close and reopen the modal.';
+    msg.classList.add('show', 'error');
+    return;
+  }
+
+  const outcome = $('outcomeSelect').value;
+  if (!outcome) {
+    msg.textContent = 'Please select an outcome.';
+    msg.classList.add('show', 'error');
+    return;
+  }
+
+  // Build payload. Send fields conditionally so we don't clutter the
+  // server-side row with empty strings (the API treats "" and null
+  // differently for indexed columns).
+  const payload = { outcome };
+  if (outcome === 'filled') {
+    const prev = $('outcomePrevCompany').value.trim();
+    if (prev) payload.placed_candidate_company_prev = prev;
+    const skillsRaw = $('outcomePlacedSkills').value.trim();
+    if (skillsRaw) {
+      payload.placed_candidate_skills = skillsRaw
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+  } else if (outcome === 'lost') {
+    const lostTo = $('outcomeLostTo').value.trim();
+    if (lostTo) payload.lost_to_company = lostTo;
+  }
+  const notes = $('outcomeNotes').value.trim();
+  if (notes) payload.notes = notes;
+
+  // Disable the button during the request to prevent double-submits
+  const submitBtn = $('outcomeSubmitBtn');
+  submitBtn.disabled = true;
+  const origLabel = submitBtn.textContent;
+  submitBtn.textContent = 'Saving...';
+
+  try {
+    const resp = await fetch(`/api/req/${encodeURIComponent(_outcomeReqId)}/outcome`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      let errMsg = `${resp.status} ${resp.statusText}`;
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson && errJson.detail) errMsg = errJson.detail;
+      } catch (e) { /* fallthrough */ }
+      msg.textContent = `Error: ${errMsg}`;
+      msg.classList.add('show', 'error');
+      return;
+    }
+
+    const data = await resp.json();
+    const days = (data && data.time_to_close_days != null)
+      ? ` (${data.time_to_close_days} days to close)`
+      : '';
+    msg.textContent = `Saved.${days} The Live Intelligence Stream will use this on your next intake.`;
+    msg.classList.add('show', 'success');
+
+    // Reload history so the user sees the new entry land
+    await loadOutcomeHistory(_outcomeReqId);
+
+    // Auto-close after a brief moment so the user sees the success message
+    setTimeout(() => {
+      closeOutcomeModal();
+      // Re-fire the intelligence stream so any newly-eligible signals
+      // (outcome_velocity, outcome_pattern, Stage 3-A predictions) pop in
+      try { initIntelligenceStream(); } catch (e) { /* non-fatal */ }
+    }, 1400);
+  } catch (e) {
+    msg.textContent = `Network error: ${e.message || e}`;
+    msg.classList.add('show', 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = origLabel;
+  }
+}
+
+// Wire static handlers once on script load (not per-render). The button
+// inside the Saved card is wired per-render in renderResults because it
+// needs the current data.req_id closure.
+(function wireOutcomeModalStatic() {
+  const select = $('outcomeSelect');
+  if (select) select.addEventListener('change', updateOutcomeConditionals);
+  const cancelBtn = $('outcomeCancelBtn');
+  if (cancelBtn) cancelBtn.addEventListener('click', closeOutcomeModal);
+  const submitBtn = $('outcomeSubmitBtn');
+  if (submitBtn) submitBtn.addEventListener('click', submitOutcome);
+  // Click on the modal backdrop (but not the inner box) closes the modal
+  const modal = $('outcomeModal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeOutcomeModal();
+    });
+  }
+  // Esc to close
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const m = $('outcomeModal');
+      if (m && m.classList.contains('active')) closeOutcomeModal();
+    }
+  });
+})();
+
 
 loadUser();
 </script>
