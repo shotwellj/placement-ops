@@ -3705,6 +3705,147 @@ def _format_sse_event(event_type: str, payload: dict) -> str:
     return f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
 
 
+
+# ============================================================================
+# STAGE 2 INTELLIGENCE HELPERS (2026-05-06)
+# ----------------------------------------------------------------------------
+# These helpers query the req_outcomes table directly to power outcome-driven
+# intelligence events. Where Stage 1's helpers compute over pipeline shape,
+# Stage 2 helpers compute over actual closed-loop data.
+#
+# Both helpers are async and take the DB client (different from Stage 1
+# helpers which are sync and take a pre-fetched reqs list). This is a
+# deliberate split — Stage 2 needs SQL aggregation that's not in the Stage 1
+# req payload.
+# ============================================================================
+
+
+async def _intel_outcome_velocity(client, user_id: str):
+    """Read real fill times from req_outcomes. Returns the actual median +
+    range for closed reqs. Replaces the Stage 1 velocity_baseline if the
+    user has logged outcomes.
+
+    Returns event dict or None if no outcomes logged yet.
+    """
+    rs = await client.execute(
+        """SELECT outcome, time_to_close_days
+           FROM req_outcomes
+           WHERE logged_by_user_id = ?
+             AND outcome IN ('filled', 'lost', 'cancelled')
+             AND time_to_close_days IS NOT NULL
+           ORDER BY logged_at DESC
+           LIMIT 100""",
+        [user_id],
+    )
+    if not rs.rows:
+        return None
+
+    filled_days = [r[1] for r in rs.rows if r[0] == "filled"]
+    if not filled_days:
+        # User has logged outcomes but none filled yet — different signal
+        return None
+
+    filled_days.sort()
+    n = len(filled_days)
+    median = filled_days[n // 2] if n % 2 == 1 else (filled_days[n // 2 - 1] + filled_days[n // 2]) / 2
+    fastest = min(filled_days)
+    slowest = max(filled_days)
+    avg = sum(filled_days) / n
+
+    return {
+        "type": "outcome_velocity",
+        "median_days": round(median, 1),
+        "avg_days": round(avg, 1),
+        "fastest_days": fastest,
+        "slowest_days": slowest,
+        "sample_size": n,
+        "headline": f"Median fill: {round(median)} days (range {fastest}–{slowest})",
+        "insight": f"Real velocity from {n} filled reqs you've logged. Use this to set client expectations.",
+    }
+
+
+async def _intel_outcome_pattern(client, user_id: str):
+    """Surface the fastest-closing and slowest-closing patterns from real
+    outcome data. This is the prediction layer turning on: 'reqs with
+    Embedded C/C++ fill 38% faster than your average.'
+
+    Requires at least 5 filled outcomes with skill data. Without enough
+    samples the signal is noisy and we suppress it.
+
+    Returns event dict or None.
+    """
+    rs = await client.execute(
+        """SELECT time_to_close_days, placed_candidate_skills
+           FROM req_outcomes
+           WHERE logged_by_user_id = ?
+             AND outcome = 'filled'
+             AND time_to_close_days IS NOT NULL
+             AND placed_candidate_skills IS NOT NULL
+           ORDER BY logged_at DESC
+           LIMIT 100""",
+        [user_id],
+    )
+    if len(rs.rows) < 5:
+        return None
+
+    # Aggregate: skill -> list of fill times
+    skill_to_times = {}
+    all_times = []
+    for r in rs.rows:
+        days = r[0]
+        try:
+            skills = json.loads(r[1]) if r[1] else []
+        except Exception:
+            skills = []
+        if not skills:
+            continue
+        all_times.append(days)
+        for s in skills:
+            if isinstance(s, str):
+                skill_to_times.setdefault(s, []).append(days)
+
+    if not all_times:
+        return None
+
+    overall_avg = sum(all_times) / len(all_times)
+
+    # For each skill with enough samples, compute the gap from overall
+    skill_signals = []
+    for skill, times in skill_to_times.items():
+        if len(times) < 3:
+            continue  # need 3+ samples to make a claim
+        skill_avg = sum(times) / len(times)
+        gap_pct = round(((skill_avg - overall_avg) / overall_avg) * 100)
+        skill_signals.append((skill, skill_avg, gap_pct, len(times)))
+
+    if not skill_signals:
+        return None
+
+    # Find the most extreme — fastest or slowest
+    skill_signals.sort(key=lambda x: x[2])
+    fastest_skill = skill_signals[0]
+    slowest_skill = skill_signals[-1]
+
+    # Pick whichever signal is more striking (largest absolute gap)
+    if abs(fastest_skill[2]) >= abs(slowest_skill[2]):
+        skill, avg, gap, n = fastest_skill
+        direction = "faster" if gap < 0 else "slower"
+    else:
+        skill, avg, gap, n = slowest_skill
+        direction = "slower" if gap > 0 else "faster"
+
+    return {
+        "type": "outcome_pattern",
+        "skill": skill,
+        "skill_avg_days": round(avg, 1),
+        "overall_avg_days": round(overall_avg, 1),
+        "gap_percent": gap,
+        "sample_size": n,
+        "headline": f"Reqs with '{skill}' fill {abs(gap)}% {direction} than average",
+        "insight": f"Based on {n} filled reqs containing this skill (avg {round(avg)} days vs overall {round(overall_avg)} days). Use to prioritize sourcing depth.",
+    }
+
+
 @app.get("/api/intelligence/stream")
 async def intelligence_stream(
     token: Optional[str] = Query(None),
@@ -3784,17 +3925,38 @@ async def intelligence_stream(
                 event_count += 1
                 await asyncio.sleep(0.15)
 
-            # Pass 3: velocity baseline (single event if we have data)
-            vb = _intel_velocity_baseline(reqs)
-            if vb:
-                yield _format_sse_event("intelligence", vb)
+            # Pass 3: velocity baseline. Stage 2 (2026-05-06): try real
+            # outcome data from req_outcomes first; fall back to pipeline-only
+            # baseline if the user hasn't logged any outcomes yet. The new
+            # outcome_velocity event uses median + range from real fills,
+            # which is more informative than the Stage 1 average.
+            async with db() as client:
+                ov = await _intel_outcome_velocity(client, user["id"])
+            if ov:
+                yield _format_sse_event("intelligence", ov)
                 event_count += 1
                 await asyncio.sleep(0.15)
+            else:
+                vb = _intel_velocity_baseline(reqs)
+                if vb:
+                    yield _format_sse_event("intelligence", vb)
+                    event_count += 1
+                    await asyncio.sleep(0.15)
 
             # Pass 4: difficulty spike (single event if pipeline is heavy)
             ds = _intel_difficulty_distribution(reqs)
             if ds:
                 yield _format_sse_event("intelligence", ds)
+                event_count += 1
+                await asyncio.sleep(0.15)
+
+            # Pass 5: Stage 2 outcome pattern. Surfaces fastest/slowest
+            # closing skill if user has 5+ filled outcomes with skill data.
+            # Returns None silently for users without enough sample size.
+            async with db() as client:
+                op = await _intel_outcome_pattern(client, user["id"])
+            if op:
+                yield _format_sse_event("intelligence", op)
                 event_count += 1
                 await asyncio.sleep(0.15)
 
@@ -3817,6 +3979,231 @@ async def intelligence_stream(
             "Connection": "keep-alive",
         },
     )
+
+
+# ============================================================================
+# REQ OUTCOME LOGGING (Stage 2 of proactive engine, 2026-05-06)
+# ============================================================================
+#
+# Endpoint that lets a recruiter log what happened with a requisition.
+# This data feeds back into the Live Intelligence Stream (Stage 1) so the
+# velocity_baseline, skill_concentration, and competitor_overlap signals
+# learn from real outcomes instead of pure pipeline shape.
+#
+# Why this is the proactive layer:
+#   - Stage 1 reads pipeline state. Predictive but unsupervised.
+#   - Stage 2 reads OUTCOMES. The system learns which signals correlate
+#     with fast closes vs slow closes vs lost reqs.
+#   - Stage 3 (later) closes the loop by surfacing those learnings as
+#     prediction confidence on new reqs.
+#
+# Design:
+#   - Outcome events are append-only (one req can have multiple outcomes
+#     over time: filled -> fell_off -> reopened -> filled)
+#   - Latest outcome wins for "current state" queries
+#   - History is preserved for trend analysis
+#   - Compliance: every write logs an audit event for EU AI Act Article 12
+# ============================================================================
+
+
+class ReqOutcomeRequest(BaseModel):
+    """Payload for POST /api/req/{req_id}/outcome.
+
+    All fields except `outcome` are optional. The model is permissive on
+    purpose — early users may not have all the metadata, and we'd rather
+    capture the outcome with partial data than block the log because they
+    don't remember which company they lost to.
+    """
+
+    outcome: str = Field(..., description="filled | lost | cancelled | fell_off | reopened")
+    placed_candidate_company_prev: Optional[str] = Field(
+        None, description="If outcome=filled, the company the candidate left to take this role"
+    )
+    placed_candidate_skills: Optional[list] = Field(
+        None, description="If outcome=filled, list of canonical skill ids the candidate actually had"
+    )
+    lost_to_company: Optional[str] = Field(
+        None, description="If outcome=lost, the company the candidate went to instead"
+    )
+    notes: Optional[str] = Field(None, max_length=2000)
+
+
+@app.post("/api/req/{req_id}/outcome")
+async def log_req_outcome(
+    req_id: str,
+    payload: ReqOutcomeRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Log the outcome of a requisition.
+
+    Auth: bearer token. Owner check: the req must belong to this user OR
+    same org. Mirrors the access policy on /api/req/{id}/export.
+
+    On 'filled' or 'lost' outcomes, also marks the source req as closed
+    (status='closed', closed_at=now) so existing dashboards reflect the
+    state change. This is a write-through: outcome history lives in
+    req_outcomes; latest snapshot lives on requisitions.
+
+    Returns the created outcome event id and the computed time_to_close_days.
+    """
+    # Validate outcome value (Pydantic validates field presence; the CHECK
+    # constraint on the table enforces enum, but we want a clean 400 on bad
+    # input rather than a 500 from a constraint violation)
+    valid_outcomes = {"filled", "lost", "cancelled", "fell_off", "reopened"}
+    if payload.outcome not in valid_outcomes:
+        raise HTTPException(
+            400, f"outcome must be one of: {', '.join(sorted(valid_outcomes))}"
+        )
+
+    async with db() as client:
+        # Owner / org check
+        req_rs = await client.execute(
+            "SELECT id, user_id, org_id, opened_at, status FROM requisitions WHERE id = ?",
+            [req_id],
+        )
+        if not req_rs.rows:
+            raise HTTPException(404, "Requisition not found")
+        r = req_rs.rows[0]
+        if r[1] != user["id"] and r[2] != user.get("org_id"):
+            raise HTTPException(403, "Not authorized to log outcome for this requisition")
+
+        # Compute time_to_close_days from req.opened_at to now. NULL for 'reopened'
+        # because that's a state restart, not a close event.
+        time_to_close_days = None
+        if payload.outcome != "reopened":
+            try:
+                opened_at = datetime.fromisoformat(
+                    str(r[3]).replace("Z", "+00:00").replace(" ", "T")
+                )
+                # Make timezone-aware if naive
+                if opened_at.tzinfo is None:
+                    opened_at = opened_at.replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+                delta = (now - opened_at).days
+                if 0 <= delta <= 3650:  # 10 year sanity cap
+                    time_to_close_days = delta
+            except Exception:
+                pass
+
+        outcome_id = str(uuid.uuid4())
+        skills_json = (
+            json.dumps(payload.placed_candidate_skills)
+            if payload.placed_candidate_skills
+            else None
+        )
+
+        # Write the outcome event
+        await client.execute(
+            """INSERT INTO req_outcomes
+               (id, req_id, outcome, time_to_close_days,
+                placed_candidate_company_prev, placed_candidate_skills,
+                lost_to_company, notes, logged_by_user_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                outcome_id,
+                req_id,
+                payload.outcome,
+                time_to_close_days,
+                payload.placed_candidate_company_prev,
+                skills_json,
+                payload.lost_to_company,
+                payload.notes,
+                user["id"],
+            ],
+        )
+
+        # Update req status if this is a closing outcome
+        if payload.outcome in ("filled", "lost", "cancelled"):
+            await client.execute(
+                """UPDATE requisitions
+                   SET status = ?, closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                ["closed" if payload.outcome != "cancelled" else "cancelled", req_id],
+            )
+        elif payload.outcome == "reopened":
+            await client.execute(
+                """UPDATE requisitions
+                   SET status = 'open', closed_at = NULL, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                [req_id],
+            )
+
+        # Audit trail (compliance: EU AI Act Article 12 traceability)
+        try:
+            await write_audit_event(
+                client,
+                event_type="req_outcome",
+                action="log_outcome",
+                actor_user_id=user["id"],
+                entity_type="requisition",
+                entity_id=req_id,
+                inputs={"outcome": payload.outcome},
+                outputs={
+                    "outcome_id": outcome_id,
+                    "time_to_close_days": time_to_close_days,
+                    "status_change": payload.outcome in ("filled", "lost", "cancelled", "reopened"),
+                },
+            )
+        except Exception:
+            # Audit failure should not block the outcome log itself
+            pass
+
+    return {
+        "outcome_id": outcome_id,
+        "req_id": req_id,
+        "outcome": payload.outcome,
+        "time_to_close_days": time_to_close_days,
+        "logged_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/req/{req_id}/outcomes")
+async def list_req_outcomes(
+    req_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Return the full outcome history for a requisition (newest first).
+
+    Useful for the UI to show e.g. 'Filled 2024-03-15, fell off 2024-05-20,
+    reopened 2024-05-21'. Most reqs will have exactly one outcome.
+    """
+    async with db() as client:
+        # Owner check (same pattern as POST endpoint)
+        req_rs = await client.execute(
+            "SELECT user_id, org_id FROM requisitions WHERE id = ?",
+            [req_id],
+        )
+        if not req_rs.rows:
+            raise HTTPException(404, "Requisition not found")
+        if req_rs.rows[0][0] != user["id"] and req_rs.rows[0][1] != user.get("org_id"):
+            raise HTTPException(403, "Not authorized")
+
+        rs = await client.execute(
+            """SELECT id, outcome, time_to_close_days, placed_candidate_company_prev,
+                      placed_candidate_skills, lost_to_company, notes, logged_at
+               FROM req_outcomes
+               WHERE req_id = ?
+               ORDER BY logged_at DESC""",
+            [req_id],
+        )
+        outcomes = []
+        for r in rs.rows:
+            try:
+                skills = json.loads(r[4]) if r[4] else None
+            except Exception:
+                skills = None
+            outcomes.append({
+                "outcome_id": r[0],
+                "outcome": r[1],
+                "time_to_close_days": r[2],
+                "placed_candidate_company_prev": r[3],
+                "placed_candidate_skills": skills,
+                "lost_to_company": r[5],
+                "notes": r[6],
+                "logged_at": r[7],
+            })
+
+    return {"req_id": req_id, "outcomes": outcomes}
 
 
 @app.post("/api/intake")
