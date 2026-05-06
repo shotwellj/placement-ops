@@ -3527,10 +3527,18 @@ async def export_req(req_id: str, user: dict = Depends(get_current_user)):
 #     Stage 3 (cross-company calibration moat)
 #
 # Event types emitted today:
+#   Stage 1 (pipeline-shape signals):
 #   - skill_concentration: a skill appears in 2+ of user's open reqs
 #   - competitor_overlap: a competitor appears in 2+ of user's CI reports
 #   - difficulty_spike: avg difficulty across open reqs is elevated
 #   - velocity_baseline: predicted fill time based on user's closed reqs
+#   Stage 2 (outcome-driven signals):
+#   - outcome_velocity: real median/range from logged req_outcomes
+#   - outcome_pattern: skill-level fast/slow close patterns
+#   Stage 3-A (predictive signals on the current req):
+#   - skill_match_prediction: median fill time for similar skill mixes
+#   - company_poach_history: user's most-poached company + closing speed
+#   - difficulty_outcome_correlation: fill rate at current difficulty band
 # ============================================================================
 
 
@@ -3846,6 +3854,269 @@ async def _intel_outcome_pattern(client, user_id: str):
     }
 
 
+# ============================================================================
+# STAGE 3-A INTELLIGENCE HELPERS — Predictive signals (2026-05-06)
+# ----------------------------------------------------------------------------
+# Where Stage 1 reads pipeline shape and Stage 2 reads outcome history,
+# Stage 3-A reads outcomes THROUGH THE LENS OF the current req.
+#
+# When the user pastes a new JD, the engine looks back at outcomes for
+# similar reqs (matching skills, difficulty, level) and emits prospective
+# signals:
+#   - "Reqs with this skill mix fill in N days (n=M)"
+#   - "You've placed N candidates from Company X, closing Y% faster"
+#   - "At difficulty 8, your fill rate is N% (n=M)"
+#
+# All helpers gate aggressively by sample size. Below threshold → return
+# None silently. Predictions on n=1 or n=2 are noise; we'd rather emit
+# nothing than emit confidently wrong.
+#
+# Confidence bands: helpers return a 'confidence' field ('high' / 'medium' /
+# 'low') based on sample size, so the frontend can render uncertainty
+# visually if it wants. Low confidence still emits — small samples are
+# better than no signal IF labeled honestly.
+# ============================================================================
+
+
+def _intel_predict_confidence(n: int) -> str:
+    """Map sample size to a confidence label.
+
+    Calibrated for recruiting outcomes specifically — even 5 placements is
+    a lot of data per (skill, difficulty) bucket for a single recruiter.
+    """
+    if n >= 10:
+        return "high"
+    if n >= 5:
+        return "medium"
+    return "low"
+
+
+async def _intel_skill_match_prediction(client, user_id: str, current_skills: list):
+    """Find outcomes where placed candidates had skills overlapping with
+    the current req's skills, compute median fill time + range.
+
+    Why this beats Stage 2's outcome_velocity:
+      Stage 2 tells you 'your average req fills in 28 days'
+      Stage 3-A tells you 'reqs with THIS skill mix fill in 22 days'
+
+    The shape is the same as outcome_velocity but filtered to the current
+    req's skill signature. Returns None if fewer than 3 matching outcomes
+    exist (would be too noisy below that threshold).
+    """
+    if not current_skills or not isinstance(current_skills, list):
+        return None
+
+    # Normalize current skills for matching (lowercase, strip whitespace)
+    target_skills = set()
+    for s in current_skills:
+        if isinstance(s, str) and s.strip():
+            target_skills.add(s.strip().lower())
+    if not target_skills:
+        return None
+
+    # Pull all filled outcomes with skill data for this user
+    rs = await client.execute(
+        """SELECT time_to_close_days, placed_candidate_skills
+           FROM req_outcomes
+           WHERE logged_by_user_id = ?
+             AND outcome = 'filled'
+             AND time_to_close_days IS NOT NULL
+             AND placed_candidate_skills IS NOT NULL
+           ORDER BY logged_at DESC
+           LIMIT 200""",
+        [user_id],
+    )
+    if not rs.rows:
+        return None
+
+    # For each historical outcome, count skill overlap with current req.
+    # Outcomes with 2+ overlapping skills are "matching" enough to predict on.
+    matching_times = []
+    for r in rs.rows:
+        days = r[0]
+        try:
+            placed_skills = json.loads(r[1]) if r[1] else []
+        except Exception:
+            continue
+        if not isinstance(placed_skills, list):
+            continue
+        placed_set = set(
+            s.strip().lower() for s in placed_skills if isinstance(s, str) and s.strip()
+        )
+        overlap = target_skills & placed_set
+        if len(overlap) >= 2:
+            matching_times.append(days)
+
+    if len(matching_times) < 3:
+        return None
+
+    matching_times.sort()
+    n = len(matching_times)
+    median = matching_times[n // 2] if n % 2 == 1 else (matching_times[n // 2 - 1] + matching_times[n // 2]) / 2
+    fastest = min(matching_times)
+    slowest = max(matching_times)
+    confidence = _intel_predict_confidence(n)
+
+    return {
+        "type": "skill_match_prediction",
+        "median_days": round(median, 1),
+        "fastest_days": fastest,
+        "slowest_days": slowest,
+        "sample_size": n,
+        "confidence": confidence,
+        "headline": f"Reqs with this skill mix fill in {round(median)} days (range {fastest}–{slowest})",
+        "insight": f"Based on {n} similar filled reqs in your history. Confidence: {confidence}. Use to set client expectations on this specific req.",
+    }
+
+
+async def _intel_company_poach_history(client, user_id: str):
+    """Surface the user's most-poached company. If they've placed 3+
+    candidates from Company X over their career, that's a real signal
+    about where the talent pool actually sits.
+
+    Returns None if no company appears 3+ times (can't make a claim).
+    """
+    rs = await client.execute(
+        """SELECT placed_candidate_company_prev, time_to_close_days
+           FROM req_outcomes
+           WHERE logged_by_user_id = ?
+             AND outcome = 'filled'
+             AND placed_candidate_company_prev IS NOT NULL
+             AND time_to_close_days IS NOT NULL
+           ORDER BY logged_at DESC
+           LIMIT 200""",
+        [user_id],
+    )
+    if not rs.rows:
+        return None
+
+    # Bucket by company
+    company_to_times = {}
+    all_times = []
+    for r in rs.rows:
+        company = r[0]
+        days = r[1]
+        if not company or not isinstance(company, str):
+            continue
+        company_to_times.setdefault(company.strip(), []).append(days)
+        all_times.append(days)
+
+    if not all_times:
+        return None
+    overall_avg = sum(all_times) / len(all_times)
+
+    # Find companies with 3+ placements
+    candidates = []
+    for company, times in company_to_times.items():
+        if len(times) >= 3:
+            company_avg = sum(times) / len(times)
+            gap_pct = round(((company_avg - overall_avg) / overall_avg) * 100) if overall_avg > 0 else 0
+            candidates.append((company, company_avg, gap_pct, len(times)))
+
+    if not candidates:
+        return None
+
+    # Pick the company with the most placements (most reliable signal).
+    # Tie-break on largest absolute gap from average.
+    candidates.sort(key=lambda x: (-x[3], -abs(x[2])))
+    company, company_avg, gap, n = candidates[0]
+    direction = "faster" if gap < 0 else "slower"
+    confidence = _intel_predict_confidence(n)
+
+    return {
+        "type": "company_poach_history",
+        "company": company,
+        "placement_count": n,
+        "company_avg_days": round(company_avg, 1),
+        "overall_avg_days": round(overall_avg, 1),
+        "gap_percent": gap,
+        "confidence": confidence,
+        "headline": f"You've placed {n} candidates from {company} (closing {abs(gap)}% {direction})",
+        "insight": f"Source-from-{company} is a proven path for you. Average time-to-fill: {round(company_avg)} days vs {round(overall_avg)} days overall. Confidence: {confidence}.",
+    }
+
+
+async def _intel_difficulty_outcome_correlation(client, user_id: str, current_difficulty):
+    """For the current req's difficulty score, what's the historical fill
+    rate at that difficulty band? E.g. 'At difficulty 8, your fill rate is
+    71% (n=14). Lost: 29%.'
+
+    Difficulty bands: 1-3 (easy), 4-6 (moderate), 7-8 (hard), 9-10 (very hard).
+    Falls back gracefully if current_difficulty is missing or invalid.
+    """
+    if not isinstance(current_difficulty, (int, float)):
+        return None
+    if not (1 <= current_difficulty <= 10):
+        return None
+
+    # Define the band for the current req
+    if current_difficulty <= 3:
+        band_low, band_high, band_label = 1, 3, "easy"
+    elif current_difficulty <= 6:
+        band_low, band_high, band_label = 4, 6, "moderate"
+    elif current_difficulty <= 8:
+        band_low, band_high, band_label = 7, 8, "hard"
+    else:
+        band_low, band_high, band_label = 9, 10, "very hard"
+
+    # Get all outcomes (filled / lost / cancelled) joined with their req's
+    # difficulty score from parsed_json. Outcome data lives in req_outcomes,
+    # difficulty lives in requisitions.parsed_json — need a JOIN.
+    rs = await client.execute(
+        """SELECT ro.outcome, r.parsed_json
+           FROM req_outcomes ro
+           JOIN requisitions r ON r.id = ro.req_id
+           WHERE ro.logged_by_user_id = ?
+             AND ro.outcome IN ('filled', 'lost', 'cancelled')
+             AND r.parsed_json IS NOT NULL
+           ORDER BY ro.logged_at DESC
+           LIMIT 300""",
+        [user_id],
+    )
+    if not rs.rows:
+        return None
+
+    # Filter to outcomes for reqs in this difficulty band
+    band_outcomes = []
+    for r in rs.rows:
+        outcome = r[0]
+        try:
+            parsed = json.loads(r[1]) if r[1] else {}
+        except Exception:
+            continue
+        md = parsed.get("market_dynamics") or {}
+        diff = md.get("difficulty_score")
+        if not isinstance(diff, (int, float)):
+            continue
+        if band_low <= diff <= band_high:
+            band_outcomes.append(outcome)
+
+    if len(band_outcomes) < 5:
+        return None
+
+    n = len(band_outcomes)
+    filled = sum(1 for o in band_outcomes if o == "filled")
+    lost = sum(1 for o in band_outcomes if o == "lost")
+    cancelled = sum(1 for o in band_outcomes if o == "cancelled")
+    fill_rate = round((filled / n) * 100)
+    confidence = _intel_predict_confidence(n)
+
+    return {
+        "type": "difficulty_outcome_correlation",
+        "difficulty_score": current_difficulty,
+        "band_label": band_label,
+        "band_range": f"{band_low}-{band_high}",
+        "fill_rate_percent": fill_rate,
+        "filled_count": filled,
+        "lost_count": lost,
+        "cancelled_count": cancelled,
+        "sample_size": n,
+        "confidence": confidence,
+        "headline": f"At {band_label} difficulty ({band_low}-{band_high}), your fill rate is {fill_rate}% (n={n})",
+        "insight": f"Of {n} {band_label}-difficulty reqs in your history: {filled} filled, {lost} lost, {cancelled} cancelled. Confidence: {confidence}. Set realistic expectations with the hiring manager.",
+    }
+
+
 @app.get("/api/intelligence/stream")
 async def intelligence_stream(
     token: Optional[str] = Query(None),
@@ -3957,6 +4228,42 @@ async def intelligence_stream(
                 op = await _intel_outcome_pattern(client, user["id"])
             if op:
                 yield _format_sse_event("intelligence", op)
+                event_count += 1
+                await asyncio.sleep(0.15)
+
+            # Stage 3-A predictive signals (2026-05-06): predict on the
+            # most-recent req in the user's pipeline (reqs[0] since the
+            # underlying SELECT is ORDER BY opened_at DESC). The recent req
+            # is effectively the one the user is looking at right after
+            # intake, which is when the stream fires. Each helper queries
+            # req_outcomes through the lens of this specific req's shape
+            # (skills, difficulty) and returns None if the user doesn't
+            # have enough outcome history to make a reliable claim.
+            current_req_parsed = (reqs[0].get("parsed") or {}) if reqs else {}
+            current_skills = current_req_parsed.get("canonical_skills") or []
+            current_difficulty = (current_req_parsed.get("market_dynamics") or {}).get("difficulty_score")
+
+            # Pass 6: skill-mix prediction for THIS req
+            async with db() as client:
+                smp = await _intel_skill_match_prediction(client, user["id"], current_skills)
+            if smp:
+                yield _format_sse_event("intelligence", smp)
+                event_count += 1
+                await asyncio.sleep(0.15)
+
+            # Pass 7: company poach history (most-poached company by user)
+            async with db() as client:
+                cph = await _intel_company_poach_history(client, user["id"])
+            if cph:
+                yield _format_sse_event("intelligence", cph)
+                event_count += 1
+                await asyncio.sleep(0.15)
+
+            # Pass 8: difficulty band fill rate (for current req's difficulty)
+            async with db() as client:
+                doc = await _intel_difficulty_outcome_correlation(client, user["id"], current_difficulty)
+            if doc:
+                yield _format_sse_event("intelligence", doc)
                 event_count += 1
                 await asyncio.sleep(0.15)
 
