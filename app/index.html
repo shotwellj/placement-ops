@@ -99,6 +99,108 @@
   .collapsible-body { padding: 1.5rem 2rem 2rem; }
   .collapsible-body > section.card { padding: 0; border: none; margin-bottom: 0; background: transparent; }
 
+  /* ========================================================================
+     Live Intelligence Stream panel (Stage 1 of proactive engine, 2026-04-30)
+     Real-time SSE-driven panel that renders cross-req intelligence events
+     as they arrive from /api/intelligence/stream. Lives at the top of the
+     results page so the user sees motion immediately.
+     ======================================================================== */
+  .intel-panel {
+    background: linear-gradient(135deg, rgba(64, 156, 255, 0.06), rgba(126, 87, 194, 0.04));
+    border: 1px solid rgba(64, 156, 255, 0.25);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .intel-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.85rem;
+  }
+  .intel-panel-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: rgb(64, 156, 255);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .intel-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .intel-status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: rgb(64, 156, 255);
+    box-shadow: 0 0 0 0 rgba(64, 156, 255, 0.7);
+    animation: intel-pulse 1.5s ease-in-out infinite;
+  }
+  .intel-status.done .intel-status-dot {
+    background: var(--good);
+    box-shadow: none;
+    animation: none;
+  }
+  .intel-status.empty .intel-status-dot {
+    background: var(--text-mute);
+    box-shadow: none;
+    animation: none;
+  }
+  @keyframes intel-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(64, 156, 255, 0.5); }
+    70% { box-shadow: 0 0 0 8px rgba(64, 156, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(64, 156, 255, 0); }
+  }
+  .intel-events {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .intel-event {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+    animation: intel-arrive 0.35s ease-out;
+  }
+  @keyframes intel-arrive {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .intel-event-headline {
+    font-weight: 700;
+    color: var(--text);
+    font-size: 0.92rem;
+    margin-bottom: 0.25rem;
+  }
+  .intel-event-insight {
+    font-size: 0.83rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .intel-event-type {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-mute);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+  .intel-empty {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-style: italic;
+    padding: 0.5rem 0;
+  }
+
   /* Skill-alternatives row collapsibles (Stage 1.5 rework, 2026-04-30).
      Native <details> rows inside the Skill Intelligence section. Same
      pattern as the page-level collapsibles but smaller/denser. */
@@ -266,6 +368,23 @@
     <div id="companyOverrideBanner" style="display: none; background: rgba(255, 183, 77, 0.08); border: 1px solid rgba(255, 183, 77, 0.4); border-radius: 8px; padding: 0.9rem 1.1rem; margin-bottom: 1rem; font-size: 0.9rem;">
       <div style="font-weight: 600; color: var(--warn); margin-bottom: 0.25rem;">Company updated</div>
       <div id="companyOverrideText" style="color: var(--text-dim);"></div>
+    </div>
+    <!--
+      Live Intelligence Stream panel (Stage 1 of proactive engine, 2026-04-30).
+      Auto-connects to /api/intelligence/stream via EventSource as soon as the
+      results section becomes visible. Shows cross-req signals as they arrive.
+      Empty state is acceptable for new users with <2 reqs - the empty message
+      itself is the call to action ("run more intakes to unlock intelligence").
+    -->
+    <div id="intelPanel" class="intel-panel" style="display: none;">
+      <div class="intel-panel-header">
+        <span class="intel-panel-title">⚡ Live Intelligence</span>
+        <span id="intelStatus" class="intel-status">
+          <span class="intel-status-dot"></span>
+          <span id="intelStatusText">Connecting...</span>
+        </span>
+      </div>
+      <div id="intelEvents" class="intel-events"></div>
     </div>
     <section class="card">
       <div class="card-label">Core Analysis</div>
@@ -519,6 +638,133 @@ function escapeHtml(s) {
 }
 
 function escapeAttr(s) { return String(s || '').replace(/"/g, '&quot;'); }
+
+// ============================================================================
+// Live Intelligence Stream consumer (Stage 1, 2026-04-30)
+// ----------------------------------------------------------------------------
+// Connects to /api/intelligence/stream via EventSource (Server-Sent Events)
+// and renders intelligence events as they arrive from the server. The stream
+// is auth-required so we attach the bearer token via the URL token param,
+// since EventSource doesn't support custom headers.
+//
+// Why EventSource not fetch+ReadableStream: EventSource handles reconnection,
+// event parsing, and connection state for free. The trade-off is no custom
+// headers, but the auth token via query param is acceptable given (a) the
+// page is HTTPS, (b) tokens are already in localStorage which is the same
+// trust boundary, (c) the endpoint is auth-gated server-side regardless.
+//
+// Note: requires backend support for ?token= query param auth on the stream
+// endpoint. If get_current_user only reads Authorization header, we need to
+// add a token query param fallback. Checked at deploy time.
+// ============================================================================
+
+let _intelEventSource = null;
+
+function initIntelligenceStream() {
+  // Bail if already connected (e.g., re-render of results in same session)
+  if (_intelEventSource) {
+    try { _intelEventSource.close(); } catch (e) {}
+    _intelEventSource = null;
+  }
+
+  const panel = document.getElementById('intelPanel');
+  const eventsContainer = document.getElementById('intelEvents');
+  const statusText = document.getElementById('intelStatusText');
+  const statusEl = document.getElementById('intelStatus');
+  if (!panel || !eventsContainer || !statusText) return;
+
+  const token = localStorage.getItem('sn_token');
+  if (!token) {
+    // Not signed in. Hide the panel - intelligence stream requires auth.
+    panel.style.display = 'none';
+    return;
+  }
+
+  // Show the panel and clear any prior events
+  panel.style.display = 'block';
+  eventsContainer.innerHTML = '';
+  statusText.textContent = 'Connecting...';
+  statusEl.classList.remove('done', 'empty');
+
+  // EventSource connection. Token via query param (see header comment).
+  const url = `/api/intelligence/stream?token=${encodeURIComponent(token)}`;
+  let es;
+  try {
+    es = new EventSource(url);
+  } catch (e) {
+    statusText.textContent = 'Stream unavailable';
+    statusEl.classList.add('empty');
+    return;
+  }
+  _intelEventSource = es;
+
+  let eventCount = 0;
+
+  // Handle 'ready' event - server says stream is live
+  es.addEventListener('ready', () => {
+    statusText.textContent = 'Listening...';
+  });
+
+  // Handle 'intelligence' events - the actual signals
+  es.addEventListener('intelligence', (msg) => {
+    try {
+      const event = JSON.parse(msg.data);
+      const card = document.createElement('div');
+      card.className = 'intel-event';
+      const typeLabel = (event.type || '').replace(/_/g, ' ');
+      card.innerHTML = `
+        <div class="intel-event-type">${escapeHtml(typeLabel)}</div>
+        <div class="intel-event-headline">${escapeHtml(event.headline || '')}</div>
+        <div class="intel-event-insight">${escapeHtml(event.insight || '')}</div>
+      `;
+      eventsContainer.appendChild(card);
+      eventCount++;
+    } catch (e) {
+      console.warn('Failed to parse intelligence event:', e);
+    }
+  });
+
+  // Handle 'done' event - server is finished, close cleanly
+  es.addEventListener('done', (msg) => {
+    let payload = {};
+    try { payload = JSON.parse(msg.data); } catch (e) {}
+    if (eventCount === 0) {
+      // Empty pipeline - show the encouraging empty state
+      eventsContainer.innerHTML = `
+        <div class="intel-empty">${escapeHtml(payload.message || 'No signals yet. Run more intakes to unlock cross-req intelligence.')}</div>
+      `;
+      statusText.textContent = 'No signals yet';
+      statusEl.classList.add('empty');
+    } else {
+      statusText.textContent = `${eventCount} signal${eventCount === 1 ? '' : 's'}`;
+      statusEl.classList.add('done');
+    }
+    es.close();
+    _intelEventSource = null;
+  });
+
+  // Handle 'error' event from server-side
+  es.addEventListener('error', (msg) => {
+    // Distinguish between SSE protocol errors (msg.data undefined, connection
+    // dropped) and server-emitted error events (msg.data is JSON we sent)
+    if (msg.data) {
+      try {
+        const payload = JSON.parse(msg.data);
+        eventsContainer.innerHTML = `<div class="intel-empty">⚠ ${escapeHtml(payload.message || 'Intelligence stream error')}</div>`;
+      } catch (e) {
+        // Fall through to connection-error handling
+      }
+    }
+    // Connection-level error (network drop, server gone, auth fail)
+    if (es.readyState === EventSource.CLOSED) {
+      if (eventCount === 0) {
+        statusText.textContent = 'Connection ended';
+        statusEl.classList.add('empty');
+      }
+      _intelEventSource = null;
+    }
+  });
+}
 
 // ---------- Collapsible card helper (Stage 1, 2026-04-30) ----------
 //
@@ -2196,6 +2442,12 @@ renderResults = function(data) {
 
   $('results').classList.add('active');
   $('results').scrollIntoView({ behavior: 'smooth' });
+
+  // Live Intelligence Stream (Stage 1, 2026-04-30): kick off the SSE
+  // subscriber as soon as results are visible. The stream computes
+  // cross-req signals from the user's pipeline and renders them inline
+  // as they arrive. Empty pipelines render an encouraging empty state.
+  initIntelligenceStream();
 };
 
 loadUser();

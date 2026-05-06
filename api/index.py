@@ -1,11 +1,11 @@
 """
-SourcingNav Talent Engine — API v1
+SourcingNav Talent Engine - API v1
 Deployed at sourcingnav.com/api/*
 
 Two tiers of endpoints in one file:
-1. DEMO endpoints (/api/dashboard/*, /api/candidates, etc) — read-only seed data
+1. DEMO endpoints (/api/dashboard/*, /api/candidates, etc) - read-only seed data
    powering the hardcoded demos at /ui/dashboard.html and /ui/people-ops.html.
-2. PRODUCTION endpoints (/api/intake, /api/auth/*, /api/reqs/*, etc) — the real
+2. PRODUCTION endpoints (/api/intake, /api/auth/*, /api/reqs/*, etc) - the real
    talent engine at /app/, backed by Turso SQLite + BYOK AI.
 """
 
@@ -18,11 +18,12 @@ import httpx
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 
-# Compliance helpers — lives in api/_compliance.py. See that module's docstring.
+# Compliance helpers - lives in api/_compliance.py. See that module's docstring.
 from api._compliance import (
     register_data_subject,
     register_model_version,
@@ -75,7 +76,7 @@ SERVER_TOGETHER_KEY = os.environ.get("SERVER_TOGETHER_KEY", "")
 # Server-side Anthropic key used as automatic FAILOVER when Together.ai is
 # slow, unreachable, or returning 5xx. Together is primary because it's
 # cheapest; Anthropic is fallback because it's the most reliable provider
-# we have. The fallback only fires on transient errors (timeouts, 5xx) —
+# we have. The fallback only fires on transient errors (timeouts, 5xx) -
 # never on 4xx (which would just hide bugs). See _call_with_failover().
 SERVER_ANTHROPIC_KEY = os.environ.get("SERVER_ANTHROPIC_KEY", "")
 
@@ -289,7 +290,7 @@ def health():
 
 
 # =====================================================================
-# DEMO ENDPOINTS — read-only, unchanged from v0.1
+# DEMO ENDPOINTS - read-only, unchanged from v0.1
 # Powers the hardcoded demos at /ui/dashboard.html and /ui/people-ops.html
 # =====================================================================
 
@@ -348,14 +349,14 @@ def integrations_demo():
 
 
 # =====================================================================
-# PRODUCTION — the real talent engine at /app/
+# PRODUCTION - the real talent engine at /app/
 # =====================================================================
 
 FREE_CAPS = {"intake": 5, "eval": 10, "outreach": 10}
 
 
 # Free-tier billing period is rolling 30 days, not calendar months. Fairer
-# to users who sign up mid-month, simpler to reason about, no cron needed —
+# to users who sign up mid-month, simpler to reason about, no cron needed -
 # we reset lazily on the next cap check.
 FREE_PERIOD_DAYS = 30
 
@@ -423,7 +424,7 @@ async def increment_cap(user_id: str, cap_type: str):
 
 
 async def check_and_increment_cap(user_id: str, cap_type: str):
-    """Legacy combined function — kept for any callers that want the old behavior."""
+    """Legacy combined function - kept for any callers that want the old behavior."""
     await check_cap(user_id, cap_type)
     await increment_cap(user_id, cap_type)
 
@@ -441,8 +442,8 @@ class VerifyTokenRequest(BaseModel):
 def sign_token(email: str, exp_minutes: int = 15, kind: str = "magic_link") -> str:
     """Sign a token with an email, expiry, and purpose tag.
 
-    kind="magic_link" — short-lived (15 min), sent via email, used once
-    kind="session"    — long-lived (30 days), stored in browser, used for API auth
+    kind="magic_link" - short-lived (15 min), sent via email, used once
+    kind="session"    - long-lived (30 days), stored in browser, used for API auth
     """
     exp = int((datetime.now(timezone.utc) + timedelta(minutes=exp_minutes)).timestamp())
     payload = f"{email}|{exp}|{kind}"
@@ -455,7 +456,7 @@ def verify_token(token: str, expected_kind: Optional[str] = None) -> Optional[st
     try:
         parts = token.split("|")
         # New format: email|exp|kind|sig (4 parts)
-        # Old format: email|exp|sig (3 parts) — treat as session for backwards compat
+        # Old format: email|exp|sig (3 parts) - treat as session for backwards compat
         if len(parts) == 4:
             email, exp_str, kind, sig = parts
         elif len(parts) == 3:
@@ -521,7 +522,7 @@ async def get_current_user(authorization: str = Header(None), user_agent: Option
             session_id, _user_id, revoked_at, expires_at = rs.rows[0]
             if revoked_at is not None:
                 raise HTTPException(401, "Session revoked. Please sign in again.")
-            # last_used_at update — best-effort, don't fail the request if it errors
+            # last_used_at update - best-effort, don't fail the request if it errors
             try:
                 await client.execute(
                     "UPDATE sessions SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -530,7 +531,7 @@ async def get_current_user(authorization: str = Header(None), user_agent: Option
             except Exception:
                 pass
         # If no session row found, this is a legacy token (issued before this table existed).
-        # We accept it based on signature alone — they'll get a proper session next login.
+        # We accept it based on signature alone - they'll get a proper session next login.
 
         # Step 3: load the user
         rs = await client.execute("SELECT id, email, mode, plan FROM users WHERE email = ?", [email])
@@ -589,7 +590,7 @@ async def call_ai(user_id: str, prompt: str, max_tokens: int = 8000) -> str:
     Earlier versions had a BYOK branch that bypassed the failover wrapper,
     causing Together 503s to surface directly to users. Recruiters (our
     target audience) don't know what an API key is and shouldn't be asked
-    to bring one. Now everyone — free and Pro — uses our server keys with
+    to bring one. Now everyone - free and Pro - uses our server keys with
     failover.
 
     Free-tier abuse is prevented one layer up: every intake/eval/outreach
@@ -612,7 +613,7 @@ def _ai_error(provider: str, status: int, body: str) -> HTTPException:
 
 
 async def _call_anthropic_haiku(api_key: str, prompt: str, max_tokens: int) -> str:
-    """Call Anthropic Claude Haiku 4.5 — our PRIMARY model for all intake calls.
+    """Call Anthropic Claude Haiku 4.5 - our PRIMARY model for all intake calls.
 
     Why Haiku 4.5 as primary:
       - 5-8x cheaper than Together Qwen 235B for our workload (~\$0.07/intake
@@ -792,7 +793,7 @@ async def _call_with_failover(prompt: str, max_tokens: int = 8000) -> str:
                 else:
                     print(f"[ai-call FAILOVER] haiku failed twice ({e.status_code}): {str(e.detail)[:160]} -> trying sonnet")
             else:
-                # 4xx (auth, bad request, rate limit) — surface immediately, never retry/failover
+                # 4xx (auth, bad request, rate limit) - surface immediately, never retry/failover
                 raise
 
     # ── Fallback: Sonnet 4.5 ──
@@ -833,7 +834,7 @@ Parse this job description and return a structured JSON analysis.
 JOB DESCRIPTION:
 {jd}
 
-CRITICAL RULE — NEVER RECOMMEND POACHING THE HIRING COMPANY:
+CRITICAL RULE - NEVER RECOMMEND POACHING THE HIRING COMPANY:
 
 The company in the JD is the CLIENT. It is a non-solicit violation in most
 recruiting contracts and a legal risk to recommend sourcing candidates from
@@ -900,7 +901,7 @@ Rules:
     not "Spark Core", "UVM" not "Universal Verification Methodology".
   - Mark each with severity matching its source must_have/nice_to_have entry.
   - 6-15 entries total. If the JD mentions a skill, extract it.
-  - Do NOT include soft skills like "communication" or "teamwork" here — those
+  - Do NOT include soft skills like "communication" or "teamwork" here - those
     belong in must_have_skills prose, not canonical_skills.
 
 CRITICAL RULES FOR comp_snapshot:
@@ -916,7 +917,7 @@ Look at the JD for hourly / contract / 1099 / W2-contract indicators:
 
 If ANY of those signals are present, this is a HOURLY role. NEVER convert
 hourly rates to fake annual figures. A "$50-100/hr" rate is NOT "$104k-$208k
-annual" — taskers don't work 40hr/wk for 52 weeks. Reporting fake annual
+annual" - taskers don't work 40hr/wk for 52 weeks. Reporting fake annual
 comp on hourly work is the kind of error that destroys recruiter trust
 in the tool.
 
@@ -943,21 +944,21 @@ expand the searchable surface beyond the literal job title.
 
 Three dimensions, all required:
 
-  level_progression — same role at different IC levels. If the JD is for
+  level_progression - same role at different IC levels. If the JD is for
     a "Senior Backend Engineer", give the actual titles peer companies use
     at junior, mid, senior, and staff_plus levels. Real titles, not generic
     ones. "L4 Software Engineer" is fine if that's what FAANG uses. Aim for
-    2-4 titles per level. Reflect title inflation — "Staff Engineer" at a
+    2-4 titles per level. Reflect title inflation - "Staff Engineer" at a
     50-person Series B is doing what "Senior" does at FAANG; capture both.
 
-  functional_aliases — what the SAME PERSON is called at peer companies
+  functional_aliases - what the SAME PERSON is called at peer companies
     that name the role differently. A Backend Engineer at a startup is a
     Platform Engineer at infra-heavy shops, a Distributed Systems Engineer
     at scale companies, an Infrastructure Engineer at cloud-native shops.
     Give 3-6 functional aliases with one-line rationale per alias. These
     are pure title-naming differences for the same skill profile.
 
-  adjacent_crossover — DIFFERENT roles where the same person could shift.
+  adjacent_crossover - DIFFERENT roles where the same person could shift.
     A Site Reliability Engineer with strong systems chops can take a
     Backend Engineer role; a senior Data Engineer can often shift to
     Platform Engineer; etc. Give 3-5 adjacent titles with rationale on
@@ -971,24 +972,24 @@ misses 60% of qualified candidates who hold one of these alternative titles.
 Your alt_titles output is the broader search universe.
 
 CRITICAL RULES FOR watering_holes:
-This is venue-specific sourcing intelligence — the actual websites, forums,
+This is venue-specific sourcing intelligence - the actual websites, forums,
 events, mailing lists, Discords, and communities where THIS specific
 archetype congregates. Generic ("LinkedIn", "GitHub") doesn't count.
 
 For each watering hole, give:
   - venue: the specific name (lore.kernel.org, NeurIPS, Bootlin, HuggingFace,
-    DEFCON CTF, KX/Q forums, Embedded World speakers list — be specific)
+    DEFCON CTF, KX/Q forums, Embedded World speakers list - be specific)
   - venue_type: mailing_list | conference | community | publication |
     code_host | training_alumni | competition | discord_slack
   - signal: what kind of candidate signal you find there in 1 sentence
-    ("Linux kernel maintainers — Signed-off-by tags = professional-grade
+    ("Linux kernel maintainers - Signed-off-by tags = professional-grade
     upstream contribution")
   - how_to_use: 1 sentence on how to actually source from this venue.
     Use Google X-ray syntax with DOUBLE quotes and no literal AND:
     ("X-ray: site:lore.kernel.org \"Signed-off-by:\" \"embedded\" (\"arm\" OR \"aarch64\")")
 
 Aim for 5-8 watering holes. Span at least 3 venue_types. Skip generic
-catch-alls like "LinkedIn" or "Indeed" — those are already in the X-ray
+catch-alls like "LinkedIn" or "Indeed" - those are already in the X-ray
 strings. The point is the NICHE venues only a grandmaster would know.
 
 Examples by archetype:
@@ -1076,7 +1077,7 @@ Return ONLY valid JSON with this shape:
     {{
       "venue": "lore.kernel.org",
       "venue_type": "mailing_list",
-      "signal": "Linux kernel maintainers — Signed-off-by tags signal professional-grade upstream contribution",
+      "signal": "Linux kernel maintainers - Signed-off-by tags signal professional-grade upstream contribution",
       "how_to_use": "X-ray: site:lore.kernel.org \"Signed-off-by:\" \"embedded\" \"arm\""
     }}
   ]
@@ -1112,7 +1113,7 @@ Return ONLY valid JSON. CRITICAL SYNTAX NOTES before the schema:
     for pages containing the word AND itself, which kills your results.
   - DO write OR (uppercase) between alternatives, always inside parentheses:
     (\"BSP\" OR \"board support package\")
-  - LinkedIn Recruiter strings are the exception — they use single quotes and
+  - LinkedIn Recruiter strings are the exception - they use single quotes and
     accept the AND keyword. Keep LR and X-ray syntax strictly separated.
 
 {{
@@ -1144,7 +1145,7 @@ Return ONLY valid JSON. CRITICAL SYNTAX NOTES before the schema:
 Rules:
 - No em dashes anywhere
 - LR strings use LR syntax (title:, location:, current_company:)
-- X-ray strings use Google syntax: site:, intitle:, -site: (exclusion), OR (uppercase), double-quoted phrases. DO NOT write the literal word AND — a space is already an implicit AND on Google and writing AND makes Google search for the word "AND" itself.
+- X-ray strings use Google syntax: site:, intitle:, -site: (exclusion), OR (uppercase), double-quoted phrases. DO NOT write the literal word AND - a space is already an implicit AND on Google and writing AND makes Google search for the word "AND" itself.
 - Tier 1 = same product/market as the hiring company
 - Tier 2 = adjacent industry/skill overlap
 - NEVER include the hiring company itself in tier_1 or tier_2. The hiring company
@@ -1156,7 +1157,7 @@ Rules:
 X-RAY SEARCH CONSTRAINTS (these strings must actually run on Google, not just look smart):
 
 0. DOUBLE QUOTES ONLY AROUND PHRASES. Single quotes (apostrophes) are IGNORED
-   by Google — they do nothing. Every multi-word phrase in an X-ray MUST be
+   by Google - they do nothing. Every multi-word phrase in an X-ray MUST be
    wrapped in double quotes. Because these strings are going into a JSON string
    field, escape them as \"...\". Example of the WRONG pattern:
      site:linkedin.com/in/ 'Senior Embedded Linux Engineer' AND 'BSP'
@@ -1165,7 +1166,7 @@ X-RAY SEARCH CONSTRAINTS (these strings must actually run on Google, not just lo
 
 0a. NO LITERAL AND BETWEEN TERMS. A space is already an implicit AND on
     Google. Writing the word AND makes Google search for pages containing
-    the literal word "AND" — killing your string. OR (uppercase) IS required
+    the literal word "AND" - killing your string. OR (uppercase) IS required
     between alternatives, always inside parentheses.
 
 1. MAX 3 SPACE-SEPARATED SIGNALS per string. Google's ranking collapses past 3.
@@ -1264,13 +1265,13 @@ For each alternative, include:
   - context: 1 sentence on WHERE/WHY this alternative gets used instead
   - transferability: "high" (>80% skills overlap, candidate is fully qualified
                      day 1, drop-in replacement),
-                     "medium" (50-80% overlap, worth a phone screen — solid
+                     "medium" (50-80% overlap, worth a phone screen - solid
                      transfer but candidate will need 1-2 weeks to ramp),
                      "low" (25-50% overlap, candidate could ramp but isn't
-                     ready day 1 — needs 30-60 days)
+                     ready day 1 - needs 30-60 days)
 
 ──────────────────────────────────────────────────────────
-DISTRIBUTION CALIBRATION — REQUIRED
+DISTRIBUTION CALIBRATION - REQUIRED
 ──────────────────────────────────────────────────────────
 
 Real-world skill alternative distributions cluster around:
@@ -1279,7 +1280,7 @@ Real-world skill alternative distributions cluster around:
   - ~20% low (transferable foundation, longer ramp)
 
 If you mark 80%+ of your alternatives as "high", you are inflating the
-ratings. This destroys the recruiters ability to triage candidates —
+ratings. This destroys the recruiters ability to triage candidates -
 everything looks equally great, so nothing is actually prioritized.
 
 GOOD CALIBRATION RULES:
@@ -1287,7 +1288,7 @@ GOOD CALIBRATION RULES:
 A "high" alternative is rare. It means the candidates resume could
 literally have one tool name swapped for another and they would still
 do the job equivalently from day 1. Examples that genuinely qualify:
-  - PostgreSQL <-> MySQL (for app-layer dev — both relational, similar SQL)
+  - PostgreSQL <-> MySQL (for app-layer dev - both relational, similar SQL)
   - React <-> Preact (near-identical APIs, same mental model)
   - Apache Kafka <-> Apache Pulsar (similar pub/sub semantics at scale)
 
@@ -1301,7 +1302,7 @@ learning the specific quirks of the target stack:
 
 "Low" alternatives are valuable but require real ramp:
   - Pinecone -> FAISS (vector search but different abstraction level)
-  - PostgreSQL -> Cassandra (relational vs wide-column — paradigm shift)
+  - PostgreSQL -> Cassandra (relational vs wide-column - paradigm shift)
   - REST APIs -> gRPC (different mental model, different tooling)
 
 Skip alternatives below 25% overlap. Skip generic synonyms ("PyTorch" -> "Torch"
@@ -1321,12 +1322,12 @@ sparingly for genuine drop-in replacements.
 
 Examples of BAD alternatives (do not include these patterns):
   - Generic synonyms ("AWS" -> "Amazon Web Services")
-  - Complete category swaps ("PyTorch" -> "scikit-learn" — different problem space)
-  - Overly broad ("any Python framework" — too vague to be useful)
+  - Complete category swaps ("PyTorch" -> "scikit-learn" - different problem space)
+  - Overly broad ("any Python framework" - too vague to be useful)
   - Inflating ratings to "high" when the candidate genuinely needs ramp time
 
 Skip skills that don't have meaningful alternatives. A skill like "U.S. Citizenship"
-or "Active Secret Clearance" has no alternative — just omit it from output.
+or "Active Secret Clearance" has no alternative - just omit it from output.
 
 Return STRICT JSON only:
 
@@ -1357,7 +1358,7 @@ message.
 PARSED JD CONTEXT:
 {parsed_context}
 
-CRITICAL — TRUTHFULNESS RULES (read this first, every time):
+CRITICAL - TRUTHFULNESS RULES (read this first, every time):
 
 A counter that contains an INVENTED fact about the company is worse than
 no counter at all. The recruiter pastes it into an InMail, the candidate
@@ -1366,7 +1367,7 @@ lying or uninformed. This destroys their credibility and the placement.
 
 You may ONLY reference facts that fit one of these categories:
 
-  ALLOWED — facts visible in the parsed JD context:
+  ALLOWED - facts visible in the parsed JD context:
     - Role title, level, location, remote policy, industry
     - Comp range and any explicit benefits in the JD
     - Required and preferred skills as stated
@@ -1374,7 +1375,7 @@ You may ONLY reference facts that fit one of these categories:
     - The role's responsibilities as written in the JD
     - Any explicit clearance, citizenship, or eligibility requirements
 
-  ALLOWED — universally true industry knowledge:
+  ALLOWED - universally true industry knowledge:
     - "DoD contracts require US citizenship" (true by federal law)
     - "Most defense roles cannot sponsor H1B visas" (regulatory fact)
     - "FAANG L5 total comp typically exceeds $400k" (well-known market data)
@@ -1382,7 +1383,7 @@ You may ONLY reference facts that fit one of these categories:
        publication record" (industry-recognized norm)
     - General industry trends and common career trajectories
 
-  FORBIDDEN — DO NOT INVENT any of the following, ever:
+  FORBIDDEN - DO NOT INVENT any of the following, ever:
     - Team size or headcount ("12-person team", "80 engineers")
     - Specific leader names, titles, or career history
        ("led by a former SpaceX avionics engineer")
@@ -1416,36 +1417,36 @@ that references what's actually true about THIS opportunity (not generic).
 Common objection categories (use the ones that apply, skip the ones that
 don't matter for this role):
 
-  industry_perception — "I'd never work at [defense / FAANG / startup /
+  industry_perception - "I'd never work at [defense / FAANG / startup /
     legacy / non-mission-driven]". Counter must reference what's
-    SURPRISING and TRUE about this specific industry or role —
+    SURPRISING and TRUE about this specific industry or role -
     using only facts from the JD or universal industry knowledge.
 
-  comp_below_market — "I just got a raise" / "I'm already at $X". Counter
+  comp_below_market - "I just got a raise" / "I'm already at $X". Counter
     must address the comp delta gap honestly OR reframe what the role
     offers beyond base. Use only the comp_snapshot from the JD.
 
-  location_remote — "I want fully remote" or "I won't relocate to X".
+  location_remote - "I want fully remote" or "I won't relocate to X".
     Counter must be honest about the requirement AND offer what's
     actually compelling about being there. DO NOT invent stipends or
     perks; reference only what the JD says about location/remote.
 
-  brand_unknown — "I've never heard of this company". Counter is a
+  brand_unknown - "I've never heard of this company". Counter is a
     1-paragraph elevator pitch built ONLY from facts in the JD:
     what the company says it does (in the JD), the industry, the
     products mentioned by name in the JD, and any verifiable scale
     indicators the JD provides.
 
-  career_risk — "What if this doesn't work out / the company fails /
+  career_risk - "What if this doesn't work out / the company fails /
     I get RIF'd". Counter addresses general industry stability or
     candidate-side mitigations. DO NOT invent severance terms,
     vesting schedules, or specific company stability claims.
 
-  visa_clearance_blocker — "I don't have clearance" or "I need
+  visa_clearance_blocker - "I don't have clearance" or "I need
     sponsorship". Counter uses only what the JD says about clearance
     and citizenship requirements, plus universal regulatory facts.
 
-  tech_stack_skepticism — "Your stack is ancient" or "I don't want
+  tech_stack_skepticism - "Your stack is ancient" or "I don't want
     to work in [legacy tech]". Counter references ONLY the technologies
     the JD mentions and explains why they matter in this domain. DO NOT
     invent additional modern tooling not stated in the JD.
@@ -1467,7 +1468,7 @@ For each objection in your output:
       "industry: <general industry fact>"
     This gives the recruiter a transparent provenance trail. If you
     cannot fill sources_used with real grounding, you should not be
-    writing the counter — drop the objection entirely.
+    writing the counter - drop the objection entirely.
   - safe_to_paste_verbatim: true if every claim in the counter is
     directly traceable to the JD or universal industry knowledge,
     false if the recruiter should verify any specific claim before
@@ -1477,7 +1478,7 @@ Pick ONLY the 3-5 most likely objections for THIS role. Quality over
 quantity. If you cannot ground a counter in the allowed sources, omit
 the objection entirely rather than invent.
 
-Skip the elevator pitch as a separate objection — instead, work it
+Skip the elevator pitch as a separate objection - instead, work it
 INTO whichever counter benefits most (usually brand_unknown or
 industry_perception), still grounded in JD-only facts.
 
@@ -1489,7 +1490,7 @@ every claim traces to either the JD or industry knowledge):
     {{
       "objection_type": "visa_clearance_blocker",
       "likely_phrasing": "I don't have a security clearance and I'm not sure if I'm eligible for one.",
-      "counter": "The JD allows for either an active Secret clearance OR the ability to obtain one, which means US citizenship plus a clean background is the realistic bar — not prior clearance experience. Many embedded engineers in San Diego have moved into cleared work this way; the company sponsors the clearance process. The bigger filter here is the citizenship and eligibility piece, which is non-negotiable for DoD contracts.",
+      "counter": "The JD allows for either an active Secret clearance OR the ability to obtain one, which means US citizenship plus a clean background is the realistic bar - not prior clearance experience. Many embedded engineers in San Diego have moved into cleared work this way; the company sponsors the clearance process. The bigger filter here is the citizenship and eligibility piece, which is non-negotiable for DoD contracts.",
       "confidence": "high",
       "sources_used": [
         "JD: 'Must possess a Secret level security clearance; or the ability to obtain one will be considered'",
@@ -1527,30 +1528,30 @@ level, and a different expected response rate.
 
 The 5 phases (all required, in order):
 
-  Phase 1 — Days 1-3 — Warm-channel opener
+  Phase 1 - Days 1-3 - Warm-channel opener
     Channels: 1st-degree LinkedIn connections, alumni networks, referrals
     from current employees at Tier 1 companies, past placements the
     recruiter already knows. No cold yet.
     Message style: personal, concise, direct ask for intro or interest.
     Expected response rate: 30-50%. Tiny universe, high-quality signal.
 
-  Phase 2 — Days 4-7 — Tier 1 cold with hyper-personalization
+  Phase 2 - Days 4-7 - Tier 1 cold with hyper-personalization
     Channels: Tier 1 target-company employees via LinkedIn Recruiter /
     InMail, outreach via verified personal email (Hunter/Apollo).
-    Message style: references something SPECIFIC about the candidate —
+    Message style: references something SPECIFIC about the candidate -
     their recent talk, OSS commit, patent, promotion, their company's
     recent news (layoff, acquisition, IPO). First line should prove the
     recruiter actually looked at their profile.
     Expected response rate: 8-15%.
 
-  Phase 3 — Days 8-14 — Tier 2 broader outreach
+  Phase 3 - Days 8-14 - Tier 2 broader outreach
     Channels: Tier 2 companies, less-personalized but still role-fit
     targeted. Template-based with 2-3 customized fields.
     Message style: leads with the ROLE + COMP + COMPANY story since less
     personal context exists per candidate. Volume game.
     Expected response rate: 3-7%.
 
-  Phase 4 — Days 15-21 — Unconventional channels + watering holes
+  Phase 4 - Days 15-21 - Unconventional channels + watering holes
     Channels: X-ray (personal sites, GitHub, Stack Overflow), niche
     communities (specific Discords, mailing lists, conference speakers),
     the watering_holes from the parsed JD.
@@ -1559,15 +1560,15 @@ The 5 phases (all required, in order):
     actively job-searching and respond to curiosity, not pitches.
     Expected response rate: 10-20% from a much smaller universe.
 
-  Phase 5 — Days 22+ — Back-channels + parallel escalation
+  Phase 5 - Days 22+ - Back-channels + parallel escalation
     Channels: recruiters' Discord groups, friend-of-friend referrals,
     former colleagues. If the search is still open past 21 days, this
     is where grandmasters ask their network for intros directly.
     Also: revisit Phase 2 candidates who didn't respond with a new
-    angle (often: a news hook — their company just announced layoffs,
+    angle (often: a news hook - their company just announced layoffs,
     a comp change, a reorg).
     Message style: asking for intros or advice, not pitching the role.
-    Expected response rate: varies wildly — depends on network depth.
+    Expected response rate: varies wildly - depends on network depth.
 
 For each phase, produce:
   - phase: 1-5
@@ -1591,28 +1592,28 @@ advice fails. Reference the Tier 1 companies and watering holes that
 were passed in.
 
 ──────────────────────────────────────────────────────────
-TRUTHFULNESS RULES — MANDATORY
+TRUTHFULNESS RULES - MANDATORY
 ──────────────────────────────────────────────────────────
 
 A first_move that contains an INVENTED candidate detail is worse than no
 first_move at all. The recruiter will paste it into outreach, the candidate
-asks "how did you find my PR on X?" — and the recruiter is exposed because
+asks "how did you find my PR on X?" - and the recruiter is exposed because
 that PR doesnt exist.
 
 You may ONLY reference facts that fit one of these categories:
 
-  ALLOWED — facts visible in the parsed JD context:
+  ALLOWED - facts visible in the parsed JD context:
     - Tier 1 / Tier 2 company names from the JD parser output
     - Watering hole venues from the watering_holes list provided
     - Role title, level, location, industry from the parsed JD
     - Skills explicitly mentioned in the JD
 
-  ALLOWED — universally true industry knowledge:
+  ALLOWED - universally true industry knowledge:
     - "Most LR-based searches Tuesday-Thursday outperform Monday or Friday"
     - "OpenBMC mailing list traffic peaks mid-week"
     - "FAANG L5 engineers respond more to comp + scope than equity hooks"
 
-  FORBIDDEN — DO NOT INVENT any of the following, ever:
+  FORBIDDEN - DO NOT INVENT any of the following, ever:
     - Specific candidate names ("Sarah Chen", "Jian Wei")
     - Specific candidate work products ("their fan control PR",
       "their JTAG debugging talk", "their patent on power sequencing")
@@ -1689,21 +1690,21 @@ RAW JD (for grounding quotes):
 {jd_excerpt}
 
 ──────────────────────────────────────────────────────────
-TIER DEFINITIONS — these are the ONLY valid tier values
+TIER DEFINITIONS - these are the ONLY valid tier values
 ──────────────────────────────────────────────────────────
 
-  tier 1 — NON-NEGOTIABLE
+  tier 1 - NON-NEGOTIABLE
     Without this skill the candidate gets auto-rejected at the resume screen.
     Hiring manager will not even take a phone screen. There is no candidate
     success path that bypasses this skill.
     HARD CAP: maximum 3 skills can be Tier 1.
 
-  tier 2 — STRONG PREFERENCE
+  tier 2 - STRONG PREFERENCE
     Listed as required in the JD, but a strong candidate missing this can
     still get an interview if they have a credible substitute or strong
     other-dimension signal. The recruiter will need to advocate for them.
 
-  tier 3 — NICE-TO-HAVE (ACTUALLY)
+  tier 3 - NICE-TO-HAVE (ACTUALLY)
     The JD says "required" but realistically the hiring manager will trade
     this off for almost any candidate who covers the Tier 1 and Tier 2
     requirements well. Most "team player / strong communication" lines are
@@ -1714,13 +1715,13 @@ true Tier 1 blockers and the rest are negotiable. A senior recruiter knows
 which is which. Your job is to surface that distinction explicitly.
 
 ──────────────────────────────────────────────────────────
-INTERVIEW STAGE — the ONLY valid values
+INTERVIEW STAGE - the ONLY valid values
 ──────────────────────────────────────────────────────────
 
-  resume_screen        — assessed from resume keywords + recent companies
-  phone_screen         — comes up in a 30-min recruiter or HM screen
-  onsite_technical     — tested in a coding/system-design/take-home
-  not_directly_tested  — inferred from background; never directly assessed
+  resume_screen        - assessed from resume keywords + recent companies
+  phone_screen         - comes up in a 30-min recruiter or HM screen
+  onsite_technical     - tested in a coding/system-design/take-home
+  not_directly_tested  - inferred from background; never directly assessed
 
 Map each skill to the stage where it actually gets tested. Don't guess.
 "Strong communication skills" is not_directly_tested at resume_screen but
@@ -1728,7 +1729,7 @@ shows up as a yes/no signal at phone_screen. "Distributed systems" is
 phone_screen for level confirmation and onsite_technical for the deep dive.
 
 ──────────────────────────────────────────────────────────
-TRUTHFULNESS RULES — MANDATORY
+TRUTHFULNESS RULES - MANDATORY
 ──────────────────────────────────────────────────────────
 
 For every entry, you MUST populate the grounded_in array with literal phrases
@@ -1745,21 +1746,21 @@ NEVER fabricate:
 
 If a skill genuinely cannot be classified from the JD alone (because the JD
 is sparse), set safe_to_paste_verbatim to false and write a rationale that
-says so explicitly: "JD is sparse on this — recommend asking the hiring
+says so explicitly: "JD is sparse on this - recommend asking the hiring
 manager directly whether X is hard-required or negotiable."
 
 The recruiter will paste your output into Slack to brief their hiring
 manager. If you fabricate, you damage the recruiter's credibility.
 
 ──────────────────────────────────────────────────────────
-PUSHBACK GUIDANCE — what to write
+PUSHBACK GUIDANCE - what to write
 ──────────────────────────────────────────────────────────
 
 For each skill, write 1-2 sentences the recruiter would say to the hiring
 manager when defending a candidate who is missing this skill. Be specific
 to the tier:
 
-  tier 1: "This is non-negotiable — we'd be wasting the panel's time
+  tier 1: "This is non-negotiable - we'd be wasting the panel's time
           interviewing without it" (or similar firm language)
 
   tier 2: "If we're seeing a candidate strong on Tier 1 skills who has
@@ -1783,12 +1784,12 @@ auto-disqualify a candidate. Examples:
   JD says "PyTorch" → acceptable substitutions: ["JAX", "TensorFlow 2.x"]
   JD says "Kubernetes" → acceptable substitutions: ["Nomad", "ECS at scale"]
 
-If the skill is truly unique (no real substitutes — e.g., "FDA 510(k) clearance
+If the skill is truly unique (no real substitutes - e.g., "FDA 510(k) clearance
 process"), return an empty array and note in pushback_guidance that there
 genuinely is no substitute.
 
 ──────────────────────────────────────────────────────────
-CAREER SWITCHER ARCHETYPES — non-obvious source pools
+CAREER SWITCHER ARCHETYPES - non-obvious source pools
 ──────────────────────────────────────────────────────────
 
 After classifying the must-have skills, identify 3-5 ROLE-TO-ROLE TRANSITIONS
@@ -1809,12 +1810,12 @@ recruiter knows that:
 
 For each archetype, write:
 
-  from_role: the role title these candidates currently hold (be specific —
+  from_role: the role title these candidates currently hold (be specific -
              "Hardware Engineer (FPGA/RTL)" not just "Engineer")
   to_role:   the target role title (use the JD's exact role_title)
   transferable_skills: 3-5 skills the from_role candidates already have
                        that map onto the canonical_skills of the target role.
-                       These must be REAL transfers — not vague claims like
+                       These must be REAL transfers - not vague claims like
                        "problem solving" but specific ones like "C++ in
                        embedded contexts" or "PyTorch model training"
   where_to_find: 2-4 specific platforms / communities / company types where
@@ -1824,11 +1825,11 @@ For each archetype, write:
                the role appealing to this candidate type. Specific to their
                career trajectory. Not generic ("we're hiring great talent")
                but specific ("you've spent 4 years optimizing power management
-               in silicon — this role lets you ship that work into actual
+               in silicon - this role lets you ship that work into actual
                flying drones").
   transition_difficulty: "easy" | "moderate" | "hard"
 
-HONESTY RULES — MANDATORY:
+HONESTY RULES - MANDATORY:
 
   - Do NOT fabricate success rate percentages. The CandidatIQ implementation
     of this had hardcoded "70% success rate" claims with no evidence. Do
@@ -1843,7 +1844,7 @@ HONESTY RULES — MANDATORY:
     direct-match candidates will work, which itself is useful information).
 
 ──────────────────────────────────────────────────────────
-OUTPUT SCHEMA — RETURN ONLY THIS JSON
+OUTPUT SCHEMA - RETURN ONLY THIS JSON
 ──────────────────────────────────────────────────────────
 
 {{
@@ -1903,7 +1904,7 @@ Your job is to extend that with everything a senior sourcer would do but a junio
 PARSED CONTEXT:
 {parsed_context}
 
-EXISTING FREE-TIER OUTPUT (that you are extending — do NOT regenerate, only ANNOTATE):
+EXISTING FREE-TIER OUTPUT (that you are extending - do NOT regenerate, only ANNOTATE):
 {existing_booleans}
 
 WATERING HOLES from the JD parser pass (your raw material for Pro X-rays):
@@ -2003,7 +2004,7 @@ Beyond direct-match LinkedIn searches and watering-hole X-rays, identify
 4-6 NON-OBVIOUS pools where qualified candidates concentrate. These are
 sources a junior sourcer would not think to check.
 
-Examples (do NOT reuse verbatim — generate role-specific pools):
+Examples (do NOT reuse verbatim - generate role-specific pools):
 
   - Open-source contributors to projects in the role's tech stack
   - Recently acquired startups whose engineers are about to vest
@@ -2021,7 +2022,7 @@ For each pool, write:
              "Active OpenBMC Maintainers", "Bootcamp Grads with ML
              Production Experience")
   why_target: 1-2 sentences on WHY this pool is a defensible source for
-              THIS specific role. Be specific — not "they have skills"
+              THIS specific role. Be specific - not "they have skills"
               but "they shipped autonomous driving stacks to production
               and are job-hunting after the December layoffs"
   platforms: 2-4 specific platforms / communities / lists where this pool
@@ -2031,7 +2032,7 @@ For each pool, write:
                If a runnable boolean / X-ray fits, include it (with
                the same Google syntax rules as the other X-rays).
 
-HONESTY RULES — MANDATORY:
+HONESTY RULES - MANDATORY:
 
   - Do NOT fabricate response rate percentages. The CandidatIQ
     implementation of this had hardcoded "25-35% response rate" claims
@@ -2044,7 +2045,7 @@ HONESTY RULES — MANDATORY:
     exist, return 4. Better fewer-and-specific than more-and-vague.
   - Pools must NOT overlap with the existing pro_xrays. If you'd
     suggest "openbmc.dev maintainers" and there's already a pro_xray
-    for openbmc.dev, that's redundant — choose a different pool.
+    for openbmc.dev, that's redundant - choose a different pool.
 
 ──────────────────────────────────────────────────────────
 EXTENDED MENTOR NOTES (5-8 tactical tips)
@@ -2093,7 +2094,7 @@ RETURN ONLY THIS JSON
       "venue_name": "openbmc.dev mailing list",
       "venue_type": "mailing_list",
       "xray_string": "site:lists.ozlabs.org \"openbmc\" \"patch\" \"review\"",
-      "signal": "Active OpenBMC maintainers — patch submissions = real production-grade contribution",
+      "signal": "Active OpenBMC maintainers - patch submissions = real production-grade contribution",
       "hit_volume": "low",
       "signal_to_noise": "high"
     }}
@@ -2103,12 +2104,12 @@ RETURN ONLY THIS JSON
       "pool_name": "Active OpenBMC Maintainers",
       "why_target": "1-2 sentences on why this pool is a defensible source for THIS role",
       "platforms": ["openbmc-discuss mailing list", "OCP Summit BMC track speakers"],
-      "search_tips": "1-2 sentences on how to find people in this pool — runnable X-ray if applicable"
+      "search_tips": "1-2 sentences on how to find people in this pool - runnable X-ray if applicable"
     }}
   ],
   "extended_mentor_notes": [
-    {{"label": "Sequencing", "note": "Run the GitHub OpenBMC X-ray first — merged PRs are higher signal than LR for this archetype"}},
-    {{"label": "Anti-pattern", "note": "Don't blast InMails on Mondays — Staff-level engineers triage their inbox Sunday night"}}
+    {{"label": "Sequencing", "note": "Run the GitHub OpenBMC X-ray first - merged PRs are higher signal than LR for this archetype"}},
+    {{"label": "Anti-pattern", "note": "Don't blast InMails on Mondays - Staff-level engineers triage their inbox Sunday night"}}
   ]
 }}
 
@@ -2288,7 +2289,7 @@ class CompetitiveIntelRequest(BaseModel):
 
     The endpoint pulls competitors from the req's stored Boolean Builder output
     (tier_1_direct_competitors + tier_2_adjacent) by default. The competitors
-    field is an OPTIONAL override — if provided, it replaces the tier list and
+    field is an OPTIONAL override - if provided, it replaces the tier list and
     is capped at 8 companies to control AI cost.
     """
     req_id: str = Field(..., min_length=1)
@@ -2301,7 +2302,7 @@ class CompetitiveIntelRequest(BaseModel):
 #
 # Every successful intake stores a denormalized signature row capturing
 # the signal-rich features of the parsed JD. This is the data foundation
-# for Phase B3 (role archetype clustering) — we accumulate signatures
+# for Phase B3 (role archetype clustering) - we accumulate signatures
 # now, cluster later when N is meaningful (>= 30).
 #
 # Goal: tell the story of how the talent market is changing.
@@ -2324,7 +2325,7 @@ def _parse_comp_range(comp_str: str) -> tuple:
 
     Handles both salary formats ('$150k - $220k', '$220k - $280k') and
     hourly formats ('$50 - $100/hr'). Returns (None, None, False) on any
-    parse failure — the goal is best-effort enrichment, never to crash
+    parse failure - the goal is best-effort enrichment, never to crash
     the intake pipeline over a malformed comp string.
 
     Returns:
@@ -2424,13 +2425,13 @@ def _derive_canonical_from_must_have(must_have: list) -> list:
         word_count = len(skill_str.split())
 
         if word_count <= 4:
-            # Short — use as-is
+            # Short - use as-is
             key = skill_str.lower()
             if key not in seen:
                 seen.add(key)
                 out.append({"name": skill_str, "severity": severity})
         else:
-            # Verbose — extract keyword tokens.
+            # Verbose - extract keyword tokens.
             # Strategy: split on common delimiters, then keep tokens that are
             # either ALL-CAPS acronyms (RTL, EDA, LLM) or capitalized words
             # not in the stopword list (Python, Chip, NumPy).
@@ -2473,7 +2474,7 @@ def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
 
     Defensive: every field uses .get() chains because the JD parser can
     occasionally produce shapes that don't match the spec. Missing fields
-    become NULL in the database — better than crashing the intake.
+    become NULL in the database - better than crashing the intake.
 
     Returns a dict ready to be passed as positional args to the INSERT.
 
@@ -2491,12 +2492,12 @@ def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
     alt_titles = parsed.get("alt_titles", {}) or {}
     market360 = parsed.get("market360", {}) or {}
 
-    # Skills — split blockers vs preferred
+    # Skills - split blockers vs preferred
     must_have = parsed.get("must_have_skills", []) or []
     blockers = [m.get("skill") for m in must_have if m.get("severity") == "blocker" and m.get("skill")]
     preferred = [m.get("skill") for m in must_have if m.get("severity") == "preferred" and m.get("skill")]
 
-    # Canonical skills — primary path: use parser output if present
+    # Canonical skills - primary path: use parser output if present
     canonical = parsed.get("canonical_skills", []) or []
     canonical_clean = [
         {"name": c.get("name"), "severity": c.get("severity")}
@@ -2512,11 +2513,11 @@ def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
         if canonical_clean:
             print(f"[signature fallback] req={req_id[:8]} derived {len(canonical_clean)} canonical skills from must_have_skills")
 
-    # Functional aliases — what peer companies call this same person
+    # Functional aliases - what peer companies call this same person
     func_aliases = alt_titles.get("functional_aliases", []) or []
     aliases_clean = [a.get("title") for a in func_aliases if a.get("title")]
 
-    # Adjacent crossover — DIFFERENT roles where the same person fits.
+    # Adjacent crossover - DIFFERENT roles where the same person fits.
     # This is where Talent Engineer / Forward-Deployed Engineer / Prompt
     # Engineer-style emerging archetypes will surface in clustering.
     crossovers = alt_titles.get("adjacent_crossover", []) or []
@@ -2526,7 +2527,7 @@ def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
         if c.get("title")
     ]
 
-    # Watering hole VENUE_TYPES — not the venues themselves (too granular
+    # Watering hole VENUE_TYPES - not the venues themselves (too granular
     # for clustering), but the type categories (mailing_list, conference,
     # community, code_host, training_alumni, competition, discord_slack,
     # publication). The TYPE distribution per role tells us which kinds
@@ -2536,7 +2537,7 @@ def _extract_signature(req_id: str, user_id: str, parsed: dict) -> dict:
         h.get("venue_type") for h in watering_holes if h.get("venue_type")
     ))
 
-    # Poaching target companies — this is the sourcing universe for the
+    # Poaching target companies - this is the sourcing universe for the
     # role. Patterns here will reveal which companies cluster together
     # for which role archetypes.
     poach = market360.get("poaching_targets", []) or []
@@ -2744,7 +2745,7 @@ def _extract_atomic_skills(raw_entries: list) -> list:
             "must be willing", "must be able", "u.s. citizen", "us citizen",
             "ability to work", "willing to travel", "must have", "preferred",
             "nice to have", "bonus points",
-            # Negations and qualifiers — common JD parenthetical noise
+            # Negations and qualifiers - common JD parenthetical noise
             "not just",
             "or equivalent",
             "and beyond",
@@ -2754,7 +2755,7 @@ def _extract_atomic_skills(raw_entries: list) -> list:
         # Skip clauses starting with stop-words that betray sentence-shape
         if cl.startswith(("not ", "or ", "and ", "the ", "a ", "an ")):
             return
-        # Skip if still a sentence (more than 4 words) — leftover JD prose
+        # Skip if still a sentence (more than 4 words) - leftover JD prose
         if len(c.split()) > 4:
             return
         if cl in seen_lower:
@@ -2796,7 +2797,7 @@ def _extract_atomic_skills(raw_entries: list) -> list:
             for p in parts:
                 _add(p)
 
-        # Step 6: add the cleaned sentence remainder (only if VERY short — 3 words max).
+        # Step 6: add the cleaned sentence remainder (only if VERY short - 3 words max).
         # Anything longer is sentence-shaped JD prose that won't match profiles.
         # Atomic skill names are 1-3 words ("Python", "C/C++", "embedded systems").
         if cleaned and len(cleaned.split()) <= 3:
@@ -2830,7 +2831,7 @@ def _generate_competitive_boolean_strategies(
     Args:
         company_name: target competitor (e.g., "Anduril", "AUSGAR Technologies")
         role_title: requisition title verbatim (e.g., "Senior Embedded Linux Engineer")
-        jd_skills: list of atomic skill strings — should come from parsed.canonical_skills
+        jd_skills: list of atomic skill strings - should come from parsed.canonical_skills
                   (clean atomic names like 'PyTorch', 'C++') for best results. The
                   helper still accepts must_have_skills sentences and runs them
                   through _extract_atomic_skills as a defensive fallback for older
@@ -2958,14 +2959,14 @@ def _generate_competitive_boolean_strategies(
     # is the more permissive form for the "title OR skills" macro clause.
     if is_verbose_title:
         title_match = f'"{role_title_clean}"'                    # body quoted phrase
-        intitle_or_quoted = f'"{role_title_clean}"'              # same — drop intitle:
+        intitle_or_quoted = f'"{role_title_clean}"'              # same - drop intitle:
     else:
         title_match = f'intitle:"{role_title_clean}"'            # short title -> intitle: still wins
         intitle_or_quoted = f'intitle:"{role_title_clean}"'
 
     # Build the 5 strategies. Note: per BOOLEAN_BUILDER_PROMPT rules, we use
     # Google syntax (site:, intitle:, OR uppercase, double quotes around phrases,
-    # NO literal AND between terms — a space is implicit AND on Google).
+    # NO literal AND between terms - a space is implicit AND on Google).
     macro = (
         f'{li} ("{company_name}" OR "ex-{company_name}" OR "former {company_name}") '
         f'({intitle_or_quoted} OR {macro_skills_or}) {seniority_filter}'
@@ -3075,15 +3076,15 @@ def _build_intake_completion_email(
     role = core.get("role_title") or "your search"
     company = core.get("company") or "this role"
 
-    # Subject — specific, useful as an inbox handle later
+    # Subject - specific, useful as an inbox handle later
     subject = f"Sourcing kit ready: {role} at {company}"
 
     # Pull the three highest-leverage strings:
-    #   1. LR sniper (tightest match — what they'll run first)
+    #   1. LR sniper (tightest match - what they'll run first)
     #   2. GitHub X-ray (highest signal for technical archetypes)
     #   3. Best watering-hole (the unique-to-this-role insight)
     #
-    # If anything is missing, the section just doesn't render — better to
+    # If anything is missing, the section just doesn't render - better to
     # ship a slightly thinner email than to put placeholder text in front
     # of the user.
     lr_strings = booleans.get("linkedin_recruiter") or []
@@ -3095,17 +3096,17 @@ def _build_intake_completion_email(
     holes = parsed.get("watering_holes") or []
     top_hole = holes[0] if holes else None
 
-    # Pull the mentor note's first tip — that's the 'do this first' nudge
+    # Pull the mentor note's first tip - that's the 'do this first' nudge
     mentor = booleans.get("mentor_notes") or {}
     next_move = (
         mentor.get("best_xray_to_start")
         or mentor.get("pro_tip")
-        or "Run the GitHub X-ray first — public commits are the highest signal for technical roles."
+        or "Run the GitHub X-ray first - public commits are the highest signal for technical roles."
     )
 
     req_url = f"https://sourcingnav.com/app/pipeline.html?req={req_id}"
 
-    # HTML — minimal styling, mobile-readable, no images (better deliverability)
+    # HTML - minimal styling, mobile-readable, no images (better deliverability)
     parts = []
     parts.append(f"""
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1a1a1a;">
@@ -3116,7 +3117,7 @@ def _build_intake_completion_email(
     if sniper and sniper.get("string"):
         parts.append(f"""
       <div style="margin:0 0 18px 0;padding:14px;background:#f6f8fa;border-left:3px solid #2d7eb8;border-radius:4px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#2d7eb8;margin-bottom:6px;">LinkedIn Recruiter — Sniper (start here)</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#2d7eb8;margin-bottom:6px;">LinkedIn Recruiter - Sniper (start here)</div>
         <div style="font-family:Menlo,Consolas,monospace;font-size:12px;color:#1a1a1a;word-break:break-word;line-height:1.5;">{sniper["string"]}</div>
       </div>
         """)
@@ -3124,7 +3125,7 @@ def _build_intake_completion_email(
     if github_xray and github_xray.get("string"):
         parts.append(f"""
       <div style="margin:0 0 18px 0;padding:14px;background:#f6f8fa;border-left:3px solid #4a9d4a;border-radius:4px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#4a9d4a;margin-bottom:6px;">GitHub X-ray — public code, highest signal</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#4a9d4a;margin-bottom:6px;">GitHub X-ray - public code, highest signal</div>
         <div style="font-family:Menlo,Consolas,monospace;font-size:12px;color:#1a1a1a;word-break:break-word;line-height:1.5;">{github_xray["string"]}</div>
       </div>
         """)
@@ -3133,7 +3134,7 @@ def _build_intake_completion_email(
         venue = top_hole.get("venue", "specialty venue")
         parts.append(f"""
       <div style="margin:0 0 18px 0;padding:14px;background:#f6f8fa;border-left:3px solid #b85e2d;border-radius:4px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#b85e2d;margin-bottom:6px;">Watering hole — {venue}</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#b85e2d;margin-bottom:6px;">Watering hole - {venue}</div>
         <div style="font-family:Menlo,Consolas,monospace;font-size:12px;color:#1a1a1a;word-break:break-word;line-height:1.5;">{top_hole["how_to_use"]}</div>
       </div>
         """)
@@ -3216,7 +3217,7 @@ async def send_magic_link(
     # at resend._domainkey.sourcingnav.com (root). Resend's Improved
     # Deliverability also installs SPF + bounce handling on the send.
     # subdomain, but the FROM address must be on the registered root,
-    # not the send subdomain — that's internal Resend infrastructure.
+    # not the send subdomain - that's internal Resend infrastructure.
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.post(
@@ -3448,7 +3449,7 @@ async def save_byok_key(req: ByokRequest, user: dict = Depends(get_current_user)
 #
 # Why a separate endpoint and not /api/intake/{id}: intake is the create
 # action; this is a read for export. Keeping them separate makes the auth
-# story simpler — export is a pure read with owner verification, while
+# story simpler - export is a pure read with owner verification, while
 # intake has cap-checking, AI calls, and storage logic.
 @app.get("/api/req/{req_id}/export")
 async def export_req(req_id: str, user: dict = Depends(get_current_user)):
@@ -3504,6 +3505,319 @@ async def export_req(req_id: str, user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(500, f"[export] {type(e).__name__}: {str(e)[:200]}")
 
+# ============================================================================
+# LIVE INTELLIGENCE STREAM (Stage 1 of proactive engine, 2026-04-30)
+# ============================================================================
+#
+# Real-time cross-req intelligence delivered via Server-Sent Events. The user
+# opens any req in the app, an EventSource connects to /api/intelligence/stream,
+# and intelligence events arrive live as the server computes them - no page
+# refresh, no polling, no static dashboard feel.
+#
+# Why SSE not WebSockets: Vercel's serverless function model doesn't support
+# long-lived bidirectional connections cleanly. SSE is one-way (server -> client)
+# which is exactly what an intelligence stream needs, and it works on Vercel's
+# native runtime without special infrastructure.
+#
+# Why this is the proactive engine, not just a dashboard:
+#   - Events fire from real cross-req aggregation, not setTimeout fakes
+#   - User sees intelligence arrive AS the server computes it (motion = value)
+#   - Each event is a prediction or signal, not a static metric
+#   - This is the substrate for Stage 2 (outcome feedback loop) and
+#     Stage 3 (cross-company calibration moat)
+#
+# Event types emitted today:
+#   - skill_concentration: a skill appears in 2+ of user's open reqs
+#   - competitor_overlap: a competitor appears in 2+ of user's CI reports
+#   - difficulty_spike: avg difficulty across open reqs is elevated
+#   - velocity_baseline: predicted fill time based on user's closed reqs
+# ============================================================================
+
+
+async def _intel_get_user_reqs(client, user_id: str) -> list:
+    """Fetch all of a user's reqs with the JSON columns we need for cross-req
+    aggregation. Returns list of dicts with parsed fields ready to compute on.
+
+    Limited to last 50 reqs to bound query cost. Order by opened_at DESC so
+    the freshest reqs influence intelligence most.
+    """
+    rs = await client.execute(
+        """SELECT id, title, parsed_json, competitive_intel_json,
+                  status, opened_at, closed_at
+           FROM requisitions
+           WHERE user_id = ?
+           ORDER BY opened_at DESC
+           LIMIT 50""",
+        [user_id],
+    )
+    out = []
+    for r in rs.rows:
+        try:
+            parsed = json.loads(r[2]) if r[2] else {}
+        except Exception:
+            parsed = {}
+        try:
+            ci = json.loads(r[3]) if r[3] else {}
+        except Exception:
+            ci = {}
+        out.append({
+            "id": r[0],
+            "title": r[1],
+            "parsed": parsed,
+            "ci": ci,
+            "status": r[4],
+            "opened_at": r[5],
+            "closed_at": r[6],
+        })
+    return out
+
+
+def _intel_skill_concentration(reqs: list) -> list:
+    """Find skills appearing in 2+ of the user's open reqs. These are
+    candidates for pooled sourcing - one boolean run can serve multiple reqs.
+    Returns events sorted by concentration DESC.
+    """
+    open_reqs = [r for r in reqs if r["status"] == "open"]
+    if len(open_reqs) < 2:
+        return []
+    skill_to_reqs = {}
+    for r in open_reqs:
+        # canonical_skills is the clean atomic list per the JD parser
+        skills = (r["parsed"].get("canonical_skills") or [])
+        if not skills:
+            # fallback: pull from must_have_skills if canonical_skills missing
+            mh = r["parsed"].get("must_have_skills") or []
+            skills = [s.get("skill") for s in mh if isinstance(s, dict) and s.get("skill")]
+        for skill in skills:
+            if not skill or not isinstance(skill, str):
+                continue
+            skill_to_reqs.setdefault(skill, []).append(r["title"])
+    events = []
+    for skill, titles in skill_to_reqs.items():
+        if len(titles) >= 2:
+            events.append({
+                "type": "skill_concentration",
+                "skill": skill,
+                "req_count": len(titles),
+                "req_titles": titles[:5],
+                "headline": f"{skill} appears in {len(titles)} of your open reqs",
+                "insight": f"Pool these into one sourcing run. Same boolean serves all {len(titles)}.",
+            })
+    events.sort(key=lambda e: e["req_count"], reverse=True)
+    return events[:5]
+
+
+def _intel_competitor_overlap(reqs: list) -> list:
+    """Find competitors appearing across 2+ of the user's CI reports.
+    These are systemic competitors, not one-off appearances. They're the
+    companies the user is consistently fighting for talent against.
+    """
+    competitor_to_reqs = {}
+    for r in reqs:
+        ci = r.get("ci") or {}
+        companies = ci.get("companies") if isinstance(ci, dict) else None
+        if not isinstance(companies, list):
+            continue
+        for c in companies:
+            if not isinstance(c, dict):
+                continue
+            name = c.get("company")
+            if not name or not isinstance(name, str):
+                continue
+            competitor_to_reqs.setdefault(name, []).append(r["title"])
+    events = []
+    for comp, titles in competitor_to_reqs.items():
+        if len(titles) >= 2:
+            events.append({
+                "type": "competitor_overlap",
+                "competitor": comp,
+                "req_count": len(titles),
+                "req_titles": titles[:5],
+                "headline": f"{comp} is competing for talent in {len(titles)} of your reqs",
+                "insight": "Build a per-competitor counter-poach narrative once. Reuse across all matching reqs.",
+            })
+    events.sort(key=lambda e: e["req_count"], reverse=True)
+    return events[:5]
+
+
+def _intel_velocity_baseline(reqs: list):
+    """If user has closed reqs, compute average days-to-close. This becomes
+    the predicted fill baseline for new reqs. Returns event dict or None.
+    """
+    closed = [r for r in reqs if r["status"] != "open" and r.get("closed_at")]
+    if not closed:
+        return None
+    deltas = []
+    for r in closed:
+        try:
+            opened = datetime.fromisoformat(str(r["opened_at"]).replace("Z", "+00:00").replace(" ", "T"))
+            closed_dt = datetime.fromisoformat(str(r["closed_at"]).replace("Z", "+00:00").replace(" ", "T"))
+            days = (closed_dt - opened).days
+            if 0 <= days <= 365:
+                deltas.append(days)
+        except Exception:
+            continue
+    if not deltas:
+        return None
+    avg = sum(deltas) / len(deltas)
+    return {
+        "type": "velocity_baseline",
+        "avg_days": round(avg, 1),
+        "sample_size": len(deltas),
+        "headline": f"Your historical fill velocity: ~{round(avg)} days",
+        "insight": f"Based on {len(deltas)} closed reqs. New reqs benchmark against this baseline.",
+    }
+
+
+def _intel_difficulty_distribution(reqs: list):
+    """Compute the difficulty distribution across open reqs. If the user's
+    pipeline is heavy with 8+ difficulty reqs, that's a workload signal.
+    """
+    open_reqs = [r for r in reqs if r["status"] == "open"]
+    if len(open_reqs) < 3:
+        return None
+    scores = []
+    for r in open_reqs:
+        md = r["parsed"].get("market_dynamics") or {}
+        s = md.get("difficulty_score")
+        if isinstance(s, (int, float)) and 1 <= s <= 10:
+            scores.append(s)
+    if len(scores) < 3:
+        return None
+    avg = sum(scores) / len(scores)
+    hard_count = sum(1 for s in scores if s >= 8)
+    if hard_count >= 2:
+        return {
+            "type": "difficulty_spike",
+            "avg_difficulty": round(avg, 1),
+            "hard_count": hard_count,
+            "total": len(scores),
+            "headline": f"{hard_count} of your {len(scores)} open reqs are 8+ difficulty",
+            "insight": "Heavy pipeline. Consider sequencing hard reqs across weeks vs parallel.",
+        }
+    return None
+
+
+def _format_sse_event(event_type: str, payload: dict) -> str:
+    """Format a Server-Sent Events frame. SSE protocol: event:<name>\\n
+    data:<json>\\n\\n. The double newline at the end signals end of event.
+    """
+    return f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
+
+
+@app.get("/api/intelligence/stream")
+async def intelligence_stream(
+    token: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
+):
+    """Live Intelligence Stream - Server-Sent Events of cross-req signals.
+
+    Auth: accepts EITHER an Authorization: Bearer header OR a ?token= query
+    param. The query param fallback is required because EventSource (the
+    browser API used by the frontend) does not support custom headers, so
+    the only way to authenticate is via the URL.
+
+    Client opens an EventSource on /api/intelligence/stream?token=X. Server
+    fetches user's reqs once, runs all aggregation passes, streams each event
+    as it's computed, then sends a 'done' event and closes the stream.
+
+    Event types: ready, intelligence (with sub-types), done, error.
+
+    Why we don't hold the connection open indefinitely: Vercel function
+    timeout is 60s and serverless billing is per-invocation. We compute,
+    stream, close. Frontend reconnects every N minutes for fresh intelligence
+    (Stage 2 will add change-driven re-streaming).
+    """
+    # Resolve auth: header takes precedence, query param is the EventSource fallback
+    bearer = None
+    if authorization and authorization.startswith("Bearer "):
+        bearer = authorization.replace("Bearer ", "")
+    elif token:
+        bearer = token
+
+    if not bearer:
+        raise HTTPException(401, "Missing auth token (header or ?token=)")
+
+    # Validate token signature + load user (mirrors get_current_user logic
+    # but inline so we can support the dual auth modes)
+    email = verify_token(bearer)
+    if not email:
+        raise HTTPException(401, "Invalid or expired token")
+
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT id, email, mode, plan FROM users WHERE email = ?", [email]
+        )
+        if not rs.rows:
+            raise HTTPException(404, "User not found")
+        ur = rs.rows[0]
+        user = {"id": ur[0], "email": ur[1], "mode": ur[2], "plan": ur[3]}
+
+    async def event_generator():
+        try:
+            # Send a ready event immediately so the frontend knows the stream
+            # is live (otherwise it sits silent for 1-2s while we query the DB)
+            yield _format_sse_event("ready", {"message": "Intelligence stream live"})
+
+            async with db() as client:
+                reqs = await _intel_get_user_reqs(client, user["id"])
+
+            if not reqs:
+                yield _format_sse_event("done", {
+                    "message": "No reqs in your pipeline yet. Run an intake to start building intelligence.",
+                    "event_count": 0,
+                })
+                return
+
+            event_count = 0
+
+            # Pass 1: skill concentration. Small yield delay between events
+            # so the frontend can render each one with a nice arrival animation.
+            for event in _intel_skill_concentration(reqs):
+                yield _format_sse_event("intelligence", event)
+                event_count += 1
+                await asyncio.sleep(0.15)
+
+            # Pass 2: competitor overlap
+            for event in _intel_competitor_overlap(reqs):
+                yield _format_sse_event("intelligence", event)
+                event_count += 1
+                await asyncio.sleep(0.15)
+
+            # Pass 3: velocity baseline (single event if we have data)
+            vb = _intel_velocity_baseline(reqs)
+            if vb:
+                yield _format_sse_event("intelligence", vb)
+                event_count += 1
+                await asyncio.sleep(0.15)
+
+            # Pass 4: difficulty spike (single event if pipeline is heavy)
+            ds = _intel_difficulty_distribution(reqs)
+            if ds:
+                yield _format_sse_event("intelligence", ds)
+                event_count += 1
+                await asyncio.sleep(0.15)
+
+            yield _format_sse_event("done", {
+                "message": f"Computed {event_count} intelligence signals across {len(reqs)} reqs.",
+                "event_count": event_count,
+                "req_count": len(reqs),
+            })
+        except Exception as e:
+            yield _format_sse_event("error", {
+                "message": f"Intelligence stream error: {type(e).__name__}: {str(e)[:200]}"
+            })
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
 
 @app.post("/api/intake")
 async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
@@ -3527,7 +3841,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        # ReadTimeout, ConnectError, etc. — the AI provider didn't respond in time.
+        # ReadTimeout, ConnectError, etc. - the AI provider didn't respond in time.
         # Surface a user-friendly message instead of the raw exception class name.
         etype = type(e).__name__
         prompt_len = len(JD_PARSER_PROMPT.format(jd=req.jd_text))
@@ -3569,7 +3883,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
 
     # Steps 3.5 / 3.6 / 3.7: enrichment LLM calls run in PARALLEL.
     #
-    # All three calls are independent — they read from `parsed` (already
+    # All three calls are independent - they read from `parsed` (already
     # populated by step 1) and don't depend on each other's output. Running
     # them serially was costing ~25-40s of wall time on top of the parser
     # and boolean calls; together that pushed total intake time past
@@ -3579,7 +3893,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     #   - call_ai() creates a fresh httpx.AsyncClient per call (no shared
     #     state, no connection pool contention).
     #   - Each call independently reads the user's BYOK key from the DB
-    #     (3x redundant reads, ~600ms total — acceptable, fix later by
+    #     (3x redundant reads, ~600ms total - acceptable, fix later by
     #     caching once at intake start).
     #   - asyncio.gather(..., return_exceptions=True) returns exception
     #     objects in place of failed task results, so one failure cannot
@@ -3593,7 +3907,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     # to serial.
 
     async def _run_skill_alternatives():
-        """Step 3.5 body — returns dict of {skill: [alternatives]}."""
+        """Step 3.5 body - returns dict of {skill: [alternatives]}."""
         try:
             must_have = parsed.get("must_have_skills") or []
             skills_for_alts = [s.get("skill", "") for s in must_have if s.get("skill")][:8]
@@ -3619,7 +3933,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             return {}
 
     async def _run_objection_playbook():
-        """Step 3.6 body — returns list of objection entries."""
+        """Step 3.6 body - returns list of objection entries."""
         try:
             ctx = json.dumps({
                 "role_title": parsed.get("core", {}).get("role_title"),
@@ -3642,7 +3956,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             return []
 
     async def _run_sequenced_play():
-        """Step 3.7 body — returns list of phase entries.
+        """Step 3.7 body - returns list of phase entries.
 
         Reads tier 1 companies and watering_holes from `parsed` so the
         phases reference specific venues, not generic advice."""
@@ -3652,7 +3966,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             tier1 = [p.get("company") for p in poaching if p.get("tier") == 1 and p.get("company")]
             if not tier1:
                 tier1 = (market360.get("top_hiring_companies") or [])[:5]
-            tier1_str = ", ".join(tier1[:8]) if tier1 else "(not specified — use general Tier 1 targets for this industry)"
+            tier1_str = ", ".join(tier1[:8]) if tier1 else "(not specified - use general Tier 1 targets for this industry)"
 
             holes = parsed.get("watering_holes") or []
             holes_str = "\n".join(
@@ -3688,11 +4002,11 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
 
 
     async def _run_pro_skill_briefing():
-        """Step 3.8 body — Pro tier ONLY. Returns list of per-skill briefings.
+        """Step 3.8 body - Pro tier ONLY. Returns list of per-skill briefings.
 
         Gated on user["plan"] == "pro". Free users get an empty list (the
         UI shows a locked placeholder card with the structure but not the
-        content — see renderProSkillBriefingCard).
+        content - see renderProSkillBriefingCard).
 
         We pass:
           - parsed_context: the same context dict the other enrichment calls use
@@ -3729,7 +4043,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             )
             # Returns a dict containing both pro_skill_briefing (per-skill rows)
             # AND career_switcher_archetypes (3-5 role-to-role transition pools).
-            # The single AI call produces both fields by design — combining them
+            # The single AI call produces both fields by design - combining them
             # gives the model the full context (skill tier + archetype) instead
             # of forcing two parallel AI calls that don't see each other's reasoning.
             parsed_response = parse_json_strict(text)
@@ -3743,7 +4057,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
 
 
     async def _run_pro_boolean_extensions():
-        """Step 3.9 body — Pro tier ONLY. Returns dict of pro boolean extensions.
+        """Step 3.9 body - Pro tier ONLY. Returns dict of pro boolean extensions.
 
         Gated on user["plan"] == "pro". Free users get an empty dict; the UI
         shows a locked placeholder card with structure visible but content
@@ -3754,7 +4068,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
           - existing_booleans: the free-tier output from step 3 (so the model
             can ANNOTATE the existing 3 LR tiers, not regenerate them)
           - watering_holes_list: stringified watering_holes from parsed (raw
-            material for the Pro X-ray conversion — role-aware by construction)
+            material for the Pro X-ray conversion - role-aware by construction)
 
         IMPORTANT: this depends on `booleans` (step 3 output) being available,
         so it runs in the parallel block alongside the other enrichments.
@@ -3765,7 +4079,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         try:
             holes = parsed.get("watering_holes") or []
             if not holes:
-                holes_str = "(none — produce 3-5 generic Pro X-rays based on the role archetype)"
+                holes_str = "(none - produce 3-5 generic Pro X-rays based on the role archetype)"
             else:
                 holes_str = "\n".join(
                     f"- {h.get('venue', '')} ({h.get('venue_type', 'unknown')}): {h.get('signal', '')}"
@@ -3793,7 +4107,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
             return {}
 
     # Fire all enrichment tasks concurrently. return_exceptions=True ensures we get a
-    # value back for each task even if one explodes — but each task already
+    # value back for each task even if one explodes - but each task already
     # catches its own exceptions and returns a safe default ({} or []), so
     # the gather should never actually surface an exception. Belt + suspenders.
     enrich_t0 = datetime.now(timezone.utc)
@@ -3816,7 +4130,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     # Step 4: save to DB + compliance records
     try:
         # Company override rule: JD body is source of truth. If the AI
-        # extracted a company from the JD, use it — even if the user typed
+        # extracted a company from the JD, use it - even if the user typed
         # something different. Users mistype. JDs don't lie about who is
         # hiring. The override is surfaced back to the client in the
         # response payload as `company_override` so the UI can banner it.
@@ -3824,7 +4138,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
         parsed_company = (parsed.get("core", {}).get("company") or "").strip() or None
         company_override = None
         if parsed_company and user_entered and parsed_company.lower() != user_entered.lower():
-            # Mismatch — the AI found a company in the JD that differs
+            # Mismatch - the AI found a company in the JD that differs
             # from what the user typed. Use the parsed one.
             org_name = parsed_company
             company_override = {
@@ -3905,7 +4219,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                     model_name=provider,
                 )
 
-                # Audit event — the JD was parsed by AI, this is the record
+                # Audit event - the JD was parsed by AI, this is the record
                 ae_id = await write_audit_event(
                     client,
                     event_type="ai_decision",
@@ -3921,7 +4235,7 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                     model_version_id=mv_id,
                 )
 
-                # Decision explanation — the "why this was parsed this way" record
+                # Decision explanation - the "why this was parsed this way" record
                 must_have = parsed.get("must_have_skills") or []
                 top_factors = [
                     {"factor": s.get("skill", ""), "severity": s.get("severity", "preferred"),
@@ -3939,10 +4253,10 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
                     plain_english=plain_english[:500],
                 )
 
-                # Structured req_skills — THIS populates the brain's demand signal
+                # Structured req_skills - THIS populates the brain's demand signal
                 await write_req_skills(client, req_id, parsed)
 
-                # Company override audit event — fires only when the AI extracted
+                # Company override audit event - fires only when the AI extracted
                 # a different company from the JD than what the user typed in.
                 # Per RISK_ASSESSMENT.md §2.3, automated overrides of user input
                 # must be recorded. This lets an auditor trace why the DB org
@@ -4028,16 +4342,16 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     try:
         await increment_cap(user["id"], "intake")
     except Exception:
-        pass  # silently swallow — the work is done, accounting is best-effort
+        pass  # silently swallow - the work is done, accounting is best-effort
 
     # Step 6: fire-and-forget retention email.
     # asyncio.create_task() schedules the send AFTER we return, so the user
     # gets their intake response immediately and the email goes out in
-    # background. The helper itself swallows all errors — a Resend hiccup
+    # background. The helper itself swallows all errors - a Resend hiccup
     # must NEVER break a successful intake response.
     #
     # We deliberately email even on first-intake users (no opt-in) because:
-    #   1. They actively pasted a JD and ran an intake — clear engagement signal
+    #   1. They actively pasted a JD and ran an intake - clear engagement signal
     #   2. The email is content-rich (their booleans), not promotional
     #   3. Footer has a manage-emails link for opt-out (TODO: build the unsub flow)
     try:
@@ -4089,7 +4403,7 @@ async def competitive_intel(req: CompetitiveIntelRequest, user: dict = Depends(g
 
     Cap policy: counts against the 'intake' bucket (1 unit per call regardless
     of competitor count). Cap is checked upfront but only incremented on
-    success — failed AI calls don't burn quota, matching /api/intake pattern.
+    success - failed AI calls don't burn quota, matching /api/intake pattern.
     """
     # Step 0a: Pro tier gate. Returns 402 (Payment Required) so the frontend
     # can route to upgrade page with the same handler as cap-exhaustion.
@@ -4170,7 +4484,7 @@ async def competitive_intel(req: CompetitiveIntelRequest, user: dict = Depends(g
     # results (no human writes that verbatim in a profile).
     #
     # Resolution order:
-    #   1. Use parsed.canonical_skills (clean names, what we want) — 83%
+    #   1. Use parsed.canonical_skills (clean names, what we want) - 83%
     #      of reqs as of 2026-04-28
     #   2. Fall back to parsed.must_have_skills via _extract_atomic_skills
     #      defensive parser (handles older reqs that pre-date the
@@ -4284,7 +4598,7 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
     Pattern matches /api/intake: cap check upfront, AI call, JSON parse, DB save,
     then increment usage at the end. Failed AI calls don't burn quota.
     """
-    # Step 0: cap check (does NOT increment) — uses 'eval' bucket (10/mo on free)
+    # Step 0: cap check (does NOT increment) - uses 'eval' bucket (10/mo on free)
     try:
         await check_cap(user["id"], "eval")
     except HTTPException:
@@ -4303,7 +4617,7 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
                 raise HTTPException(404, "Requisition not found")
             req_row = rs.rows[0]
             if not req_row[2]:
-                raise HTTPException(400, "Requisition has no parsed data — re-run the intake first")
+                raise HTTPException(400, "Requisition has no parsed data - re-run the intake first")
             parsed_jd = req_row[2]  # JSON string, pass directly to prompt
     except HTTPException:
         raise
@@ -4375,7 +4689,7 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
                 ],
             )
 
-            # 5b: compliance layer (best-effort — a failure here does NOT roll back
+            # 5b: compliance layer (best-effort - a failure here does NOT roll back
             #     the submission. Compliance is additive, not blocking the UX.)
             try:
                 # Register the candidate as a GDPR data subject (idempotent on candidate_id)
@@ -4384,7 +4698,7 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
                 )
 
                 # Register (or reuse) the model_versions row for this eval
-                async with db() as ai_client:  # new connection — reads only
+                async with db() as ai_client:  # new connection - reads only
                     rs = await ai_client.execute(
                         "SELECT byok_provider FROM users WHERE id = ?", [user["id"]]
                     )
@@ -4435,10 +4749,10 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
                     plain_english=evaluation.get("headline", "")[:500],
                 )
 
-                # 8-dimension scores (partial today — fit_score only; expand next session)
+                # 8-dimension scores (partial today - fit_score only; expand next session)
                 await write_submission_dimensions(client, submission_id, evaluation)
 
-                # Structured candidate skills (new — populates the taxonomy)
+                # Structured candidate skills (new - populates the taxonomy)
                 # Reads evaluation['extracted_skills'] if present, else falls back
                 # to blocker_assessment + preferred_assessment with status='met'/'partial'
                 await write_candidate_skills(client, candidate_id, evaluation)
@@ -4605,7 +4919,7 @@ async def get_req(req_id: str, user: dict = Depends(get_current_user)):
 
 
 # ============================================================
-# PHASE B1 — Pipeline stage transitions + calibration
+# PHASE B1 - Pipeline stage transitions + calibration
 # ============================================================
 # POST /api/submissions/{id}/stage
 #   Recruiter updates a submission's stage. Side effects:
@@ -4665,7 +4979,7 @@ async def update_submission_stage(
 
         from_stage = current_stage or "submitted"
 
-        # 2. Update the submission — set placed_at/rejected_at appropriately
+        # 2. Update the submission - set placed_at/rejected_at appropriately
         if new_stage == "placed":
             await client.execute(
                 "UPDATE submissions SET stage = ?, placed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -4682,7 +4996,7 @@ async def update_submission_stage(
                 [new_stage, submission_id],
             )
 
-        # 3. Compliance — every stage change is a decision that will
+        # 3. Compliance - every stage change is a decision that will
         #    feed the learning loop. Must be audited.
         signal = signal_for_transition(from_stage, new_stage)
         try:
@@ -4698,7 +5012,7 @@ async def update_submission_stage(
                 model_version_id=None,
             )
         except Exception as audit_err:
-            # Non-fatal — the state change already committed. Log and continue.
+            # Non-fatal - the state change already committed. Log and continue.
             print(f"[calibration] audit write failed: {audit_err!r}")
             ae_id = None
 
@@ -4747,7 +5061,7 @@ async def trigger_calibration_run(user: dict = Depends(get_current_user)):
     """Admin/dev-triggered batch. Processes every unprocessed
     calibration_event in chronological order. Returns the run
     summary (run_id, events_processed, pairs_updated).
-    Safe to call when nothing is pending — returns a no-op run.
+    Safe to call when nothing is pending - returns a no-op run.
     """
     async with db() as client:
         summary = await run_calibration(
@@ -4759,17 +5073,17 @@ async def trigger_calibration_run(user: dict = Depends(get_current_user)):
 
 
 # ============================================================
-# PHASE B2 — Skill resolution (alias / promote / reject)
+# PHASE B2 - Skill resolution (alias / promote / reject)
 # ============================================================
 # Four endpoints turn the unresolved-skill firehose into a
-# manageable approval queue. The user is in control — the LLM
+# manageable approval queue. The user is in control - the LLM
 # only suggests. Every decision is audited as a taxonomy_change
 # event for EU AI Act Article 12 record-keeping.
 #
-# GET  /api/taxonomy/unresolved           — ranked queue
-# GET  /api/taxonomy/suggestion/{raw}     — LLM suggestion (cached)
-# POST /api/taxonomy/decide               — apply alias/promote/reject
-# GET  /api/taxonomy/recent-decisions     — see what's been decided
+# GET  /api/taxonomy/unresolved           - ranked queue
+# GET  /api/taxonomy/suggestion/{raw}     - LLM suggestion (cached)
+# POST /api/taxonomy/decide               - apply alias/promote/reject
+# GET  /api/taxonomy/recent-decisions     - see what's been decided
 # ============================================================
 
 
@@ -4856,7 +5170,7 @@ async def taxonomy_decide(payload: dict, user: dict = Depends(get_current_user))
         raise HTTPException(400, "raw_text is empty after normalization")
 
     async with db() as client:
-        # Defensive — refuse to re-decide something already in the table.
+        # Defensive - refuse to re-decide something already in the table.
         # The caller can call /undecide first if they want to change it.
         existing = await client.execute(
             "SELECT decision FROM skill_resolution_decisions WHERE raw_text_normalized = ?",
@@ -5000,7 +5314,7 @@ async def backfill_signatures(user: dict = Depends(get_current_user)):
     extraction-logic changes. Returns counts so you know what happened.
     """
     if user.get("plan") != "pro":
-        raise HTTPException(403, "Admin endpoint — Pro tier required")
+        raise HTTPException(403, "Admin endpoint - Pro tier required")
 
     async with db() as client:
         rs = await client.execute(
@@ -5050,7 +5364,7 @@ async def signatures_stats(user: dict = Depends(get_current_user)):
     shape look like?
     """
     if user.get("plan") != "pro":
-        raise HTTPException(403, "Admin endpoint — Pro tier required")
+        raise HTTPException(403, "Admin endpoint - Pro tier required")
 
     async with db() as client:
         # Row count + date range
@@ -5137,7 +5451,7 @@ async def signatures_stats(user: dict = Depends(get_current_user)):
         top_preferred_skills = sorted(pref_freq.items(), key=lambda x: -x[1])[:25]
         top_preferred_skills = [{"skill": s, "count": c} for s, c in top_preferred_skills]
 
-        # Top adjacent crossover roles — THIS is the early signal for
+        # Top adjacent crossover roles - THIS is the early signal for
         # emerging archetypes. If "Forward-Deployed Engineer" or "Prompt
         # Engineer" starts showing up here repeatedly across different
         # base roles, that's the archetype emerging.
@@ -5155,7 +5469,7 @@ async def signatures_stats(user: dict = Depends(get_current_user)):
         top_crossovers = sorted(crossover_freq.items(), key=lambda x: -x[1])[:25]
         top_crossovers = [{"crossover_role": s, "count": c} for s, c in top_crossovers]
 
-        # Top poaching target companies across all reqs — tells us which
+        # Top poaching target companies across all reqs - tells us which
         # companies are the most defensible talent sources across our
         # whole intake corpus.
         rs = await client.execute("SELECT poaching_target_companies_json FROM jd_signatures WHERE poaching_target_companies_json IS NOT NULL")
@@ -5213,7 +5527,7 @@ async def signatures_stats(user: dict = Depends(get_current_user)):
 #   5. For each cluster, identify "defining skills" = skills appearing in
 #      ≥50% of cluster members AND in <20% of non-cluster members
 #   6. Singletons (no edges to anyone) are the "potentially emerging"
-#      bucket — these are roles the current taxonomy doesn't have a
+#      bucket - these are roles the current taxonomy doesn't have a
 #      coherent pattern for yet.
 
 def _signature_features(sig_row: dict) -> set:
@@ -5232,7 +5546,7 @@ def _signature_features(sig_row: dict) -> set:
             if name:
                 features.add(f"skill:{name}")
                 if c.get("severity") == "blocker":
-                    # Blockers are higher signal — represent twice
+                    # Blockers are higher signal - represent twice
                     features.add(f"blocker:{name}")
     except Exception:
         pass
@@ -5431,7 +5745,7 @@ async def _run_clustering(similarity_threshold: float = 0.30) -> dict:
             "n_noise": n,
             "clusters": [],
             "noise_signatures": [{"req_id": s["req_id"], "role_title": s["role_title"]} for s in sigs],
-            "warning": f"Only {len(valid_indices)} signatures have feature data — most have empty canonical_skills",
+            "warning": f"Only {len(valid_indices)} signatures have feature data - most have empty canonical_skills",
         }
 
     # Pairwise Jaccard, build edges above threshold
@@ -5506,7 +5820,7 @@ async def _run_clustering(similarity_threshold: float = 0.30) -> dict:
         "noise_signatures": noise_results,
         "interpretation_notes": [
             "Clusters with high avg_cohesion (>0.5) are tight role patterns.",
-            "Noise signatures are roles that don't fit any current cluster — these are where emerging archetypes live.",
+            "Noise signatures are roles that don't fit any current cluster - these are where emerging archetypes live.",
             "Defining features with high lift (>5) are skills that strongly distinguish this cluster from the rest of the corpus.",
             f"Run on N={n} signatures. Reliability of cluster discovery improves significantly past N=100.",
         ],
@@ -5522,7 +5836,7 @@ async def cluster_signatures(user: dict = Depends(get_current_user)):
     timeline of how clustering evolves as data grows).
     """
     if user.get("plan") != "pro":
-        raise HTTPException(403, "Admin endpoint — Pro tier required")
+        raise HTTPException(403, "Admin endpoint - Pro tier required")
 
     threshold = 0.30  # Tunable via query param later if needed
     results = await _run_clustering(similarity_threshold=threshold)
@@ -5560,7 +5874,7 @@ async def cluster_signatures(user: dict = Depends(get_current_user)):
 async def latest_cluster_results(user: dict = Depends(get_current_user)):
     """Return the most recent cluster run (no recompute)."""
     if user.get("plan") != "pro":
-        raise HTTPException(403, "Admin endpoint — Pro tier required")
+        raise HTTPException(403, "Admin endpoint - Pro tier required")
 
     async with db() as client:
         rs = await client.execute(
@@ -5594,7 +5908,7 @@ async def cluster_history(user: dict = Depends(get_current_user)):
     Useful for tracking how the cluster landscape evolves as data grows.
     """
     if user.get("plan") != "pro":
-        raise HTTPException(403, "Admin endpoint — Pro tier required")
+        raise HTTPException(403, "Admin endpoint - Pro tier required")
 
     async with db() as client:
         rs = await client.execute(
@@ -5635,12 +5949,12 @@ async def cluster_history(user: dict = Depends(get_current_user)):
 #   - No req_ids (internal handles only)
 #   - No timestamps under 24h old (don't leak real-time platform activity)
 #   - Member company names ARE included (these are public JDs we parsed,
-#     not customer data — companies named are who's HIRING, not our
+#     not customer data - companies named are who's HIRING, not our
 #     customers)
 
 @app.get("/api/public/market-intel")
 async def public_market_intel():
-    """Public market intelligence summary — no auth required.
+    """Public market intelligence summary - no auth required.
 
     Reads the latest cluster_runs row and combines with current signature
     stats. Caches at the application layer is overkill; Vercel's CDN
@@ -5729,7 +6043,7 @@ async def public_market_intel():
             "n_industries": n_industries,
             "n_companies": n_companies,
             "n_levels": n_levels,
-            "honest_caveat": "Early signal — this corpus reflects the JDs SourcingNav users have parsed. Reliability of cluster patterns improves significantly past N=100.",
+            "honest_caveat": "Early signal - this corpus reflects the JDs SourcingNav users have parsed. Reliability of cluster patterns improves significantly past N=100.",
         },
         "top_blocker_skills": [{"skill": s, "count": c} for s, c in top_blockers],
         "top_adjacent_crossover_roles": [{"role": s, "count": c} for s, c in top_crossovers],
@@ -5737,12 +6051,12 @@ async def public_market_intel():
         "difficulty_distribution": difficulty,
     }
 
-    # Latest cluster run — include only if we have one
+    # Latest cluster run - include only if we have one
     if cluster_rs.rows:
         row = cluster_rs.rows[0]
         try:
             results = json.loads(row[6])
-            # Strip req_ids from clusters and noise — keep role + company
+            # Strip req_ids from clusters and noise - keep role + company
             clusters_out = []
             for c in results.get("clusters", []):
                 clusters_out.append({
