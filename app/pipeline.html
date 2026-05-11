@@ -358,7 +358,13 @@ function renderDetail(d) {
           <span>Opened ${timeAgo(d.opened_at)}</span>
         </div>
       </div>
+      ${d.status === 'open' ? `
+        <div>
+          <button id="closeOutBtn" class="btn btn-primary" style="white-space: nowrap;">Close Out Req</button>
+        </div>
+      ` : ''}
     </div>
+    ${renderCloseOutForm(d)}
     ${renderCompCard(comp, p)}
     ${renderSkillsCard(mustHaves, niceToHaves)}
     ${renderAltTitlesCard(p.alt_titles)}
@@ -383,7 +389,117 @@ function renderDetail(d) {
     });
   });
   wireEvalForm();
+  wireCloseOutForm(d);
   loadSubmissions(d.id);
+}
+
+// Close Out feature (2026-05-11): allows closing out an open req from the
+// pipeline detail view. Renders an inline form (hidden by default) that
+// expands when "Close Out Req" is clicked. On submit, POSTs to the existing
+// Stage 2 outcome endpoint AND updates the req's status. The req then
+// disappears from the "open" filter and shows up under "closed".
+function renderCloseOutForm(d) {
+  if (d.status !== 'open') return '';
+  return `
+    <section id="closeOutCard" class="card" style="display: none; border-color: var(--accent);">
+      <div class="card-label" style="color: var(--accent);">Close Out Requisition</div>
+      <h2 class="card-title">What happened with this search?</h2>
+      <p style="color: var(--text-dim); margin-bottom: 1rem;">Logging the outcome feeds the Live Intelligence Stream so future intakes get smarter predictions.</p>
+      <div style="display: grid; gap: 0.85rem;">
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem;">Outcome</label>
+          <select id="coOutcome" style="width: 100%; padding: 0.6rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;">
+            <option value="">-- select --</option>
+            <option value="filled">Filled / Hired</option>
+            <option value="lost">Lost (req went to another agency or internal)</option>
+            <option value="cancelled">Cancelled / Closed without hire</option>
+            <option value="fell_off">Fell off (placement reversed within guarantee)</option>
+          </select>
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem;">Time to close (days, optional)</label>
+          <input type="number" id="coDays" min="0" placeholder="e.g. 42" style="width: 100%; padding: 0.6rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div id="coFilledFields" style="display: none; padding: 0.75rem; background: rgba(74,222,128,0.05); border-radius: 6px; display: grid; gap: 0.6rem;">
+          <div>
+            <label style="display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem;">Placed candidate's previous company (optional, feeds poach intelligence)</label>
+            <input type="text" id="coPrevCompany" placeholder="e.g. NVIDIA" style="width: 100%; padding: 0.6rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem;">Placed candidate's top skills (comma-separated, optional)</label>
+            <input type="text" id="coSkills" placeholder="e.g. python, embedded linux, arm" style="width: 100%; padding: 0.6rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;">
+          </div>
+        </div>
+        <div id="coLostFields" style="display: none;">
+          <label style="display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem;">Lost to which company (optional)</label>
+          <input type="text" id="coLostTo" placeholder="e.g. Skydio in-house" style="width: 100%; padding: 0.6rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;">
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.35rem;">Notes (optional)</label>
+          <textarea id="coNotes" rows="2" placeholder="What did you learn from this search?" style="width: 100%; padding: 0.6rem; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; resize: vertical;"></textarea>
+        </div>
+        <div class="btn-row" style="margin-top: 0.5rem;">
+          <button id="coSubmit" class="btn btn-primary">Submit Outcome</button>
+          <button id="coCancel" class="btn btn-ghost">Cancel</button>
+          <span id="coStatus" style="margin-left: 0.5rem; font-size: 0.85rem; color: var(--text-dim);"></span>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function wireCloseOutForm(d) {
+  if (d.status !== 'open') return;
+  const btn = document.getElementById('closeOutBtn');
+  const card = document.getElementById('closeOutCard');
+  const outcomeSel = document.getElementById('coOutcome');
+  const filledFields = document.getElementById('coFilledFields');
+  const lostFields = document.getElementById('coLostFields');
+  const cancelBtn = document.getElementById('coCancel');
+  const submitBtn = document.getElementById('coSubmit');
+  const statusEl = document.getElementById('coStatus');
+  if (!btn || !card) return;
+  btn.addEventListener('click', () => {
+    card.style.display = 'block';
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  cancelBtn.addEventListener('click', () => { card.style.display = 'none'; });
+  outcomeSel.addEventListener('change', () => {
+    const v = outcomeSel.value;
+    filledFields.style.display = v === 'filled' ? 'grid' : 'none';
+    lostFields.style.display = v === 'lost' ? 'block' : 'none';
+  });
+  submitBtn.addEventListener('click', async () => {
+    const outcome = outcomeSel.value;
+    if (!outcome) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = 'Pick an outcome first.';
+      return;
+    }
+    statusEl.style.color = 'var(--text-dim)';
+    statusEl.textContent = 'Submitting...';
+    submitBtn.disabled = true;
+    try {
+      const daysVal = document.getElementById('coDays').value;
+      const skillsVal = document.getElementById('coSkills').value;
+      const body = {
+        outcome,
+        time_to_close_days: daysVal ? parseInt(daysVal, 10) : null,
+        placed_candidate_company_prev: document.getElementById('coPrevCompany').value || null,
+        placed_candidate_skills: skillsVal ? skillsVal.split(',').map(s => s.trim()).filter(Boolean) : null,
+        lost_to_company: document.getElementById('coLostTo').value || null,
+        notes: document.getElementById('coNotes').value || null,
+      };
+      await api(`/req/${encodeURIComponent(d.id)}/outcome`, { method: 'POST', body: JSON.stringify(body) });
+      statusEl.style.color = 'var(--good)';
+      statusEl.textContent = '✓ Outcome logged. Refreshing...';
+      setTimeout(() => { window.location.href = '/app/pipeline.html'; }, 900);
+    } catch (e) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = 'Failed: ' + e.message;
+      submitBtn.disabled = false;
+    }
+  });
 }
 function renderCompCard(comp, p) {
   // Handle both shapes the model returns: numeric (base_min/base_max) OR pre-formatted string (base_range)
