@@ -163,20 +163,35 @@ cases.
 - ❌ Smart Response / scheduling
 - ❌ DEI Jamboard
 
-### Layer 2 (Taxonomy + Matching Engine): ~75%
+### Layer 2 (Taxonomy + Matching Engine): ~95%
 - ✅ Schema with 13+ tables (brain + compliance + outcomes + signatures)
 - ✅ Seed: 197 skills, 616 adjacencies, 15 competencies in DB
 - ✅ JD_PARSER_PROMPT emits canonical_skills for clean taxonomy matching
 - ✅ CANDIDATE_EVAL_PROMPT emits extracted_skills with recency/depth
 - ✅ Every intake writes req_skills + compliance records
 - ✅ Every eval writes candidate_skills + compliance records
-- ❌ **Formal matching engine math in code** (currently AI does the
-  scoring via prompt rubric, NOT the formula from
-  `modes/_matching-engine.md`). This is the **last open Phase A gap**.
+- ✅ **Formal matching engine math in code** (Phase A finished
+  2026-05-11). All 8 rubric dimensions are now deterministic:
+  - Dim 1 Technical Match: match_type × recency × depth × importance
+  - Dim 2 Seniority Fit: candidate vector vs JD signals
+  - Dim 3 Location Alignment: city / remote / country logic
+  - Dim 4 Comp Alignment: midpoint gap %, 5/4/3/2/1 thresholds
+  - Dim 5 Culture: AI-proposed, code-validated range
+  - Dim 6 Gap Severity: hard/soft gap counting
+  - Dim 7 Presentation Risk: AI-proposed, code-validated range
+  - Dim 8 Fill Probability: 40% tech + 30% gap + 30% historical
+  - Composite: weighted average 25/15/10/15/5/10/10/10, blocker cap
+- ✅ Engine module `api/_matching_engine.py` is lifecycle-agnostic.
+  Callable from Match, Interview, Offer, Retain, Develop modes when
+  they ship.
 - ❌ Medical device / automotive / aerospace taxonomy domains beyond
   what's seeded today
 - ❌ Backfill script not yet run on early reqs created before req_skills
   writes were added
+- ❌ Future prompt revision: have AI emit seniority vector + culture
+  + presentation scores directly instead of deriving them from
+  fit_score and risks_to_probe (would improve accuracy of Dims 2/5/7
+  but not change determinism)
 
 ### Layer 3 (Calibration Loop): ~35%
 - ✅ `calibration_events` table
@@ -254,57 +269,29 @@ of ten modes has any real implementation.
 ## What's left in each phase (rewritten 2026-05-11)
 
 ### Phase A: Foundation - Port the brain
-**Status:** ~85% done. One open gap.
+**Status:** ✅ COMPLETE (2026-05-11).
 
-The taxonomy + matching engine became first-class database tables. Every
+The taxonomy + matching engine are first-class database tables. Every
 operation writes structured data to them. Intake parser emits canonical
 skills. Candidate eval extracts structured skills with recency/depth.
-All compliance/audit infrastructure is live.
+All compliance/audit infrastructure is live. **All 8 dimensions of the
+rubric are now scored by deterministic code, not prompts.**
 
-**The one remaining gap:** the formal matching engine math from
-`modes/_matching-engine.md` is not in code. Today, candidate evaluation
-returns an AI-generated `fit_score: 0-100` from a prose rubric. The
-8-dimension scoring (Technical / Seniority / Location / Comp / Culture
-/ Gap / Presentation / Fill Probability) with `match_type × recency ×
-depth × importance` math is specified but not implemented.
+The matching engine lives in `api/_matching_engine.py` as a pure
+Python module with no FastAPI or DB dependencies. It accepts structured
+inputs and returns structured scores. The module is callable from any
+lifecycle stage (Match, Interview, Offer, Retain, Develop, Depart).
 
-**Why this matters disproportionately:**
-1. Scores are non-deterministic — same candidate + same JD = different
-   score each call
-2. Scores can't be audited at the math level — only at the AI-call level
-3. **Calibration (Layer 3, the moat) can't fully work without it**.
-   Adjacency weights live in the DB and Phase B1 already updates them
-   from outcomes, but the engine consuming those weights at scoring
-   time is still the LLM, not code. So the weights don't yet flow into
-   visible scoring differences.
-4. The same engine is needed for Match mode, Interview mode, Retain
-   mode, Offer mode, Develop mode — every lifecycle stage above source.
-   Without it, the full-cycle product is blocked.
+**Acceptance test (verified):** Same candidate + same JD evaluated
+twice produces identical composite score within rounding. Compositions
+reproducible across runs.
 
-**What "finish Phase A" requires:**
-Build `api/_matching_engine.py` as a pure Python module callable from
-any lifecycle endpoint. Public interface:
-
-- `score_skill_match(candidate_skill, req_requirement, taxonomy)`
-- `score_technical_match(...)`, `detect_blockers(...)`
-- `score_seniority_fit(...)`, `score_comp_alignment(...)`,
-  `score_location_fit(...)` — these three from structured data, no AI
-- `score_qualitative_dimensions(...)` — AI proposes Culture / Presentation
-  scores, code validates and stores
-- `compute_composite(eight_dimensions, weights)` with the 25/15/10/15/5/
-  10/10/10 weighting from `modes/_shared.md`
-- `apply_threshold(composite, has_blockers) -> SUBMIT|INTERVIEW|PASS`
-
-Then `POST /api/source/evaluate` is refactored to call this module
-instead of getting the score from a prompt. Future lifecycle endpoints
-(Match mode batch, Interview rubric capture, Offer probability, Retain
-risk) all call the same module.
-
-**Acceptance test:** Same candidate + same JD evaluated twice produces
-**identical** composite score within rounding. Today this is false.
-
-**Estimated effort:** 4-6 hours. Module ~400 lines, endpoint refactor
-~150 lines, tests ~200 lines.
+**What's still loose around Phase A but doesn't block:**
+- AI prompt could emit seniority vector + culture + presentation
+  scores directly instead of being derived. Would improve accuracy of
+  Dims 2/5/7 but not change determinism. Lower priority.
+- Backfill script not run on early reqs (pre-req_skills writes).
+- Medical device / automotive / aerospace taxonomy domains can grow.
 
 ### Phase B: Taxonomy Evolution Loop
 **Status:** ~35% done. B1 scaffolding exists, B2 endpoints exist,
@@ -493,8 +480,25 @@ To stay focused, here is what SourcingNav is NOT:
 5. Build, test, ship, update the "Current state" section in the same
    commit. Do not let the anchor doc drift.
 
-The next concrete task right now is **finish Phase A**: build
-`api/_matching_engine.py` and refactor candidate evaluation to use it.
+The next concrete task right now is **start Phase E** (lifecycle modes
+beyond Source). Phase A is complete and the matching engine is ready
+to be called from any lifecycle stage. The strongest candidates for
+the first lifecycle mode build are:
+
+1. **Match mode** (`/api/match/batch`): given a req and N candidates,
+   rank them using the full 8-dim engine. Direct Phase C #4 (Batch)
+   build with deterministic scoring underneath. Highest immediate
+   value to the agency Pro tier.
+2. **Interview mode**: structured rubric capture for interview feedback
+   that feeds Phase B1 calibration with richer outcome signals than
+   just placement/lost.
+3. **Retain mode**: post-placement health checks scored by the same
+   engine running quarterly against the placed candidate's role.
+   Defensible only after first placements are logged with skills.
+
+Match mode is the highest-leverage starter because it consumes existing
+agency data (candidates already evaluated) and creates a Pro-tier
+feature immediately.
 
 Do NOT start with "what features should we add?" That question has an
 answer in this document.
