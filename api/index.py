@@ -5816,6 +5816,181 @@ async def match_batch(req: MatchBatchRequest, user: dict = Depends(get_current_u
         }
 
 
+# ============================================================
+# OUTCOMES DASHBOARD (Phase B1 enablement)
+# ============================================================
+# Centralized view of the user's outcome history. Surfaces:
+#   - Aggregate stats: total, win rate, time-to-close, lost-to companies
+#   - Reqs with submission activity but no logged outcome (calls-to-action)
+#   - Full history of logged outcomes
+#
+# Why this matters: Fill Probability (engine dim #8) and historical fill
+# rate calibration are dormant until n>=3 placeable outcomes (filled +
+# lost + fell_off) exist. Logging outcomes is the cheapest unlock for
+# the whole calibration moat. This page makes that one click instead of
+# 'navigate to pipeline, find the req, click Close Out, fill the form.'
+#
+# Writes still go through /api/req/{req_id}/outcome - this endpoint is
+# read-only aggregation. One source of truth for outcome writes.
+
+@app.get("/api/outcomes")
+async def list_outcomes(user: dict = Depends(get_current_user)):
+    """Aggregate outcome data for the dashboard view.
+
+    Returns:
+      - stats: aggregate counts, win rate (when n>=3 placeable),
+        avg time-to-close, top lost-to companies
+      - awaiting: reqs with submissions but no logged outcome
+      - history: chronological list of logged outcomes
+      - fill_rate_signal: same shape _load_historical_fill_rate returns
+        (None if below n=3 threshold) - lets the UI show 'unlocked at N
+        more outcomes' messaging
+    """
+    async with db() as client:
+        # All outcomes for this user
+        rs = await client.execute(
+            """SELECT ro.id, ro.req_id, ro.outcome, ro.time_to_close_days,
+                      ro.placed_candidate_company_prev, ro.placed_candidate_skills,
+                      ro.lost_to_company, ro.notes, ro.logged_at,
+                      r.title, o.name
+               FROM req_outcomes ro
+               JOIN requisitions r ON ro.req_id = r.id
+               JOIN organizations o ON r.org_id = o.id
+               WHERE ro.logged_by_user_id = ?
+               ORDER BY ro.logged_at DESC""",
+            [user["id"]],
+        )
+        history = [
+            {
+                "id": row[0],
+                "req_id": row[1],
+                "outcome": row[2],
+                "time_to_close_days": row[3],
+                "placed_candidate_company_prev": row[4],
+                "placed_candidate_skills": (
+                    json.loads(row[5]) if row[5] else None
+                ),
+                "lost_to_company": row[6],
+                "notes": row[7],
+                "logged_at": row[8],
+                "req_title": row[9],
+                "org_name": row[10],
+            }
+            for row in rs.rows
+        ]
+
+        # Aggregate stats
+        counts = {}
+        ttc_filled = []
+        ttc_lost = []
+        lost_to_map = {}
+        placed_prev_companies = {}
+        for h in history:
+            counts[h["outcome"]] = counts.get(h["outcome"], 0) + 1
+            ttc = h.get("time_to_close_days")
+            if ttc is not None and h["outcome"] == "filled":
+                ttc_filled.append(ttc)
+            elif ttc is not None and h["outcome"] == "lost":
+                ttc_lost.append(ttc)
+            if h["outcome"] == "lost" and h["lost_to_company"]:
+                lost_to_map[h["lost_to_company"]] = (
+                    lost_to_map.get(h["lost_to_company"], 0) + 1
+                )
+            if h["outcome"] == "filled" and h["placed_candidate_company_prev"]:
+                placed_prev_companies[h["placed_candidate_company_prev"]] = (
+                    placed_prev_companies.get(
+                        h["placed_candidate_company_prev"], 0
+                    ) + 1
+                )
+
+        filled = counts.get("filled", 0)
+        lost = counts.get("lost", 0)
+        fell_off = counts.get("fell_off", 0)
+        placeable_total = filled + lost + fell_off
+        # Same math as _load_historical_fill_rate, kept in sync intentionally
+        if placeable_total >= 3:
+            effective_fills = filled + (0.5 * fell_off)
+            fill_rate = effective_fills / placeable_total
+            fill_rate_signal = {
+                "fill_rate": round(fill_rate, 3),
+                "n_outcomes": placeable_total,
+                "unlocked": True,
+            }
+        else:
+            fill_rate_signal = {
+                "fill_rate": None,
+                "n_outcomes": placeable_total,
+                "unlocked": False,
+                "needed": 3 - placeable_total,
+            }
+
+        def _avg(arr):
+            return round(sum(arr) / len(arr), 1) if arr else None
+
+        # Top 5 lost-to / placed-from
+        top_lost_to = sorted(
+            lost_to_map.items(), key=lambda x: x[1], reverse=True
+        )[:5]
+        top_placed_from = sorted(
+            placed_prev_companies.items(), key=lambda x: x[1], reverse=True
+        )[:5]
+
+        stats = {
+            "total_outcomes": len(history),
+            "counts_by_outcome": counts,
+            "fill_rate": fill_rate_signal,
+            "avg_time_to_close_filled_days": _avg(ttc_filled),
+            "avg_time_to_close_lost_days": _avg(ttc_lost),
+            "top_lost_to": [{"company": c, "count": n} for c, n in top_lost_to],
+            "top_placed_from": [
+                {"company": c, "count": n} for c, n in top_placed_from
+            ],
+        }
+
+        # Reqs awaiting outcome logging:
+        #   - status='open'
+        #   - has submissions (real search activity)
+        #   - older than 7 days (filter out brand-new active searches)
+        #   - no outcome already logged
+        #
+        # Also include reqs with status='closed' that somehow lack an
+        # outcome (data integrity check).
+        rs = await client.execute(
+            """SELECT r.id, r.title, r.status, r.opened_at, o.name,
+                      (SELECT COUNT(*) FROM submissions s WHERE s.req_id = r.id) AS sub_count,
+                      (SELECT COUNT(*) FROM req_outcomes ro2 WHERE ro2.req_id = r.id) AS outcome_count
+               FROM requisitions r
+               JOIN organizations o ON r.org_id = o.id
+               WHERE r.user_id = ?
+                 AND r.status IN ('open', 'closed')
+               ORDER BY r.opened_at DESC""",
+            [user["id"]],
+        )
+        awaiting = []
+        for row in rs.rows:
+            rid, title, status, opened_at, org_name, sub_count, outcome_count = row
+            if outcome_count and int(outcome_count) > 0:
+                continue
+            # Only surface reqs with real activity OR closed reqs without outcomes
+            has_activity = sub_count and int(sub_count) > 0
+            if not has_activity and status != "closed":
+                continue
+            awaiting.append({
+                "id": rid,
+                "title": title,
+                "status": status,
+                "opened_at": opened_at,
+                "org_name": org_name,
+                "submission_count": int(sub_count) if sub_count else 0,
+            })
+
+        return {
+            "stats": stats,
+            "awaiting": awaiting,
+            "history": history,
+        }
+
+
 @app.get("/api/reqs/{req_id}")
 async def get_req(req_id: str, user: dict = Depends(get_current_user)):
     async with db() as client:
