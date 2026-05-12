@@ -225,74 +225,101 @@ async def write_submission_dimensions(
     req_id: str = None,
     candidate_id: str = None,
 ) -> None:
-    """Write 8-dimension scores. Two dimensions (Technical Match, Gap Severity)
-    are now DETERMINISTIC and come from the matching engine. The other 6
-    dimensions stay AI-derived for now (Phase A finishing, 2026-05-11).
+    """Write 8-dimension scores using the deterministic matching engine.
 
-    Phase A finishing: matching engine in code, not prompt.
-    - Dim 1 (Technical Match): deterministic via _matching_engine.evaluate_skills
-    - Dim 6 (Gap Severity): deterministic via _matching_engine.evaluate_skills
-    - Dims 2-5, 7-8: still AI-derived (mapped from fit_score for now)
+    Phase A finished, 2026-05-11. All 8 dimensions now flow through the
+    engine. Dims 1, 2, 3, 4, 6, 8 are pure code. Dims 5 and 7 are AI-
+    proposed with code validating range and structure. Composite is
+    computed in code from the 25/15/10/15/5/10/10/10 weights per
+    modes/_shared.md.
 
-    req_id and candidate_id are optional - if not provided, only the AI-derived
-    scores are written (backward compatible with old call sites).
+    The AI's `fit_score` is preserved in match_breakdown_json for
+    historical comparison but is no longer the source of truth.
+
+    req_id and candidate_id are optional. When provided, the engine
+    path runs. When omitted, only the AI fit_score is stored (legacy
+    callers should pass both going forward).
     """
     fit_score = evaluation.get("fit_score")
-    if fit_score is None:
-        return
-
-    # Normalize the 0-100 AI fit score into the 0-5 rubric scale (fallback).
-    composite_fallback = round((fit_score / 100.0) * 5.0, 2)
+    ai_composite_fallback = (
+        round((fit_score / 100.0) * 5.0, 2) if fit_score is not None else None
+    )
 
     # AI-derived blocker count (fallback when engine isn't available)
     blockers = evaluation.get("blocker_assessment") or []
     blocker_count_fallback = sum(1 for b in blockers if b.get("status") == "missing")
 
-    # Engine-derived deterministic scores (NEW in Phase A finishing)
-    technical_match_score = None
-    gap_severity_score = None
-    blocker_count = blocker_count_fallback
-    engine_breakdown = None
-
+    # Engine output (NULL when engine can't run)
+    engine_result = None
     if req_id and candidate_id:
         try:
-            engine_result = await _run_matching_engine(client, req_id, candidate_id)
-            if engine_result:
-                technical_match_score = engine_result["technical_match"]["score"]
-                gap_severity_score = engine_result["gap_severity"]["score"]
-                blocker_count = engine_result["blocker_count"]
-                engine_breakdown = engine_result
+            engine_result = await _run_matching_engine(
+                client, req_id, candidate_id, evaluation
+            )
         except Exception as engine_err:
-            # Engine failure is non-fatal - we still write the AI scores
             print(f"[matching-engine] non-fatal: {engine_err!r}")
 
-    # Combine engine output with AI eval output for the match_breakdown_json
+    # Extract per-dimension scores from engine, fall back to None where missing
+    if engine_result:
+        dims = engine_result.get("dimensions", {})
+        technical_match = dims.get("technical_match", {}).get("score")
+        seniority_fit = dims.get("seniority_fit", {}).get("score")
+        location_alignment = dims.get("location_alignment", {}).get("score")
+        comp_alignment = dims.get("comp_alignment", {}).get("score")
+        culture_signals = dims.get("culture_signals", {}).get("score")
+        gap_severity = dims.get("gap_severity", {}).get("score")
+        presentation_risk = dims.get("presentation_risk", {}).get("score")
+        fill_probability = dims.get("fill_probability", {}).get("score")
+        composite_data = engine_result.get("composite", {})
+        composite_score = composite_data.get("effective_composite", ai_composite_fallback)
+        blocker_count = engine_result.get("blocker_count", blocker_count_fallback)
+    else:
+        technical_match = None
+        seniority_fit = None
+        location_alignment = None
+        comp_alignment = None
+        culture_signals = None
+        gap_severity = None
+        presentation_risk = None
+        fill_probability = None
+        composite_score = ai_composite_fallback
+        blocker_count = blocker_count_fallback
+
+    # Combine engine output with AI eval for transparency
     breakdown_blob = {"ai_eval": evaluation}
-    if engine_breakdown:
-        breakdown_blob["engine"] = engine_breakdown
+    if engine_result:
+        breakdown_blob["engine"] = engine_result
 
     sd_id = "sd_" + uuid.uuid4().hex[:16]
     await client.execute(
         """INSERT OR REPLACE INTO submission_dimensions
-           (id, submission_id, technical_match, gap_severity, composite_score,
-            blocker_count, match_breakdown_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           (id, submission_id, technical_match, seniority_fit, location_alignment,
+            comp_alignment, culture_signals, gap_severity, presentation_risk,
+            fill_probability, composite_score, blocker_count, match_breakdown_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             sd_id,
             submission_id,
-            technical_match_score,
-            gap_severity_score,
-            composite_fallback,  # composite still AI-derived; expand later
+            technical_match,
+            seniority_fit,
+            location_alignment,
+            comp_alignment,
+            culture_signals,
+            gap_severity,
+            presentation_risk,
+            fill_probability,
+            composite_score,
             blocker_count,
             json.dumps(breakdown_blob),
         ],
     )
 
 
-async def _run_matching_engine(client, req_id: str, candidate_id: str):
-    """Internal: load req_skills + candidate_skills + adjacencies, run engine."""
+async def _run_matching_engine(client, req_id: str, candidate_id: str,
+                                evaluation: dict = None):
+    """Internal: load all required data, run full 8-dimension engine."""
     # Lazy import to avoid circular dep
-    from api._matching_engine import evaluate_skills, build_adjacency_index
+    from api._matching_engine import evaluate_full, build_adjacency_index
 
     # Load req_skills for this requisition
     rs = await client.execute(
@@ -316,7 +343,6 @@ async def _run_matching_engine(client, req_id: str, candidate_id: str):
         for r in cs.rows
     ]
 
-    # If either side is empty, skip - engine has nothing to do
     if not req_skills or not candidate_skills:
         return None
 
@@ -330,7 +356,6 @@ async def _run_matching_engine(client, req_id: str, candidate_id: str):
             skill_ids.add(c["skill_id"])
 
     if skill_ids:
-        # Chunk the IN clause for safety
         placeholders = ",".join("?" for _ in skill_ids)
         adj = await client.execute(
             f"""SELECT skill_id, adjacent_id, weight
@@ -344,7 +369,253 @@ async def _run_matching_engine(client, req_id: str, candidate_id: str):
 
     adjacency_index = build_adjacency_index(adj_rows)
 
-    return evaluate_skills(req_skills, candidate_skills, adjacency_index)
+    # Load req metadata from parsed_json (location, comp, seniority signals)
+    req_metadata = await _load_req_metadata(client, req_id)
+
+    # Build candidate metadata from candidates table + AI eval output
+    candidate_metadata = await _load_candidate_metadata(
+        client, candidate_id, evaluation or {}
+    )
+
+    # Extract AI proposals for culture + presentation from evaluation
+    ai_proposals = _extract_ai_proposals(evaluation or {})
+
+    # Historical fill rate for this req's user (or org-wide if needed)
+    historical_data = await _load_historical_fill_rate(client, req_id)
+
+    return evaluate_full(
+        req_skills=req_skills,
+        candidate_skills=candidate_skills,
+        adjacency_index=adjacency_index,
+        req_metadata=req_metadata,
+        candidate_metadata=candidate_metadata,
+        ai_proposals=ai_proposals,
+        historical_data=historical_data,
+    )
+
+
+async def _load_req_metadata(client, req_id: str) -> dict:
+    """Extract location, comp range, seniority signals from req parsed_json."""
+    rs = await client.execute(
+        "SELECT parsed_json FROM requisitions WHERE id = ?", [req_id]
+    )
+    if not rs.rows or not rs.rows[0][0]:
+        return {}
+    try:
+        parsed = json.loads(rs.rows[0][0])
+    except Exception:
+        return {}
+
+    core = parsed.get("core") or {}
+    comp = parsed.get("comp_snapshot") or {}
+
+    # Seniority signals come from must_have_skills rationale + executive_brief
+    seniority_signals = []
+    eb = parsed.get("executive_brief") or {}
+    if isinstance(eb, dict):
+        for key in ("seniority", "seniority_level", "level", "experience_required"):
+            v = eb.get(key)
+            if v and isinstance(v, str):
+                seniority_signals.append(v)
+    # Look for "X years" patterns in must_have_skills rationale
+    import re
+    for skill in (parsed.get("must_have_skills") or []):
+        rat = skill.get("rationale", "") if isinstance(skill, dict) else ""
+        m = re.search(r'(\d+)\+?\s*years?', rat, re.IGNORECASE)
+        if m:
+            seniority_signals.append(f"{m.group(1)}+ years experience")
+            break
+
+    return {
+        "location": core.get("location") or parsed.get("location", "") or "",
+        "remote_policy": core.get("remote_policy") or parsed.get("remote_policy", "") or "",
+        "comp_range": comp.get("base_range") or comp.get("total_comp_range") or "",
+        "seniority_signals": seniority_signals,
+    }
+
+
+async def _load_candidate_metadata(client, candidate_id: str,
+                                    evaluation: dict) -> dict:
+    """Build candidate metadata from candidates table + AI eval output."""
+    rs = await client.execute(
+        """SELECT current_title, current_company, notes, resume_text
+           FROM candidates WHERE id = ?""",
+        [candidate_id],
+    )
+    location = ""
+    if rs.rows:
+        # Try to find location in notes or resume_text
+        notes = rs.rows[0][2] or ""
+        resume = (rs.rows[0][3] or "")[:2000]  # first 2k chars
+        # Cheap regex for "Location: X" or city patterns
+        import re
+        for src in (notes, resume):
+            m = re.search(r'(?:location|based\s+in|lives?\s+in)[:\s]+([A-Za-z\s,]+?)(?:\n|\||$)',
+                          src, re.IGNORECASE)
+            if m:
+                location = m.group(1).strip()[:100]
+                break
+
+    # AI eval's comp_check gives expected comp signal
+    expected_comp = ""
+    comp_check = evaluation.get("comp_check", "")
+    if comp_check and "unknown" not in comp_check.lower():
+        # Extract dollar amount if present
+        import re
+        m = re.search(r'\$[\d,]+(?:k|K)?', comp_check)
+        if m:
+            expected_comp = m.group(0)
+
+    # Seniority signals derived from AI eval's strengths + extracted skills
+    seniority_signals = _extract_candidate_seniority(evaluation)
+
+    return {
+        "location": location,
+        "expected_comp": expected_comp,
+        "seniority_signals": seniority_signals,
+    }
+
+
+def _extract_candidate_seniority(evaluation: dict) -> dict:
+    """Build the seniority vector from AI eval output.
+
+    The AI doesn't emit this directly today. We derive from strengths
+    + extracted_skills + risks_to_probe. This is best-effort; a future
+    prompt change will have AI emit this directly.
+    """
+    strengths = evaluation.get("strengths", []) or []
+    skills = evaluation.get("extracted_skills", []) or []
+    summary = (evaluation.get("summary") or "")
+
+    # Count tech_lead signals from keywords in strengths/summary
+    tech_lead = 0
+    mgmt = 0
+    text_blob = " ".join(strengths) + " " + summary
+    text_lower = text_blob.lower()
+    if any(k in text_lower for k in ["led", "leads", "leading", "tech lead",
+                                       "staff engineer", "architecture decision"]):
+        tech_lead += 1
+    if any(k in text_lower for k in ["mentor", "mentored", "mentoring",
+                                       "coached", "trained junior"]):
+        tech_lead += 1
+    if any(k in text_lower for k in ["managed", "manager", "direct report",
+                                       "team of", "people manager"]):
+        mgmt = 1
+
+    # Years extracted from any "X years" mention
+    import re
+    years_total = 0
+    years_in_niche = 0
+    m = re.search(r'(\d+)\+?\s*years?', text_blob, re.IGNORECASE)
+    if m:
+        years_total = int(m.group(1))
+        # Default years_in_niche to half of total unless we have better signal
+        years_in_niche = years_total // 2 + 1
+
+    # Refine niche years from extracted_skills with depth=expert or production
+    senior_skill_count = sum(
+        1 for s in skills
+        if isinstance(s, dict) and s.get("depth") in ("expert", "production")
+    )
+    if senior_skill_count >= 5:
+        years_in_niche = max(years_in_niche, 5)
+    elif senior_skill_count >= 3:
+        years_in_niche = max(years_in_niche, 3)
+
+    return {
+        "years_total": years_total,
+        "years_in_niche": years_in_niche,
+        "management_experience": mgmt,
+        "tech_lead_signals": tech_lead,
+        "scope_level": "team" if mgmt > 0 or tech_lead >= 2 else "individual",
+    }
+
+
+def _extract_ai_proposals(evaluation: dict) -> dict:
+    """Pull culture + presentation proposals from AI eval.
+
+    The current CANDIDATE_EVAL_PROMPT doesn't emit explicit culture or
+    presentation scores. Derive them as best-effort signals from the
+    fit_score and risks_to_probe. A future prompt revision will have
+    AI emit these directly.
+
+    Default both to a moderate 3.5 when no clear signal exists.
+    """
+    fit_score = evaluation.get("fit_score") or 50
+    risks = evaluation.get("risks_to_probe", []) or []
+
+    # Culture: start at 3.5, lower if culture-flavored risks present
+    culture = 3.5
+    culture_risk_keywords = ["startup", "enterprise", "culture", "remote",
+                              "in-office", "scrappy", "process", "structured"]
+    culture_note = "Default culture score (no specific signals)."
+    for r in risks:
+        rl = r.lower() if isinstance(r, str) else ""
+        if any(k in rl for k in culture_risk_keywords):
+            culture = 3.0
+            culture_note = f"Culture risk flagged: {r[:80]}"
+            break
+
+    # Scale culture up for high-fit candidates
+    if fit_score >= 85:
+        culture = max(culture, 4.0)
+    elif fit_score < 50:
+        culture = min(culture, 2.5)
+
+    # Presentation: derive from fit_score + risk count
+    presentation = 3.5
+    if fit_score >= 85:
+        presentation = 4.0
+    elif fit_score < 50:
+        presentation = 2.5
+    if len(risks) >= 4:
+        presentation = max(2.0, presentation - 0.5)
+    presentation_note = (
+        f"Derived from fit_score={fit_score} and {len(risks)} risks_to_probe."
+    )
+
+    return {
+        "culture_score": culture,
+        "culture_note": culture_note,
+        "presentation_score": presentation,
+        "presentation_note": presentation_note,
+    }
+
+
+async def _load_historical_fill_rate(client, req_id: str) -> dict:
+    """Compute historical fill rate from req_outcomes for this user.
+
+    Returns {fill_rate: float (0-1), n_outcomes: int} or None if no data.
+    """
+    # Get user_id from this req
+    rs = await client.execute(
+        "SELECT user_id FROM requisitions WHERE id = ?", [req_id]
+    )
+    if not rs.rows:
+        return None
+    user_id = rs.rows[0][0]
+
+    # Count outcomes by type for this user
+    rs = await client.execute(
+        """SELECT outcome, COUNT(*) FROM req_outcomes
+           WHERE logged_by_user_id = ?
+           GROUP BY outcome""",
+        [user_id],
+    )
+    counts = {r[0]: int(r[1]) for r in rs.rows}
+
+    total = sum(counts.values())
+    if total == 0:
+        return None
+
+    filled = counts.get("filled", 0)
+    fill_rate = filled / total
+
+    return {
+        "fill_rate": fill_rate,
+        "n_outcomes": total,
+        "counts_by_type": counts,
+    }
 
 
 # ============================================================

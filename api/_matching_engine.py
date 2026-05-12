@@ -506,3 +506,506 @@ def build_adjacency_index(rows: list[tuple]) -> dict:
         # Mirror for reverse lookup
         index.setdefault(aid, {})[sid] = w
     return index
+
+
+# ====================================================================
+# Phase A finishing - the remaining 6 dimensions
+# 2026-05-11: complete the deterministic engine
+# ====================================================================
+
+# 8-dimension weights from modes/_shared.md
+DIMENSION_WEIGHTS = {
+    "technical_match": 0.25,
+    "seniority_fit": 0.15,
+    "location_alignment": 0.10,
+    "comp_alignment": 0.15,
+    "culture_signals": 0.05,
+    "gap_severity": 0.10,
+    "presentation_risk": 0.10,
+    "fill_probability": 0.10,
+}
+
+
+# --------------------------------------------------------------------
+# Dim 3: Location / Remote Alignment
+# --------------------------------------------------------------------
+
+def score_location_fit(req_location: str, req_remote_policy: str,
+                       candidate_location: str) -> dict:
+    """Pure data lookup. From modes/_shared.md:
+      5 = Exact match (lives in the city, or role is fully remote)
+      4 = Willing to relocate or hybrid-compatible
+      3 = Remote but client prefers hybrid, needs conversation
+      2 = Different country / timezone mismatch
+      1 = No path to making location work
+
+    Inputs are strings. Empty/None handled gracefully.
+    """
+    rl = (req_location or "").strip().lower()
+    rp = (req_remote_policy or "").strip().lower()
+    cl = (candidate_location or "").strip().lower()
+
+    # No data on either side - default to neutral 3
+    if not rl and not rp:
+        return {"score": 3.0, "note": "No location data on req. Defaulting to neutral."}
+    if not cl:
+        return {"score": 3.0, "note": "No location data on candidate. Defaulting to neutral."}
+
+    # Fully remote roles - location doesn't matter
+    if "remote" in rp and "hybrid" not in rp and "office" not in rp:
+        return {"score": 5.0, "note": "Role is fully remote. Location is not a constraint."}
+
+    # Exact city match
+    if rl and cl and rl in cl or cl in rl:
+        return {"score": 5.0, "note": f"Candidate location matches req location ({rl})."}
+
+    # Hybrid role with remote candidate
+    if "hybrid" in rp and "remote" in cl:
+        return {"score": 3.0, "note": "Role is hybrid, candidate is remote. Needs conversation."}
+
+    # Different country detection (cheap heuristic on common country names)
+    countries = ["usa", "united states", "uk", "united kingdom", "canada",
+                 "india", "germany", "france", "australia", "brazil"]
+    req_country = next((c for c in countries if c in rl), None)
+    cand_country = next((c for c in countries if c in cl), None)
+    if req_country and cand_country and req_country != cand_country:
+        return {"score": 2.0,
+                "note": f"Different countries ({req_country} vs {cand_country})."}
+
+    # Default: assume some friction but bridgeable
+    return {"score": 3.5, "note": f"Different location ({rl} vs {cl}). May need relocation."}
+
+
+# --------------------------------------------------------------------
+# Dim 4: Compensation Alignment
+# --------------------------------------------------------------------
+
+def _parse_comp_range(comp_str: str) -> tuple:
+    """Parse a comp range string like '$120k-$160k' or '120000-160000'.
+    Returns (low, high) as ints, or (None, None) if unparseable.
+    """
+    import re
+    if not comp_str:
+        return (None, None)
+    # Find all dollar amounts
+    nums = re.findall(r'\$?\s*(\d+(?:,\d{3})*)\s*[kK]?', comp_str)
+    parsed = []
+    for n in nums:
+        n_clean = n.replace(",", "")
+        try:
+            val = int(n_clean)
+            # If 'k' suffix in original text near this number, multiply
+            if "k" in comp_str.lower() and val < 10000:
+                val *= 1000
+            parsed.append(val)
+        except ValueError:
+            continue
+    if len(parsed) >= 2:
+        return (min(parsed), max(parsed))
+    if len(parsed) == 1:
+        return (parsed[0], parsed[0])
+    return (None, None)
+
+
+def score_comp_alignment(req_comp_range: str, candidate_expected_comp: str) -> dict:
+    """Pure data math. From modes/_shared.md:
+      5 = Candidate expectations within role budget
+      4 = Within 10% - negotiable
+      3 = 10-20% gap - needs expectation management
+      2 = 20-35% gap - unlikely without adjustment
+      1 = 35%+ gap - don't waste anyone's time
+
+    Inputs are strings (e.g. '$120k-$160k' for req, '$140k' for candidate).
+    Returns score + note + parsed values for transparency.
+    """
+    req_low, req_high = _parse_comp_range(req_comp_range)
+    cand_low, cand_high = _parse_comp_range(candidate_expected_comp)
+
+    if not req_low or not cand_low:
+        return {
+            "score": 3.0,
+            "note": "Insufficient comp data on one side. Defaulting to neutral.",
+            "req_range": (req_low, req_high),
+            "candidate_range": (cand_low, cand_high),
+        }
+
+    # Use midpoints for comparison
+    req_mid = (req_low + req_high) / 2
+    cand_mid = (cand_low + cand_high) / 2
+
+    # If candidate expectation falls inside req range, perfect match
+    if req_low <= cand_mid <= req_high:
+        return {
+            "score": 5.0,
+            "note": f"Candidate expectation (${cand_mid:,.0f}) fits within req range "
+                    f"(${req_low:,.0f}-${req_high:,.0f}).",
+            "req_range": (req_low, req_high),
+            "candidate_range": (cand_low, cand_high),
+        }
+
+    # Compute gap as percentage
+    gap_pct = abs(cand_mid - req_mid) / req_mid
+
+    if gap_pct < 0.10:
+        score = 4.0
+        note = f"Comp gap {gap_pct*100:.1f}% - negotiable."
+    elif gap_pct < 0.20:
+        score = 3.0
+        note = f"Comp gap {gap_pct*100:.1f}% - needs expectation management."
+    elif gap_pct < 0.35:
+        score = 2.0
+        note = f"Comp gap {gap_pct*100:.1f}% - unlikely without adjustment."
+    else:
+        score = 1.0
+        note = f"Comp gap {gap_pct*100:.1f}% - too large to bridge."
+
+    return {
+        "score": score,
+        "note": note,
+        "req_range": (req_low, req_high),
+        "candidate_range": (cand_low, cand_high),
+        "gap_pct": round(gap_pct, 3),
+    }
+
+
+# --------------------------------------------------------------------
+# Dim 2: Seniority Fit
+# --------------------------------------------------------------------
+
+def score_seniority_fit(req_signals: list, candidate_signals: dict) -> dict:
+    """Hybrid: AI extracts the signals, code does the matching.
+
+    req_signals: list of strings from the JD like ['5+ years', 'lead a team',
+        'mentor juniors']
+    candidate_signals: dict with keys:
+      years_total (int), years_in_niche (int), management_experience (int),
+      tech_lead_signals (int), scope_level ('individual'|'team'|'org'|'company')
+
+    Per modes/_matching-engine.md Step 5, each JD signal is checked against
+    the candidate's vector. Score = avg of all checks * 5.0.
+    """
+    if not req_signals:
+        return {"score": 3.5, "note": "No seniority signals in JD. Defaulting to slight positive."}
+
+    if not candidate_signals or not isinstance(candidate_signals, dict):
+        return {"score": 2.5, "note": "No candidate seniority data extracted."}
+
+    years = candidate_signals.get("years_total", 0) or 0
+    years_niche = candidate_signals.get("years_in_niche", 0) or 0
+    mgmt = candidate_signals.get("management_experience", 0) or 0
+    tech_lead = candidate_signals.get("tech_lead_signals", 0) or 0
+
+    checks = []
+    for sig in req_signals:
+        s = sig.lower()
+        # Extract numeric years requirement
+        import re
+        years_match = re.search(r'(\d+)\+?\s*years?', s)
+        if years_match:
+            required = int(years_match.group(1))
+            if years_niche >= required:
+                checks.append((sig, 1.0, f"{years_niche}yr niche >= {required}yr required"))
+            elif years_niche >= required - 1:
+                checks.append((sig, 0.6, f"{years_niche}yr niche near {required}yr required"))
+            else:
+                checks.append((sig, 0.0, f"{years_niche}yr niche < {required}yr required"))
+        elif "lead" in s or "manag" in s:
+            if mgmt > 0 or tech_lead >= 2:
+                checks.append((sig, 1.0, f"mgmt={mgmt}, tech_lead={tech_lead} satisfies leadership signal"))
+            elif tech_lead >= 1:
+                checks.append((sig, 0.6, f"tech_lead={tech_lead} partial match for leadership"))
+            else:
+                checks.append((sig, 0.0, "No leadership signals"))
+        elif "mentor" in s:
+            if tech_lead >= 1:
+                checks.append((sig, 1.0, f"tech_lead={tech_lead} satisfies mentorship signal"))
+            else:
+                checks.append((sig, 0.3, "Mentorship signal unclear"))
+        else:
+            # Unrecognized signal, give neutral credit
+            checks.append((sig, 0.5, "Signal not pattern-matched"))
+
+    if not checks:
+        return {"score": 3.0, "note": "No signals matched any pattern."}
+
+    avg = sum(c[1] for c in checks) / len(checks)
+    score = round(avg * 5.0, 2)
+
+    return {
+        "score": score,
+        "note": f"Seniority Fit = avg({len(checks)} signal checks) × 5 = {score}",
+        "checks": [{"signal": c[0], "weight": c[1], "rationale": c[2]} for c in checks],
+    }
+
+
+# --------------------------------------------------------------------
+# Dim 5: Culture Signals (AI-proposed, code-validated)
+# --------------------------------------------------------------------
+
+def score_culture_signals(ai_proposed_score: float, ai_note: str = "") -> dict:
+    """AI emits a 1-5 culture score and a rationale. Code validates the
+    range and structure. We don't try to do this in pure code because
+    'startup person vs enterprise person' is genuinely qualitative.
+
+    From modes/_shared.md:
+      5 = Strong alignment (startup person for startup, enterprise for enterprise)
+      4 = Likely compatible, minor unknowns
+      3 = Neutral - insufficient data
+      2 = Some red flags
+      1 = Clear mismatch
+    """
+    try:
+        score = float(ai_proposed_score) if ai_proposed_score is not None else 3.0
+    except (ValueError, TypeError):
+        score = 3.0
+    # Clamp to valid range
+    score = max(1.0, min(5.0, score))
+    return {
+        "score": round(score, 2),
+        "note": ai_note or f"AI-proposed culture score = {score}",
+        "source": "ai_validated",
+    }
+
+
+# --------------------------------------------------------------------
+# Dim 7: Presentation Risk (AI-proposed, code-validated)
+# --------------------------------------------------------------------
+
+def score_presentation_risk(ai_proposed_score: float, ai_note: str = "") -> dict:
+    """AI emits a 1-5 presentation risk score. Code validates the range.
+    From modes/_shared.md:
+      5 = Interviews well, strong communicator, polished resume
+      4 = Solid with light coaching
+      3 = Average
+      2 = Known interview weakness or resume concerns
+      1 = High risk of poor impression
+    """
+    try:
+        score = float(ai_proposed_score) if ai_proposed_score is not None else 3.0
+    except (ValueError, TypeError):
+        score = 3.0
+    score = max(1.0, min(5.0, score))
+    return {
+        "score": round(score, 2),
+        "note": ai_note or f"AI-proposed presentation score = {score}",
+        "source": "ai_validated",
+    }
+
+
+# --------------------------------------------------------------------
+# Dim 8: Fill Probability
+# --------------------------------------------------------------------
+
+def score_fill_probability(
+    technical_match_score: float,
+    gap_severity_score: float,
+    historical_fill_rate: float = None,
+    n_historical_outcomes: int = 0,
+) -> dict:
+    """Pure code. Derive fill probability from:
+      - The engine's own Technical Match score (40% weight)
+      - The engine's own Gap Severity score (30% weight)
+      - Historical fill rate from req_outcomes if available (30% weight)
+        with confidence weighting by sample size (needs n >= 5 to count fully)
+
+    From modes/_shared.md:
+      5 = 80%+ chance of offer if submitted
+      4 = 60-79% - strong, normal competition
+      3 = 40-59% - competitive but realistic
+      2 = 20-39% - long shot
+      1 = Below 20% - don't submit
+    """
+    # Normalize technical and gap to 0-1
+    tech_norm = (technical_match_score or 0) / 5.0
+    gap_norm = (gap_severity_score or 0) / 5.0
+
+    # Base probability from engine signals
+    base_prob = 0.40 * tech_norm + 0.30 * gap_norm
+
+    # Add historical fill rate if we have enough sample
+    if historical_fill_rate is not None and n_historical_outcomes >= 5:
+        # Full confidence on historical
+        base_prob += 0.30 * historical_fill_rate
+        hist_note = (f"historical fill rate {historical_fill_rate*100:.0f}% "
+                     f"(n={n_historical_outcomes})")
+    elif historical_fill_rate is not None and n_historical_outcomes > 0:
+        # Partial confidence on historical, blend with neutral 0.5
+        confidence = n_historical_outcomes / 5.0
+        adjusted = (confidence * historical_fill_rate) + ((1 - confidence) * 0.5)
+        base_prob += 0.30 * adjusted
+        hist_note = (f"historical fill rate {historical_fill_rate*100:.0f}% "
+                     f"(low confidence, n={n_historical_outcomes})")
+    else:
+        # No history, use neutral 0.5 for the historical component
+        base_prob += 0.30 * 0.5
+        hist_note = "no historical outcomes available"
+
+    # Scale to 1-5
+    # base_prob is in [0, 1], scale to [1, 5]
+    score = 1.0 + (base_prob * 4.0)
+    score = max(1.0, min(5.0, score))
+
+    return {
+        "score": round(score, 2),
+        "note": f"Fill Probability = 0.4×tech({tech_norm:.2f}) + "
+                f"0.3×gap({gap_norm:.2f}) + 0.3×{hist_note} → {score:.2f}",
+        "components": {
+            "technical_normalized": round(tech_norm, 3),
+            "gap_normalized": round(gap_norm, 3),
+            "historical_fill_rate": historical_fill_rate,
+            "n_outcomes": n_historical_outcomes,
+        },
+    }
+
+
+# --------------------------------------------------------------------
+# Composite: weighted average of all 8 dimensions
+# --------------------------------------------------------------------
+
+def compute_composite(dimensions: dict, has_blockers: bool = False) -> dict:
+    """Weighted average per modes/_shared.md.
+
+    dimensions: dict with all 8 keys, each value being either a number
+      (the dimension score) or a dict with a 'score' key.
+
+    Returns dict with composite + effective composite (post-blocker-cap) +
+    recommendation.
+    """
+    raw_total = 0.0
+    weight_total = 0.0
+    breakdown = {}
+
+    for dim_name, weight in DIMENSION_WEIGHTS.items():
+        val = dimensions.get(dim_name)
+        if val is None:
+            continue
+        if isinstance(val, dict):
+            score = val.get("score")
+        else:
+            score = val
+        if score is None:
+            continue
+        try:
+            score_f = float(score)
+        except (ValueError, TypeError):
+            continue
+        raw_total += score_f * weight
+        weight_total += weight
+        breakdown[dim_name] = {"score": score_f, "weight": weight,
+                                "contribution": round(score_f * weight, 3)}
+
+    if weight_total == 0:
+        return {
+            "composite": 0.0,
+            "effective_composite": 0.0,
+            "recommendation": "Hard Pass",
+            "breakdown": breakdown,
+            "note": "No dimensions had scores. Cannot compute composite.",
+        }
+
+    composite = raw_total / weight_total
+    effective = min(composite, BLOCKER_CAP) if has_blockers else composite
+    recommendation = apply_composite_threshold(effective, has_blockers)
+
+    return {
+        "composite": round(composite, 3),
+        "effective_composite": round(effective, 3),
+        "recommendation": recommendation,
+        "has_blockers": has_blockers,
+        "weight_total": round(weight_total, 3),
+        "breakdown": breakdown,
+        "note": (f"Composite = sum({sum(b['contribution'] for b in breakdown.values()):.2f}) "
+                 f"/ weight_total ({weight_total:.2f}) = {composite:.2f}"
+                 + (f" → capped at {BLOCKER_CAP} due to blockers" if has_blockers else "")),
+    }
+
+
+# --------------------------------------------------------------------
+# Full 8-dimension evaluation
+# --------------------------------------------------------------------
+
+def evaluate_full(
+    req_skills: list,
+    candidate_skills: list,
+    adjacency_index: dict,
+    req_metadata: dict,
+    candidate_metadata: dict,
+    ai_proposals: dict,
+    historical_data: dict = None,
+) -> dict:
+    """Run the complete 8-dimension scoring.
+
+    req_metadata: {
+      'location': str, 'remote_policy': str,
+      'comp_range': str, 'seniority_signals': list[str],
+    }
+    candidate_metadata: {
+      'location': str, 'expected_comp': str,
+      'seniority_signals': dict (years_total, years_in_niche, mgmt, tech_lead),
+    }
+    ai_proposals: {
+      'culture_score': float (1-5),
+      'culture_note': str,
+      'presentation_score': float (1-5),
+      'presentation_note': str,
+    }
+    historical_data: {
+      'fill_rate': float (0-1),
+      'n_outcomes': int,
+    } or None
+    """
+    # First 2 dimensions from skills (already-shipped path)
+    skill_result = evaluate_skills(req_skills, candidate_skills, adjacency_index)
+    technical = skill_result["technical_match"]
+    gap = skill_result["gap_severity"]
+    has_blockers = skill_result["blocker_count"] > 0
+
+    # Other 6 dimensions
+    location = score_location_fit(
+        req_metadata.get("location", ""),
+        req_metadata.get("remote_policy", ""),
+        candidate_metadata.get("location", ""),
+    )
+    comp = score_comp_alignment(
+        req_metadata.get("comp_range", ""),
+        candidate_metadata.get("expected_comp", ""),
+    )
+    seniority = score_seniority_fit(
+        req_metadata.get("seniority_signals", []),
+        candidate_metadata.get("seniority_signals", {}),
+    )
+    culture = score_culture_signals(
+        ai_proposals.get("culture_score"),
+        ai_proposals.get("culture_note", ""),
+    )
+    presentation = score_presentation_risk(
+        ai_proposals.get("presentation_score"),
+        ai_proposals.get("presentation_note", ""),
+    )
+
+    hist = historical_data or {}
+    fill = score_fill_probability(
+        technical["score"], gap["score"],
+        hist.get("fill_rate"), hist.get("n_outcomes", 0),
+    )
+
+    all_dimensions = {
+        "technical_match": technical,
+        "seniority_fit": seniority,
+        "location_alignment": location,
+        "comp_alignment": comp,
+        "culture_signals": culture,
+        "gap_severity": gap,
+        "presentation_risk": presentation,
+        "fill_probability": fill,
+    }
+
+    composite_result = compute_composite(all_dimensions, has_blockers)
+
+    return {
+        "skill_matches": skill_result["skill_matches"],
+        "blockers": skill_result["blockers"],
+        "blocker_count": skill_result["blocker_count"],
+        "dimensions": {k: v for k, v in all_dimensions.items()},
+        "composite": composite_result,
+    }
