@@ -585,7 +585,19 @@ def _extract_ai_proposals(evaluation: dict) -> dict:
 async def _load_historical_fill_rate(client, req_id: str) -> dict:
     """Compute historical fill rate from req_outcomes for this user.
 
-    Returns {fill_rate: float (0-1), n_outcomes: int} or None if no data.
+    Fill rate definition: filled / (filled + lost).
+      - 'filled' = placement landed
+      - 'lost'   = req went to another agency or internal hire
+      - 'cancelled' = req closed without a real search competition; EXCLUDED
+        from denominator because it's an admin event, not a market outcome
+      - 'fell_off' = placement reversed; counts as half-filled (placement
+        actually happened, just didn't stick)
+      - 'reopened' = ignored, it's a state transition not a terminal outcome
+
+    Minimum sample size: returns None if (filled + lost) < 3. Below that,
+    the fill rate signal is too noisy to use; engine falls back to neutral
+    0.5 weighting. Prevents one cancelled req from making every candidate
+    look unfillable.
     """
     # Get user_id from this req
     rs = await client.execute(
@@ -604,16 +616,22 @@ async def _load_historical_fill_rate(client, req_id: str) -> dict:
     )
     counts = {r[0]: int(r[1]) for r in rs.rows}
 
-    total = sum(counts.values())
-    if total == 0:
+    filled = counts.get("filled", 0)
+    lost = counts.get("lost", 0)
+    fell_off = counts.get("fell_off", 0)
+    placeable_total = filled + lost + fell_off
+
+    # Need at least 3 placeable outcomes for the signal to be meaningful
+    if placeable_total < 3:
         return None
 
-    filled = counts.get("filled", 0)
-    fill_rate = filled / total
+    # Count fell_off as half-credit (the placement did happen, just didn't stick)
+    effective_fills = filled + (0.5 * fell_off)
+    fill_rate = effective_fills / placeable_total
 
     return {
         "fill_rate": fill_rate,
-        "n_outcomes": total,
+        "n_outcomes": placeable_total,
         "counts_by_type": counts,
     }
 
