@@ -5577,12 +5577,38 @@ async def list_submissions(req_id: str, user: dict = Depends(get_current_user)):
         rs = await client.execute(
             """SELECT s.id, s.candidate_id, s.ai_fit_score, s.recommendation, s.stage,
                       s.fit_analysis_json, s.created_at,
-                      c.name, c.current_title, c.current_company
-               FROM submissions s JOIN candidates c ON s.candidate_id = c.id
+                      c.name, c.current_title, c.current_company,
+                      sd.technical_match, sd.seniority_fit, sd.location_alignment,
+                      sd.comp_alignment, sd.culture_signals, sd.gap_severity,
+                      sd.presentation_risk, sd.fill_probability,
+                      sd.composite_score, sd.blocker_count, sd.match_breakdown_json
+               FROM submissions s
+               JOIN candidates c ON s.candidate_id = c.id
+               LEFT JOIN submission_dimensions sd ON sd.submission_id = s.id
                WHERE s.req_id = ?
-               ORDER BY s.ai_fit_score DESC, s.created_at DESC""",
+               ORDER BY COALESCE(sd.composite_score, s.ai_fit_score / 20.0) DESC,
+                        s.created_at DESC""",
             [req_id],
         )
+        def _engine_breakdown(raw_json):
+            """Extract just the engine portion of match_breakdown_json,
+            keeping the response payload small."""
+            if not raw_json:
+                return None
+            try:
+                blob = json.loads(raw_json)
+                eng = blob.get("engine") if isinstance(blob, dict) else None
+                if not eng:
+                    return None
+                # Strip skill_matches (can be large); keep dimensions + composite
+                return {
+                    "dimensions": eng.get("dimensions"),
+                    "composite": eng.get("composite"),
+                    "blocker_count": eng.get("blocker_count"),
+                    "blockers": eng.get("blockers"),
+                }
+            except Exception:
+                return None
         return {
             "submissions": [
                 {
@@ -5591,6 +5617,19 @@ async def list_submissions(req_id: str, user: dict = Depends(get_current_user)):
                     "evaluation": json.loads(r[5]) if r[5] else None,
                     "created_at": r[6],
                     "candidate_name": r[7], "current_title": r[8], "current_company": r[9],
+                    "engine": {
+                        "technical_match": r[10],
+                        "seniority_fit": r[11],
+                        "location_alignment": r[12],
+                        "comp_alignment": r[13],
+                        "culture_signals": r[14],
+                        "gap_severity": r[15],
+                        "presentation_risk": r[16],
+                        "fill_probability": r[17],
+                        "composite": r[18],
+                        "blocker_count": r[19],
+                        "breakdown": _engine_breakdown(r[20]),
+                    } if r[10] is not None or r[18] is not None else None,
                 }
                 for r in rs.rows
             ]
