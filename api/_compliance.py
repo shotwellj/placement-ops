@@ -394,6 +394,14 @@ async def _run_matching_engine(client, req_id: str, candidate_id: str,
     )
 
 
+# Public alias for use by other modes (e.g. Phase E match mode). The original
+# underscore prefix indicated internal use during Phase A development. Now that
+# the engine pipeline is stable, other modes call it via `run_matching_engine`.
+run_matching_engine = _run_matching_engine
+
+
+
+
 async def _load_req_metadata(client, req_id: str) -> dict:
     """Extract location, comp range, seniority signals from req parsed_json."""
     rs = await client.execute(

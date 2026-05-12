@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Match · SourcingNav Talent Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a; --bg-elev: #111827; --bg-card: #151d2e;
+    --border: #1f2a3f; --border-strong: #2d3a54;
+    --text: #e8ecf4; --text-dim: #8b9bb3; --text-mute: #5a6c85;
+    --accent: #3dd9d6; --accent-deep: #2eb8b5; --blue: #4a9eff;
+    --accent-glow: rgba(61, 217, 214, 0.15);
+    --gradient: linear-gradient(135deg, #3dd9d6 0%, #4a9eff 100%);
+    --danger: #ff6b6b; --warn: #ffb74d; --good: #4ade80;
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased; background-image: radial-gradient(ellipse at top right, rgba(61,217,214,0.06) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(74,158,255,0.04) 0%, transparent 50%); background-attachment: fixed; }
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
+  .nav-inner { max-width: 1400px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; letter-spacing: 0.08em; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+  .brand-sub { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); margin-left: 0.75rem; padding-left: 0.75rem; border-left: 1px solid var(--border-strong); }
+  .nav-right { display: flex; align-items: center; gap: 1.5rem; font-size: 0.85rem; }
+  .nav-link { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+  .nav-link:hover { color: var(--accent); }
+  .nav-link.active { color: var(--text); }
+  .page { max-width: 1400px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+  .page-header { margin-bottom: 2rem; }
+  .page-kicker { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.75rem; }
+  .page-title { font-size: 2.25rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05; }
+  .page-title em { font-style: italic; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .page-desc { color: var(--text-dim); font-size: 1rem; max-width: 720px; margin-top: 0.75rem; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .card-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.7rem 1.3rem; border: none; border-radius: 8px; font-family: var(--font-body); font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: transform 0.1s, box-shadow 0.2s; text-decoration: none; }
+  .btn-primary { background: var(--gradient); color: #0a0e1a; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(61, 217, 214, 0.3); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border-strong); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+  .loading { padding: 4rem 2rem; text-align: center; color: var(--text-dim); font-family: var(--font-mono); font-size: 0.9rem; }
+  .err-box { background: rgba(255, 107, 107, 0.08); border: 1px solid var(--danger); border-radius: 8px; padding: 1rem; color: var(--danger); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .empty-state { padding: 4rem 2rem; text-align: center; background: var(--bg-card); border: 1px dashed var(--border-strong); border-radius: 12px; }
+  .empty-state h3 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+  .empty-state p { color: var(--text-dim); margin-bottom: 1.5rem; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+  /* Req picker */
+  .picker-row { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; }
+  .picker-label { display: block; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  select.picker-select { width: 100%; padding: 0.85rem 1rem; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 0.95rem; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238b9bb3' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; padding-right: 2.5rem; }
+  select.picker-select:focus { outline: none; border-color: var(--accent); }
+
+  /* KPI strip */
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi { padding: 1.1rem; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; }
+  .kpi-label { font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-mute); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.4rem; }
+  .kpi-value { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+
+  /* Match row */
+  .match-row { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 0.85rem; transition: border-color 0.15s; overflow: hidden; }
+  .match-row.expanded { border-color: var(--accent); }
+  .match-row.unscored { opacity: 0.7; }
+  .match-row.unscored:hover { opacity: 1; }
+  .match-header { display: grid; grid-template-columns: 60px 1fr auto auto auto; gap: 1rem; padding: 1rem 1.25rem; align-items: center; cursor: pointer; }
+  .match-rank { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-mute); text-align: center; }
+  .match-composite { font-family: var(--font-mono); font-size: 1.75rem; font-weight: 700; line-height: 1; min-width: 70px; text-align: center; }
+  .match-composite.good { color: var(--good); }
+  .match-composite.ok { color: var(--accent); }
+  .match-composite.warn { color: var(--warn); }
+  .match-composite.bad { color: var(--danger); }
+  .match-composite.none { color: var(--text-mute); font-size: 1rem; }
+  .match-composite-sub { font-size: 0.55em; font-weight: 400; color: var(--text-mute); margin-left: 0.1rem; }
+  .match-name { font-weight: 600; font-size: 1rem; }
+  .match-meta { color: var(--text-mute); font-size: 0.8rem; font-family: var(--font-mono); margin-top: 0.25rem; }
+  .match-rec { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.3rem 0.6rem; border-radius: 4px; white-space: nowrap; }
+  .match-rec.Strong-Submit { background: rgba(74, 222, 128, 0.18); color: var(--good); }
+  .match-rec.Submit { background: rgba(74, 222, 128, 0.12); color: var(--good); }
+  .match-rec.Maybe { background: rgba(255, 183, 77, 0.12); color: var(--warn); }
+  .match-rec.Pass { background: rgba(255, 107, 107, 0.1); color: var(--danger); }
+  .match-rec.Hard-Pass { background: rgba(255, 107, 107, 0.2); color: var(--danger); }
+  .match-arrow { color: var(--text-mute); font-size: 1rem; transition: transform 0.15s; }
+  .match-row.expanded .match-arrow { transform: rotate(180deg); color: var(--accent); }
+  .match-blocker-pill { font-family: var(--font-mono); font-size: 0.7rem; color: var(--danger); padding: 0.2rem 0.5rem; background: rgba(255, 107, 107, 0.1); border-radius: 4px; }
+
+  /* Expanded details */
+  .match-detail { display: none; padding: 0 1.25rem 1.25rem; border-top: 1px solid var(--border); }
+  .match-row.expanded .match-detail { display: block; padding-top: 1.25rem; }
+  .prior-link { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim); margin-bottom: 1rem; padding: 0.5rem 0.8rem; background: rgba(74, 158, 255, 0.05); border: 1px solid rgba(74, 158, 255, 0.2); border-radius: 6px; }
+  .prior-link a { color: var(--blue); text-decoration: none; }
+  .prior-link a:hover { text-decoration: underline; }
+
+  /* Engine scorecard (mirrors pipeline.html, simplified) */
+  .engine-scorecard { background: linear-gradient(180deg, rgba(61, 217, 214, 0.04) 0%, transparent 100%); border: 1px solid rgba(61, 217, 214, 0.2); border-radius: 10px; padding: 1rem 1.1rem; }
+  .engine-blocker-banner { background: rgba(255, 107, 107, 0.08); border: 1px solid rgba(255, 107, 107, 0.25); color: var(--danger); padding: 0.55rem 0.8rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 0.85rem; }
+  .dim-grid { display: grid; grid-template-columns: 1fr; gap: 0.4rem; }
+  .dim-row { display: grid; grid-template-columns: minmax(120px, 1.4fr) 50px minmax(0, 3fr); gap: 0.85rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); align-items: center; }
+  .dim-row:last-child { border-bottom: none; }
+  .dim-name { font-size: 0.88rem; font-weight: 500; }
+  .dim-meta { font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-mute); margin-top: 0.15rem; }
+  .dim-score { font-family: var(--font-mono); font-size: 1.05rem; font-weight: 600; text-align: right; }
+  .dim-max { font-size: 0.65rem; color: var(--text-mute); font-weight: 400; }
+  .dim-rationale { font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; overflow-wrap: anywhere; }
+  .engine-blockers-list { list-style: none; padding: 0; margin: 0.75rem 0 0; }
+  .engine-blockers-list li { padding: 0.3rem 0; color: var(--danger); font-size: 0.85rem; }
+  .engine-note { margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.05); font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-mute); line-height: 1.5; }
+
+  /* Source context banner */
+  .source-context { padding: 0.6rem 0.85rem; background: rgba(74, 158, 255, 0.06); border: 1px solid rgba(74, 158, 255, 0.2); border-radius: 6px; margin-bottom: 1rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; }
+  .source-context strong { color: var(--blue); font-weight: 500; }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <div>
+      <a href="/" class="brand">SOURCINGNAV</a>
+      <span class="brand-sub">TALENT ENGINE</span>
+    </div>
+    <div class="nav-right">
+      <a href="/app/" class="nav-link">Intake</a>
+      <a href="/app/pipeline.html" class="nav-link">Pipeline</a>
+      <a href="/app/match.html" class="nav-link active">Match</a>
+      <a href="/app/trends.html" class="nav-link">Trends</a>
+      <a href="/app/taxonomy.html" class="nav-link">Taxonomy</a>
+      <a href="/app/settings.html" class="nav-link">Settings</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-kicker">LIFECYCLE · MATCH MODE</div>
+      <h1 class="page-title">Find the <em>right candidate</em> for any req</h1>
+      <p class="page-desc">Score every candidate in your pool against this requisition using the same deterministic 8-dimension engine that powers source evaluation. No new AI calls. Re-ranks instantly using candidate_skills already captured from prior evaluations.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="picker-row">
+      <div>
+        <label class="picker-label" for="req-picker">Requisition</label>
+        <select id="req-picker" class="picker-select">
+          <option value="">Loading reqs...</option>
+        </select>
+      </div>
+      <button id="run-match-btn" class="btn btn-primary" disabled>Match candidates</button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+  <div id="results"></div>
+</main>
+
+<script>
+const TOKEN = localStorage.getItem('sn_token');
+if (!TOKEN) {
+  document.body.innerHTML = '<div style="padding: 4rem; text-align: center; font-family: monospace; color: #8b9bb3;">Please <a href="/app/" style="color: #3dd9d6;">log in</a> first.</div>';
+  throw new Error('No token');
+}
+
+const authHeaders = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function compositeClass(c) {
+  if (c === null || c === undefined) return 'none';
+  if (c >= 4.0) return 'good';
+  if (c >= 3.0) return 'ok';
+  if (c >= 2.0) return 'warn';
+  return 'bad';
+}
+
+function dimColor(val) {
+  if (val === null || val === undefined) return 'var(--text-mute)';
+  if (val >= 4.0) return 'var(--good)';
+  if (val >= 3.0) return 'var(--accent)';
+  if (val >= 2.0) return 'var(--warn)';
+  return 'var(--danger)';
+}
+
+function fmt(v) { return (v === null || v === undefined) ? '–' : Number(v).toFixed(2); }
+
+// Same 8 dimensions/weights as Phase A
+const DIM_META = [
+  { key: 'technical_match', label: 'Technical Match', weight: 25, src: 'code' },
+  { key: 'seniority_fit', label: 'Seniority Fit', weight: 15, src: 'code' },
+  { key: 'location_alignment', label: 'Location', weight: 10, src: 'code' },
+  { key: 'comp_alignment', label: 'Comp Alignment', weight: 15, src: 'code' },
+  { key: 'culture_signals', label: 'Culture Signals', weight: 5, src: 'cached' },
+  { key: 'gap_severity', label: 'Gap Severity', weight: 10, src: 'code' },
+  { key: 'presentation_risk', label: 'Presentation Risk', weight: 10, src: 'cached' },
+  { key: 'fill_probability', label: 'Fill Probability', weight: 10, src: 'code' },
+];
+
+async function loadReqs() {
+  const params = new URLSearchParams(location.search);
+  const preselectedReq = params.get('req');
+  try {
+    const r = await fetch('/api/reqs?status=open', { headers: authHeaders });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    const picker = document.getElementById('req-picker');
+    picker.innerHTML = '<option value="">Select a requisition...</option>' +
+      (data.reqs || []).map(req =>
+        `<option value="${escapeHtml(req.id)}">${escapeHtml(req.title)} · ${escapeHtml(req.org_name || '')}</option>`
+      ).join('');
+    document.getElementById('run-match-btn').disabled = false;
+    if (preselectedReq) {
+      picker.value = preselectedReq;
+      if (picker.value) runMatch();  // auto-run if a valid req was passed
+    }
+  } catch (e) {
+    document.getElementById('status').innerHTML =
+      `<div class="err-box">Could not load reqs: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function runMatch() {
+  const reqId = document.getElementById('req-picker').value;
+  if (!reqId) {
+    document.getElementById('status').innerHTML =
+      `<div class="err-box">Please pick a requisition first.</div>`;
+    return;
+  }
+  const btn = document.getElementById('run-match-btn');
+  btn.disabled = true;
+  btn.textContent = 'Scoring candidates...';
+  document.getElementById('status').innerHTML = '';
+  document.getElementById('results').innerHTML =
+    '<div class="loading">Running engine against every candidate in pool...</div>';
+  try {
+    const r = await fetch('/api/match/batch', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ req_id: reqId, limit: 100 }),
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      throw new Error(`HTTP ${r.status}: ${errText.slice(0, 200)}`);
+    }
+    const data = await r.json();
+    renderResults(data);
+  } catch (e) {
+    document.getElementById('status').innerHTML =
+      `<div class="err-box">Match failed: ${escapeHtml(e.message)}</div>`;
+    document.getElementById('results').innerHTML = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Match candidates';
+  }
+}
+
+function renderResults(data) {
+  const { req, total_candidates_in_pool, scored_count, unscored_count, scored, unscored } = data;
+  if (total_candidates_in_pool === 0) {
+    document.getElementById('results').innerHTML = `
+      <div class="empty-state">
+        <h3>No candidates in your pool yet</h3>
+        <p>Match mode ranks your existing candidate pool against a req. Evaluate some candidates via the Intake page first, then come back here to see them ranked against other reqs.</p>
+        <a href="/app/" class="btn btn-primary">Go to Intake</a>
+      </div>`;
+    return;
+  }
+
+  let html = `
+    <div class="source-context">
+      <strong>Lifecycle stage:</strong> Match mode reuses candidate_skills captured during prior source evaluations.
+      The 8 dimensions are computed deterministically against this req. <strong>No new AI calls.</strong>
+      Culture + presentation signals come from each candidate's most recent prior evaluation (where available).
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Pool size</div><div class="kpi-value">${total_candidates_in_pool}</div></div>
+      <div class="kpi"><div class="kpi-label">Scored</div><div class="kpi-value">${scored_count}</div></div>
+      <div class="kpi"><div class="kpi-label">Unscored</div><div class="kpi-value">${unscored_count}</div></div>
+      <div class="kpi"><div class="kpi-label">Req</div><div class="kpi-value" style="font-size: 0.85rem;">${escapeHtml(req.title)}</div></div>
+    </div>
+  `;
+
+  if (scored_count === 0 && unscored_count === 0) {
+    html += `<div class="empty-state"><h3>No candidates matched</h3><p>The engine couldn't score any candidates against this req. This usually means the candidates have no skill data captured yet.</p></div>`;
+  } else {
+    if (scored.length) {
+      html += '<div style="margin-bottom: 1.5rem;">';
+      scored.forEach((row, i) => {
+        html += renderMatchRow(row, i + 1);
+      });
+      html += '</div>';
+    }
+    if (unscored.length) {
+      html += `<div class="card-label" style="margin: 2rem 0 0.75rem;">Unscored — no skill data yet</div>`;
+      unscored.forEach((row) => {
+        html += renderMatchRow(row, null);
+      });
+    }
+  }
+
+  document.getElementById('results').innerHTML = html;
+}
+
+function renderMatchRow(row, rank) {
+  const cand = row.candidate;
+  const eng = row.engine;
+  const composite = eng ? eng.composite : null;
+  const cls = compositeClass(composite);
+  const recRaw = eng?.recommendation || '';
+  const recClass = recRaw.replace(/\s+/g, '-');
+  const blockerCount = eng?.blocker_count || 0;
+  const isUnscored = !eng;
+
+  return `
+    <div class="match-row ${isUnscored ? 'unscored' : ''}" data-cand-id="${escapeHtml(cand.id)}">
+      <div class="match-header" onclick="this.parentNode.classList.toggle('expanded')">
+        <div class="match-rank">${rank !== null ? '#' + rank : '—'}</div>
+        <div>
+          <div class="match-name">${escapeHtml(cand.name || 'Unnamed candidate')}</div>
+          <div class="match-meta">
+            ${escapeHtml(cand.current_title || '—')}${cand.current_company ? ' · ' + escapeHtml(cand.current_company) : ''}
+            ${row.prior_req_title ? ' · last evaluated for: ' + escapeHtml(row.prior_req_title) : ''}
+          </div>
+        </div>
+        <div class="match-composite ${cls}">
+          ${isUnscored ? 'n/a' : fmt(composite) + '<span class="match-composite-sub">/5</span>'}
+        </div>
+        <div>
+          ${recRaw ? `<span class="match-rec ${recClass}">${escapeHtml(recRaw)}</span>` : ''}
+          ${blockerCount > 0 ? `<span class="match-blocker-pill" title="${blockerCount} blocker(s) detected">⚠ ${blockerCount}</span>` : ''}
+        </div>
+        <div class="match-arrow">▾</div>
+      </div>
+      <div class="match-detail">
+        ${row.prior_submission_id ? `
+          <div class="prior-link">
+            Previously evaluated for <strong>${escapeHtml(row.prior_req_title || 'another req')}</strong>.
+            <a href="/app/pipeline.html?req=${escapeHtml(row.prior_req_id)}">View prior evaluation →</a>
+          </div>` : `
+          <div class="prior-link" style="background: rgba(139, 155, 179, 0.06); border-color: rgba(139, 155, 179, 0.2);">
+            <span style="color: var(--text-mute);">No prior evaluation. Engine ran on cached skill data only.</span>
+          </div>`}
+        ${isUnscored ? `
+          <div style="padding: 1rem; color: var(--text-dim); font-size: 0.9rem;">
+            ${escapeHtml(row.skipped_reason || 'No engine output')}.
+            This candidate needs to be evaluated through the source flow first to capture their skills.
+          </div>` : renderScorecard(eng)}
+      </div>
+    </div>
+  `;
+}
+
+function renderScorecard(eng) {
+  const hasBlockers = (eng.blocker_count || 0) > 0;
+  const dimRows = DIM_META.map(d => {
+    const dim = (eng.dimensions || {})[d.key] || {};
+    const val = dim.score;
+    return `
+      <div class="dim-row">
+        <div>
+          <div class="dim-name">${d.label}</div>
+          <div class="dim-meta">${d.weight}% · ${d.src}</div>
+        </div>
+        <div class="dim-score" style="color: ${dimColor(val)};">${fmt(val)}<span class="dim-max">/5</span></div>
+        <div class="dim-rationale">${escapeHtml(dim.note || '')}</div>
+      </div>
+    `;
+  }).join('');
+
+  const blockersHtml = (eng.blockers || []).map(b => `
+    <li>✕ <strong>${escapeHtml(b.requirement_text || '')}</strong>: ${escapeHtml(b.rationale || '')}</li>
+  `).join('');
+
+  return `
+    <div class="engine-scorecard">
+      ${hasBlockers ? `
+        <div class="engine-blocker-banner">
+          ⚠ ${eng.blocker_count} blocker${eng.blocker_count > 1 ? 's' : ''} present. Composite capped at 3.0 per matching engine spec.
+        </div>` : ''}
+      <div class="dim-grid">${dimRows}</div>
+      ${blockersHtml ? `<ul class="engine-blockers-list">${blockersHtml}</ul>` : ''}
+      ${eng.note ? `<div class="engine-note">${escapeHtml(eng.note)}</div>` : ''}
+    </div>
+  `;
+}
+
+// Boot
+loadReqs();
+document.getElementById('run-match-btn').addEventListener('click', runMatch);
+document.getElementById('req-picker').addEventListener('change', () => {
+  const reqId = document.getElementById('req-picker').value;
+  document.getElementById('run-match-btn').disabled = !reqId;
+});
+</script>
+</body>
+</html>

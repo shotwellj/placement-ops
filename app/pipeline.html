@@ -258,6 +258,7 @@
     <div class="nav-right">
       <a href="/app/" class="nav-link">Intake</a>
       <a href="/app/pipeline.html" class="nav-link active">Pipeline</a>
+      <a href="/app/match.html" class="nav-link">Match</a>
       <a href="/app/trends.html" class="nav-link">Trends</a>
       <a href="/app/taxonomy.html" class="nav-link">Taxonomy</a>
       <a href="/app/settings.html" class="nav-link">Settings</a>
@@ -441,7 +442,8 @@ function renderDetail(d) {
         </div>
       </div>
       ${d.status === 'open' ? `
-        <div>
+        <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+          <a href="/app/match.html?req=${escapeHtml(d.id)}" class="btn btn-ghost" style="white-space: nowrap;" title="Score every candidate in your pool against this req">Match candidates</a>
           <button id="closeOutBtn" class="btn btn-primary" style="white-space: nowrap;">Close Out Req</button>
         </div>
       ` : ''}

@@ -32,6 +32,7 @@ from api._compliance import (
     write_submission_dimensions,
     write_req_skills,
     write_candidate_skills,
+    run_matching_engine,
 )
 from api._calibration import (
     record_calibration_event,
@@ -5633,6 +5634,185 @@ async def list_submissions(req_id: str, user: dict = Depends(get_current_user)):
                 }
                 for r in rs.rows
             ]
+        }
+
+
+# ============================================================
+# PHASE E - MATCH MODE (lifecycle stage 3)
+# ============================================================
+# Given a req, score every candidate in the user's pool against it using
+# the same 8-dimension deterministic engine that powers source evaluation.
+# No AI calls (engine reads cached candidate_skills written during prior
+# source evals). No DB writes (match is a read-only ranking - if the user
+# wants to officially submit a matched candidate, they go through the
+# normal source flow which creates the submission + audit chain).
+#
+# The reuse of candidate_skills across reqs is the foundation of the
+# Talent OS model: every candidate evaluated against any req contributes
+# to a growing pool that can be re-scored against future reqs.
+#
+# Lifecycle stages currently shipped:
+#   - Source (Phase A): one candidate, one req, AI + engine
+#   - Match (Phase E):  N candidates, one req, engine only
+# Future stages (Phase E+): schedule, interview, offer, onboard, etc.
+
+class MatchBatchRequest(BaseModel):
+    req_id: str
+    min_score: Optional[float] = Field(
+        default=None, ge=0.0, le=5.0,
+        description="Optional. Filter candidates whose composite is below this.",
+    )
+    limit: Optional[int] = Field(
+        default=50, ge=1, le=200,
+        description="Max candidates to return after sorting.",
+    )
+
+
+@app.post("/api/match/batch")
+async def match_batch(req: MatchBatchRequest, user: dict = Depends(get_current_user)):
+    """Phase E: rank all of the user's candidates against a single requisition.
+
+    Returns the ranked list. Each entry includes the candidate's basic info,
+    the 8 engine dimensions, composite + recommendation, and the most-recent
+    submission_id (if the candidate was previously evaluated against any
+    req - for navigating to existing evaluations).
+
+    Performance note: this currently runs the engine for every candidate in
+    the user's pool synchronously. At small scale (current state: 5 cands,
+    24 reqs) this is fast (<2s). At larger scale we'll need to (a) cache
+    scores in a match_scores table, and/or (b) batch the engine across all
+    candidates in one pass. Not a v1 problem.
+    """
+    async with db() as client:
+        # Verify req ownership
+        rs = await client.execute(
+            """SELECT id, title FROM requisitions
+               WHERE id = ? AND user_id = ?""",
+            [req.req_id, user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Requisition not found")
+        req_title = rs.rows[0][1]
+
+        # Pull all candidates owned by this user
+        rs = await client.execute(
+            """SELECT id, name, current_title, current_company,
+                      email, linkedin_url, source, created_at
+               FROM candidates
+               WHERE user_id = ?
+               ORDER BY created_at DESC""",
+            [user["id"]],
+        )
+        candidates = [
+            {
+                "id": r[0], "name": r[1], "current_title": r[2],
+                "current_company": r[3], "email": r[4],
+                "linkedin_url": r[5], "source": r[6], "created_at": r[7],
+            }
+            for r in rs.rows
+        ]
+
+        # For each candidate, fetch their most recent prior evaluation
+        # (to populate seniority + AI proposal signals). Empty if never
+        # evaluated.
+        results = []
+        for c in candidates:
+            cand_id = c["id"]
+            # Most recent submission across any req for this candidate
+            rs = await client.execute(
+                """SELECT s.id, s.fit_analysis_json, s.req_id, r.title
+                   FROM submissions s
+                   JOIN requisitions r ON s.req_id = r.id
+                   WHERE s.candidate_id = ? AND r.user_id = ?
+                   ORDER BY s.created_at DESC LIMIT 1""",
+                [cand_id, user["id"]],
+            )
+            prior_eval = None
+            prior_submission_id = None
+            prior_req_id = None
+            prior_req_title = None
+            if rs.rows:
+                prior_submission_id = rs.rows[0][0]
+                prior_req_id = rs.rows[0][2]
+                prior_req_title = rs.rows[0][3]
+                try:
+                    prior_eval = json.loads(rs.rows[0][1]) if rs.rows[0][1] else None
+                except Exception:
+                    prior_eval = None
+
+            # Run the engine - same module Phase A uses, just called outside
+            # the source eval write path
+            try:
+                engine_result = await run_matching_engine(
+                    client, req.req_id, cand_id, prior_eval
+                )
+            except Exception as e:
+                print(f"[match-engine] error for cand {cand_id}: {e!r}")
+                engine_result = None
+
+            if not engine_result:
+                # Candidate has no skill data OR engine couldn't run.
+                # Still include them in the response so the UI can show
+                # "no skills evaluated yet" cards.
+                results.append({
+                    "candidate": c,
+                    "engine": None,
+                    "skipped_reason": "No candidate_skills found",
+                    "prior_submission_id": prior_submission_id,
+                    "prior_req_id": prior_req_id,
+                    "prior_req_title": prior_req_title,
+                })
+                continue
+
+            comp = engine_result.get("composite", {}) or {}
+            dims = engine_result.get("dimensions", {}) or {}
+            results.append({
+                "candidate": c,
+                "engine": {
+                    "composite": comp.get("effective_composite"),
+                    "composite_raw": comp.get("composite"),
+                    "recommendation": comp.get("recommendation"),
+                    "has_blockers": comp.get("has_blockers"),
+                    "blocker_count": engine_result.get("blocker_count"),
+                    "blockers": engine_result.get("blockers", []),
+                    "weight_total": comp.get("weight_total"),
+                    "note": comp.get("note"),
+                    "dimensions": {
+                        name: {
+                            "score": data.get("score"),
+                            "note": data.get("note"),
+                        }
+                        for name, data in dims.items()
+                    },
+                },
+                "prior_submission_id": prior_submission_id,
+                "prior_req_id": prior_req_id,
+                "prior_req_title": prior_req_title,
+            })
+
+        # Apply min_score filter (after engine run, since unscored candidates
+        # have None composite and should always be excluded from filtered set
+        # but kept in unfiltered view as informational)
+        scored = [r for r in results if r["engine"] is not None]
+        unscored = [r for r in results if r["engine"] is None]
+
+        if req.min_score is not None:
+            scored = [r for r in scored
+                       if (r["engine"]["composite"] or 0) >= req.min_score]
+
+        # Sort scored by composite desc
+        scored.sort(key=lambda r: r["engine"]["composite"] or 0, reverse=True)
+
+        # Apply limit (only to scored; unscored is informational and small)
+        scored = scored[: req.limit]
+
+        return {
+            "req": {"id": req.req_id, "title": req_title},
+            "total_candidates_in_pool": len(candidates),
+            "scored_count": len(scored),
+            "unscored_count": len(unscored),
+            "scored": scored,
+            "unscored": unscored,
         }
 
 
