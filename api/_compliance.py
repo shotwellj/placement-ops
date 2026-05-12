@@ -436,31 +436,40 @@ async def _load_req_metadata(client, req_id: str) -> dict:
 
 async def _load_candidate_metadata(client, candidate_id: str,
                                     evaluation: dict) -> dict:
-    """Build candidate metadata from candidates table + AI eval output."""
+    """Build candidate metadata from candidates table + AI eval output.
+
+    2026-05-11 Phase A finishing: location extraction now uses LinkedIn-style
+    City/State/Country patterns and also pulls from AI eval's summary +
+    blocker_assessment evidence fields, where the AI often mentions location
+    even when the raw resume_text doesn't have a "Location:" label.
+    """
     rs = await client.execute(
         """SELECT current_title, current_company, notes, resume_text
            FROM candidates WHERE id = ?""",
         [candidate_id],
     )
-    location = ""
+    notes = ""
+    resume = ""
     if rs.rows:
-        # Try to find location in notes or resume_text
         notes = rs.rows[0][2] or ""
-        resume = (rs.rows[0][3] or "")[:2000]  # first 2k chars
-        # Cheap regex for "Location: X" or city patterns
-        import re
-        for src in (notes, resume):
-            m = re.search(r'(?:location|based\s+in|lives?\s+in)[:\s]+([A-Za-z\s,]+?)(?:\n|\||$)',
-                          src, re.IGNORECASE)
-            if m:
-                location = m.group(1).strip()[:100]
-                break
+        resume = (rs.rows[0][3] or "")[:3000]  # first 3k chars covers LinkedIn header
+
+    # Build a corpus of text to search across, in priority order
+    eval_summary = evaluation.get("summary", "") or ""
+    eval_headline = evaluation.get("headline", "") or ""
+    blocker_evidence_blob = ""
+    for s in (evaluation.get("blocker_assessment") or []):
+        if isinstance(s, dict):
+            blocker_evidence_blob += " " + (s.get("evidence") or "")
+
+    location = _extract_location_from_text(
+        resume, notes, eval_summary, eval_headline, blocker_evidence_blob
+    )
 
     # AI eval's comp_check gives expected comp signal
     expected_comp = ""
     comp_check = evaluation.get("comp_check", "")
     if comp_check and "unknown" not in comp_check.lower():
-        # Extract dollar amount if present
         import re
         m = re.search(r'\$[\d,]+(?:k|K)?', comp_check)
         if m:
@@ -474,6 +483,97 @@ async def _load_candidate_metadata(client, candidate_id: str,
         "expected_comp": expected_comp,
         "seniority_signals": seniority_signals,
     }
+
+
+def _extract_location_from_text(*sources) -> str:
+    """Extract a location string from multiple text sources.
+
+    Tries patterns in order of confidence:
+      1. LinkedIn-style "City, State/Province, Country" (3 parts) - highest
+      2. Standard "City, State/Province" (2 parts, US/Canada style)
+      3. Old "Location: X" or "based in X" label pattern
+      4. Country mention as last resort (helps catch "Canada" vs "USA" mismatch)
+
+    Returns the most specific location found, or empty string if nothing.
+    """
+    import re
+
+    # Common country names we care about for ITAR/work-auth signal
+    COUNTRIES = ["United States", "USA", "Canada", "UK", "United Kingdom",
+                  "Germany", "France", "India", "Australia", "Brazil",
+                  "Mexico", "Japan", "China", "Singapore", "Israel"]
+
+    # US states (full names) - subset; expand if needed
+    US_STATES = [
+        "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
+        "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
+        "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
+        "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+        "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+        "New Hampshire", "New Jersey", "New Mexico", "New York",
+        "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
+        "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+        "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
+        "West Virginia", "Wisconsin", "Wyoming",
+    ]
+    # Canadian provinces
+    PROVINCES = [
+        "Ontario", "Quebec", "British Columbia", "Alberta", "Manitoba",
+        "Saskatchewan", "Nova Scotia", "New Brunswick", "Newfoundland",
+        "Prince Edward Island",
+    ]
+
+    # Tier 1: City, State, Country (LinkedIn header style)
+    # e.g. "Kitchener, Ontario, Canada" or "Union City, New Jersey, United States"
+    state_pattern = "|".join(re.escape(s) for s in US_STATES + PROVINCES)
+    country_pattern = "|".join(re.escape(c) for c in COUNTRIES)
+    # Use [^\n,] for city to avoid greedy newline-crossing matches that
+    # capture preceding lines like "Senior Software Engineer\nKitchener..."
+    full_pattern = re.compile(
+        rf'(?:^|\n|\s)([A-Z][^,\n]{{1,40}}?),\s*({state_pattern}),\s*({country_pattern})',
+        re.IGNORECASE | re.MULTILINE,
+    )
+    for text in sources:
+        if not text:
+            continue
+        m = full_pattern.search(text)
+        if m:
+            return f"{m.group(1).strip()}, {m.group(2).strip()}, {m.group(3).strip()}"[:100]
+
+    # Tier 2: City, State (no country, very common in US resumes)
+    short_pattern = re.compile(
+        rf'(?:^|\n|\s)([A-Z][^,\n]{{1,40}}?),\s*({state_pattern})\b',
+        re.IGNORECASE | re.MULTILINE,
+    )
+    for text in sources:
+        if not text:
+            continue
+        m = short_pattern.search(text)
+        if m:
+            return f"{m.group(1).strip()}, {m.group(2).strip()}"[:100]
+
+    # Tier 3: explicit "Location:" / "based in" labels
+    label_pattern = re.compile(
+        r'(?:location|based\s+in|lives?\s+in)[:\s]+([A-Za-z\s,]+?)(?:\n|\||$)',
+        re.IGNORECASE,
+    )
+    for text in sources:
+        if not text:
+            continue
+        m = label_pattern.search(text)
+        if m:
+            return m.group(1).strip()[:100]
+
+    # Tier 4: just a country mention (low confidence but useful for cross-border signals)
+    country_only = re.compile(rf'\b({country_pattern})\b', re.IGNORECASE)
+    for text in sources:
+        if not text:
+            continue
+        m = country_only.search(text)
+        if m:
+            return m.group(1).strip()[:100]
+
+    return ""
 
 
 def _extract_candidate_seniority(evaluation: dict) -> dict:
@@ -640,6 +740,83 @@ async def _load_historical_fill_rate(client, req_id: str) -> dict:
 # Taxonomy resolution + skill writes
 # ============================================================
 
+def _generate_skill_variants(raw_name: str) -> list:
+    """Produce a prioritized list of normalized variants for skill matching.
+
+    Order matters - earlier variants get tried first against the canonical
+    taxonomy. Strategy:
+      1. The full normalized name (case-folded, whitespace-collapsed)
+      2. Strip trailing parentheticals: "Linux (kernel-level)" -> "Linux"
+      3. Strip leading phrases like "Experience with", "Proficiency in"
+      4. Split on slash: "C/C++" -> "C++", "C"  (note: "C++" tried first
+         because it's more specific and the taxonomy has both)
+      5. Split on " and " / " or ": "Python and C++" -> "Python", "C++"
+      6. Last token alone (catches "TCP/IP Networking" -> "Networking" or
+         "ARM Cortex" -> "Cortex" attempts)
+    """
+    import re
+    if not raw_name:
+        return []
+
+    variants = []
+    seen = set()
+
+    def add(v):
+        if not v:
+            return
+        n = " ".join(v.strip().lower().split())
+        if n and n not in seen:
+            seen.add(n)
+            variants.append(n)
+
+    # 1. As-is
+    add(raw_name)
+
+    # 2. Strip trailing parenthetical: "Linux (kernel-level understanding...)"
+    no_paren = re.sub(r'\s*\([^)]*\)\s*$', '', raw_name).strip()
+    if no_paren != raw_name:
+        add(no_paren)
+
+    # 3. Strip leading verb-prepositional phrases
+    LEAD_STRIP = re.compile(
+        r'^(experience\s+(with|in)|proficiency\s+(with|in)|skilled\s+(with|in)|'
+        r'familiar\s+with|knowledge\s+of|expert\s+(with|in)|hands-on\s+(with|in))\s+',
+        re.IGNORECASE,
+    )
+    lead_stripped = LEAD_STRIP.sub('', no_paren or raw_name).strip()
+    if lead_stripped:
+        add(lead_stripped)
+
+    # 4. Slash splits: "C/C++", "TCP/IP", "I2C/SPI"
+    base = lead_stripped or no_paren or raw_name
+    if '/' in base:
+        # Special case: keep multi-character codes like "TCP/IP" together but
+        # also try the parts. Try each side independently.
+        parts = [p.strip() for p in base.split('/') if p.strip()]
+        # Add longer/more specific parts first
+        for p in sorted(parts, key=len, reverse=True):
+            add(p)
+
+    # 5. Conjunction splits: "Python and C++", "C or Assembly"
+    for sep in [' and ', ' & ', ' or ']:
+        if sep.lower() in base.lower():
+            parts = re.split(sep, base, flags=re.IGNORECASE)
+            for p in parts:
+                p = p.strip()
+                if p:
+                    add(p)
+
+    # 6. Last word fallback (for things like "ARM Cortex" -> "ARM" or
+    #    "Linux Kernel" -> "Linux"/"Kernel")
+    tokens = re.findall(r'\b[\w+#-]+\b', base)
+    if len(tokens) >= 2:
+        # Try first and last token
+        add(tokens[0])
+        add(tokens[-1])
+
+    return variants
+
+
 async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
     """Match a raw skill name from AI output against the canonical taxonomy.
 
@@ -663,15 +840,28 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
     """
     if not raw_name or not raw_name.strip():
         return None
-    norm = " ".join(raw_name.strip().lower().split())
 
-    # ---------- Tier 1: exact canonical match ----------
-    rs = await client.execute(
-        "SELECT id FROM skills WHERE LOWER(canonical_name) = ?",
-        [norm],
-    )
-    if rs.rows:
-        return rs.rows[0][0]
+    # Generate variant forms of the input to try.
+    # Examples:
+    #   "C/C++" -> ["c/c++", "c++", "c"]
+    #   "Linux (kernel-level)" -> ["linux (kernel-level)", "linux"]
+    #   "Experience with Python" -> ["experience with python", "python"]
+    #   "TCP/IP Networking" -> ["tcp/ip networking", "tcp/ip", "networking"]
+    variants = _generate_skill_variants(raw_name)
+
+    # Try each variant against tier 1 (exact canonical match) first - cheap
+    # and high-confidence. This catches "C/C++" -> "C" without needing aliases.
+    for norm in variants:
+        rs = await client.execute(
+            "SELECT id FROM skills WHERE LOWER(canonical_name) = ?",
+            [norm],
+        )
+        if rs.rows:
+            return rs.rows[0][0]
+
+    # If no exact canonical hits, fall back to original behavior on the
+    # primary normalized form (first variant)
+    norm = variants[0]
 
     # ---------- Tier 2: alias match ----------
     rs = await client.execute(
@@ -839,21 +1029,43 @@ async def write_candidate_skills(client, candidate_id: str, evaluation: dict) ->
         return inserted
 
 
-    # Fallback path: pull confirmed skills out of blocker/preferred assessments
+    # Fallback path: extract skills from blocker_assessment + preferred_assessment.
+    # 
+    # 2026-05-11 Phase A finishing fix: write ALL skills the AI inspected, not
+    # just "met"/"partial". The previous version dropped "unclear" skills which
+    # discarded real signal - e.g. Sandeep Gill's resume listed "Linux Kernel"
+    # as his #1 LinkedIn top skill but AI marked it "partial" due to ambiguity
+    # about kernel-depth. Either way, he HAS Linux experience, and the engine
+    # should see it.
+    #
+    # We still skip "missing" status because those are confirmed gaps - writing
+    # them as candidate_skills would create false matches.
+    #
+    # Depth + confidence are now status-aware: 'met' gets full credit,
+    # 'partial' gets project-depth credit, 'unclear' gets mentioned-depth at
+    # low confidence (engine math will weight these accordingly).
     inserted = 0
+    DEPTH_BY_STATUS = {
+        "met": "production",
+        "partial": "project",
+        "unclear": "mentioned",
+    }
+    CONFIDENCE_BY_STATUS = {
+        "met": 0.8,
+        "partial": 0.55,
+        "unclear": 0.3,
+    }
     for source_field in ("blocker_assessment", "preferred_assessment"):
         for s in (evaluation.get(source_field) or []):
             if not isinstance(s, dict) or not s.get("skill"):
                 continue
-            status = s.get("status")
-            # Only insert skills with at least partial evidence. A "missing"
-            # blocker is not a candidate skill - it's a gap.
-            if status not in ("met", "partial"):
+            status = (s.get("status") or "").lower()
+            # Skip 'missing' (confirmed gap) and any unknown status. Allow met,
+            # partial, unclear through.
+            if status not in DEPTH_BY_STATUS:
                 continue
             sid = await resolve_skill_id(client, s["skill"])
             row_id = "cs_" + uuid.uuid4().hex[:16]
-            # Without explicit recency/depth, set conservative defaults
-            depth = "production" if status == "met" else "project"
             await client.execute(
                 """INSERT INTO candidate_skills
                    (id, candidate_id, skill_id, raw_skill_text, evidence,
@@ -862,9 +1074,9 @@ async def write_candidate_skills(client, candidate_id: str, evaluation: dict) ->
                 [
                     row_id, candidate_id, sid, s["skill"],
                     (s.get("evidence") or "")[:500],
-                    "current",  # fallback assumption
-                    depth,
-                    0.7 if status == "met" else 0.5,
+                    "current" if status == "met" else "unclear",
+                    DEPTH_BY_STATUS[status],
+                    CONFIDENCE_BY_STATUS[status],
                 ],
             )
             inserted += 1
