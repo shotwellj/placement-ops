@@ -5443,13 +5443,19 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
                     plain_english=evaluation.get("headline", "")[:500],
                 )
 
-                # 8-dimension scores (partial today - fit_score only; expand next session)
-                await write_submission_dimensions(client, submission_id, evaluation)
-
-                # Structured candidate skills (new - populates the taxonomy)
-                # Reads evaluation['extracted_skills'] if present, else falls back
-                # to blocker_assessment + preferred_assessment with status='met'/'partial'
+                # Structured candidate skills MUST be written before the
+                # matching engine runs - the engine reads candidate_skills rows.
+                # (Order swap, 2026-05-11 Phase A finishing.)
                 await write_candidate_skills(client, candidate_id, evaluation)
+
+                # 8-dimension scores. Technical Match (Dim 1) and Gap Severity
+                # (Dim 6) are now DETERMINISTIC via the matching engine.
+                # Other 6 dimensions stay AI-derived for now. Passing req_id +
+                # candidate_id triggers the engine path.
+                await write_submission_dimensions(
+                    client, submission_id, evaluation,
+                    req_id=req.req_id, candidate_id=candidate_id,
+                )
             except Exception as compliance_err:
                 # Log but don't fail the request. The submission is already saved.
                 # TODO: wire this into proper error monitoring.

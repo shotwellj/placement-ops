@@ -29,7 +29,7 @@ import os
 import uuid
 from typing import Any, Optional
 
-# HMAC key for audit chain. Separate from MAGIC_LINK_SECRET in production —
+# HMAC key for audit chain. Separate from MAGIC_LINK_SECRET in production -
 # but fall back to it so the deploy works without a new env var right away.
 AUDIT_HMAC_KEY = os.environ.get("AUDIT_HMAC_KEY") or os.environ.get("MAGIC_LINK_SECRET") or ""
 
@@ -107,7 +107,7 @@ async def register_model_version(
     always maps to the same version row. If the prompt text changes, a new
     row is created and the old one is retired_at set by the caller if desired.
 
-    Used for EU AI Act Article 11 (technical documentation) — every score
+    Used for EU AI Act Article 11 (technical documentation) - every score
     is traceable to an exact prompt + exact model version.
     """
     prompt_hash = hashlib.sha256(prompt_text.encode()).hexdigest()
@@ -222,36 +222,129 @@ async def write_submission_dimensions(
     client,
     submission_id: str,
     evaluation: dict,
+    req_id: str = None,
+    candidate_id: str = None,
 ) -> None:
-    """Extract whatever dimensional data we can from the current AI eval output
-    and write a submission_dimensions row.
+    """Write 8-dimension scores. Two dimensions (Technical Match, Gap Severity)
+    are now DETERMINISTIC and come from the matching engine. The other 6
+    dimensions stay AI-derived for now (Phase A finishing, 2026-05-11).
 
-    Current AI returns: fit_score, recommendation, blocker_assessment[], etc.
-    We map fit_score -> composite_score (0-5 scale) and count blockers.
+    Phase A finishing: matching engine in code, not prompt.
+    - Dim 1 (Technical Match): deterministic via _matching_engine.evaluate_skills
+    - Dim 6 (Gap Severity): deterministic via _matching_engine.evaluate_skills
+    - Dims 2-5, 7-8: still AI-derived (mapped from fit_score for now)
 
-    When we change the CANDIDATE_EVAL_PROMPT to emit the 8 dimensions explicitly
-    (next session), this function gets expanded to store all of them. For now
-    we at least record what we have, so the table isn't empty for any eval.
+    req_id and candidate_id are optional - if not provided, only the AI-derived
+    scores are written (backward compatible with old call sites).
     """
     fit_score = evaluation.get("fit_score")
     if fit_score is None:
         return
 
-    # Normalize the 0-100 AI fit score into the 0-5 rubric scale.
-    composite = round((fit_score / 100.0) * 5.0, 2)
+    # Normalize the 0-100 AI fit score into the 0-5 rubric scale (fallback).
+    composite_fallback = round((fit_score / 100.0) * 5.0, 2)
 
-    # Count missing blockers — these are the hard "below-3.0 cap" signal per
-    # the matching engine spec in modes/_matching-engine.md.
+    # AI-derived blocker count (fallback when engine isn't available)
     blockers = evaluation.get("blocker_assessment") or []
-    blocker_count = sum(1 for b in blockers if b.get("status") == "missing")
+    blocker_count_fallback = sum(1 for b in blockers if b.get("status") == "missing")
+
+    # Engine-derived deterministic scores (NEW in Phase A finishing)
+    technical_match_score = None
+    gap_severity_score = None
+    blocker_count = blocker_count_fallback
+    engine_breakdown = None
+
+    if req_id and candidate_id:
+        try:
+            engine_result = await _run_matching_engine(client, req_id, candidate_id)
+            if engine_result:
+                technical_match_score = engine_result["technical_match"]["score"]
+                gap_severity_score = engine_result["gap_severity"]["score"]
+                blocker_count = engine_result["blocker_count"]
+                engine_breakdown = engine_result
+        except Exception as engine_err:
+            # Engine failure is non-fatal - we still write the AI scores
+            print(f"[matching-engine] non-fatal: {engine_err!r}")
+
+    # Combine engine output with AI eval output for the match_breakdown_json
+    breakdown_blob = {"ai_eval": evaluation}
+    if engine_breakdown:
+        breakdown_blob["engine"] = engine_breakdown
 
     sd_id = "sd_" + uuid.uuid4().hex[:16]
     await client.execute(
         """INSERT OR REPLACE INTO submission_dimensions
-           (id, submission_id, composite_score, blocker_count, match_breakdown_json)
-           VALUES (?, ?, ?, ?, ?)""",
-        [sd_id, submission_id, composite, blocker_count, json.dumps(evaluation)],
+           (id, submission_id, technical_match, gap_severity, composite_score,
+            blocker_count, match_breakdown_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        [
+            sd_id,
+            submission_id,
+            technical_match_score,
+            gap_severity_score,
+            composite_fallback,  # composite still AI-derived; expand later
+            blocker_count,
+            json.dumps(breakdown_blob),
+        ],
     )
+
+
+async def _run_matching_engine(client, req_id: str, candidate_id: str):
+    """Internal: load req_skills + candidate_skills + adjacencies, run engine."""
+    # Lazy import to avoid circular dep
+    from api._matching_engine import evaluate_skills, build_adjacency_index
+
+    # Load req_skills for this requisition
+    rs = await client.execute(
+        """SELECT raw_skill_text, skill_id, importance
+           FROM req_skills WHERE req_id = ?""",
+        [req_id],
+    )
+    req_skills = [
+        {"raw_skill_text": r[0], "skill_id": r[1], "importance": r[2]}
+        for r in rs.rows
+    ]
+
+    # Load candidate_skills for this candidate
+    cs = await client.execute(
+        """SELECT raw_skill_text, skill_id, recency, depth
+           FROM candidate_skills WHERE candidate_id = ?""",
+        [candidate_id],
+    )
+    candidate_skills = [
+        {"raw_skill_text": r[0], "skill_id": r[1], "recency": r[2], "depth": r[3]}
+        for r in cs.rows
+    ]
+
+    # If either side is empty, skip - engine has nothing to do
+    if not req_skills or not candidate_skills:
+        return None
+
+    # Load adjacencies relevant to the skill ids we have
+    skill_ids = set()
+    for r in req_skills:
+        if r["skill_id"]:
+            skill_ids.add(r["skill_id"])
+    for c in candidate_skills:
+        if c["skill_id"]:
+            skill_ids.add(c["skill_id"])
+
+    if skill_ids:
+        # Chunk the IN clause for safety
+        placeholders = ",".join("?" for _ in skill_ids)
+        adj = await client.execute(
+            f"""SELECT skill_id, adjacent_id, weight
+                FROM skill_adjacencies
+                WHERE skill_id IN ({placeholders}) OR adjacent_id IN ({placeholders})""",
+            list(skill_ids) + list(skill_ids),
+        )
+        adj_rows = [(r[0], r[1], r[2]) for r in adj.rows]
+    else:
+        adj_rows = []
+
+    adjacency_index = build_adjacency_index(adj_rows)
+
+    return evaluate_skills(req_skills, candidate_skills, adjacency_index)
 
 
 # ============================================================
@@ -264,7 +357,7 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
     Strategy (fail-soft, four tiers, in priority order):
       1. Exact match on skills.canonical_name (case-insensitive)
       2. Match any alias in skills.aliases_json (case-insensitive)
-      3. Match a previous user decision in skill_resolution_decisions —
+      3. Match a previous user decision in skill_resolution_decisions -
          if the user aliased "c programming" -> C via Phase B2, future
          intakes resolve "c programming" automatically. THIS IS THE LOOP.
       4. Single-token whole-word match against canonical_name. Conservative
@@ -272,7 +365,7 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
          "ARM Cortex" -> tokens [arm, cortex] -> "arm" matches canonical
          "ARM" exactly. Skipped if raw_text has 4+ tokens to avoid
          false positives like "experience with python and c++" -> Python.
-      5. Return None if no match — caller still inserts with raw_skill_text
+      5. Return None if no match - caller still inserts with raw_skill_text
          populated, so we never lose data.
 
     The user trains the resolver via the Phase B2 approval queue at
@@ -309,7 +402,7 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
 
     # ---------- Tier 3: previous user decision (the learning loop) ----------
     # If the user has previously aliased OR promoted this exact raw text,
-    # use that decision automatically. Reject decisions are also honored —
+    # use that decision automatically. Reject decisions are also honored -
     # if the user said this isn't a skill, we don't try to match it.
     try:
         rs = await client.execute(
@@ -335,7 +428,7 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
     tokens = [t for t in norm.replace(",", " ").split() if t]
     if 1 <= len(tokens) <= 3:
         # Build a set of (token, skill_id) pairs we'll check
-        # Re-fetch canonical names — small table, in-memory filter is fine
+        # Re-fetch canonical names - small table, in-memory filter is fine
         rs = await client.execute("SELECT id, LOWER(canonical_name) FROM skills")
         canonical_map = {}  # canonical_lower -> skill_id
         for row in (rs.rows or []):
@@ -347,7 +440,7 @@ async def resolve_skill_id(client, raw_name: str) -> Optional[str]:
             if tok in canonical_map:
                 matches.add(canonical_map[tok])
         if len(matches) == 1:
-            # Exactly one canonical matched — confident enough
+            # Exactly one canonical matched - confident enough
             return next(iter(matches))
         # 0 matches OR ambiguous (2+) -> fall through to None
 
@@ -358,7 +451,7 @@ async def write_req_skills(client, req_id: str, parsed: dict) -> int:
     """Extract structured skills from parsed JD output and write req_skills rows.
 
     Priority:
-      1. parsed['canonical_skills']: new format — list of {name, severity}.
+      1. parsed['canonical_skills']: new format - list of {name, severity}.
          These are clean skill names AI was prompted to emit specifically for
          taxonomy matching. Used when JD_PARSER_PROMPT includes the
          canonical_skills instruction block.
@@ -427,7 +520,7 @@ async def write_candidate_skills(client, candidate_id: str, evaluation: dict) ->
     array with {name, evidence, recency, depth, confidence}. If that field is
     missing (old-format eval), we fall back to extracting skill names from
     blocker_assessment[].skill and preferred_assessment[].skill with status='met'
-    or 'partial' — those are skills we have evidence the candidate has.
+    or 'partial' - those are skills we have evidence the candidate has.
 
     Returns the number of rows inserted.
     """
@@ -465,7 +558,7 @@ async def write_candidate_skills(client, candidate_id: str, evaluation: dict) ->
                 continue
             status = s.get("status")
             # Only insert skills with at least partial evidence. A "missing"
-            # blocker is not a candidate skill — it's a gap.
+            # blocker is not a candidate skill - it's a gap.
             if status not in ("met", "partial"):
                 continue
             sid = await resolve_skill_id(client, s["skill"])
