@@ -2283,6 +2283,14 @@ class CandidateEvalRequest(BaseModel):
     current_title: Optional[str] = None
     current_company: Optional[str] = None
     source: Optional[str] = None  # where you found them: "linkedin", "github", "referral", etc.
+    candidate_id_existing: Optional[str] = Field(
+        default=None,
+        description=(
+            "Phase E.2 (Match -> Source connector): if provided and the "
+            "candidate exists and belongs to the user, skip the new-candidate "
+            "insert and reuse this id. Set by /api/source/reevaluate."
+        ),
+    )
 
 
 class CompetitiveIntelRequest(BaseModel):
@@ -5344,12 +5352,27 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
         raise HTTPException(500, f"[ai-parse] {type(e).__name__}: {str(e)[:300]} | raw start: {eval_text[:200]}")
 
     # Step 4: save the candidate (idempotent on email if provided)
+    # Phase E.2 (Match -> Source connector): if candidate_id_existing is set,
+    # skip the insert entirely and reuse that candidate row. Used when Match
+    # mode re-evaluates an already-stored candidate against a new req.
     try:
         candidate_id = str(uuid.uuid4())
         candidate_name = req.candidate_name or "Unnamed candidate"
         async with db() as client:
-            # If email provided, check for an existing candidate to avoid duplicates
-            if req.candidate_email:
+            if req.candidate_id_existing:
+                # Verify ownership; never trust client-supplied IDs without check
+                rs = await client.execute(
+                    "SELECT id FROM candidates WHERE id = ? AND user_id = ?",
+                    [req.candidate_id_existing, user["id"]],
+                )
+                if not rs.rows:
+                    raise HTTPException(
+                        400,
+                        "candidate_id_existing does not match a candidate owned by user",
+                    )
+                candidate_id = rs.rows[0][0]
+            elif req.candidate_email:
+                # If email provided, check for an existing candidate to avoid duplicates
                 rs = await client.execute(
                     "SELECT id FROM candidates WHERE user_id = ? AND email = ?",
                     [user["id"], req.candidate_email],
@@ -5814,6 +5837,92 @@ async def match_batch(req: MatchBatchRequest, user: dict = Depends(get_current_u
             "scored": scored,
             "unscored": unscored,
         }
+
+
+# ============================================================
+# MATCH -> SOURCE CONNECTOR (Phase E.2)
+# ============================================================
+# When Match mode surfaces a strong candidate against a req they were not
+# originally evaluated for, the recruiter should not have to re-paste the
+# resume. This endpoint runs the full Source eval pipeline against an
+# existing candidate row, using their stored resume_text.
+#
+# Edge case: if the candidate already has a submission for this same req,
+# we allow a fresh eval anyway (prompt evolves, taxonomy evolves, recruiter
+# may want a refreshed take). The pipeline orders by composite DESC so the
+# newer/better score surfaces first.
+#
+# Cost: 1 AI eval, same as fresh /api/source/evaluate. Same audit trail.
+# This is a friction-removal feature, not a cost-multiplier.
+
+class ReevaluateRequest(BaseModel):
+    req_id: str = Field(..., min_length=1)
+    candidate_id: str = Field(..., min_length=1)
+
+
+@app.post("/api/source/reevaluate")
+async def reevaluate_candidate(
+    req: ReevaluateRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Re-run the Source eval pipeline on an existing candidate against a new req.
+
+    Pulls candidate.resume_text + candidate.name from the database, verifies
+    the candidate belongs to the requesting user, then delegates to
+    evaluate_candidate by constructing an equivalent CandidateEvalRequest
+    payload with candidate_id_existing set. Honors the same cap-check, AI
+    call, audit chain, and engine pipeline as a fresh evaluation.
+    """
+    async with db() as client:
+        # Pull candidate metadata (also verifies ownership)
+        rs = await client.execute(
+            """SELECT id, name, email, linkedin_url, github_url,
+                      current_title, current_company, resume_text, source
+               FROM candidates
+               WHERE id = ? AND user_id = ?""",
+            [req.candidate_id, user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Candidate not found or not owned by user")
+        row = rs.rows[0]
+        (
+            cand_id, name, email, linkedin_url, github_url,
+            current_title, current_company, resume_text, source,
+        ) = row
+
+        if not resume_text or not resume_text.strip():
+            raise HTTPException(
+                400,
+                "Candidate has no resume_text stored. Re-evaluation requires "
+                "the original resume text from the prior evaluation.",
+            )
+
+        # Verify the req belongs to this user (evaluate_candidate also checks
+        # this but we surface the error earlier and more clearly)
+        rs = await client.execute(
+            "SELECT id FROM requisitions WHERE id = ? AND user_id = ?",
+            [req.req_id, user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Requisition not found or not owned by user")
+
+    # Delegate to the existing Source eval pipeline. By passing
+    # candidate_id_existing, we tell evaluate_candidate to skip the new-
+    # candidate insert and reuse the existing row. Everything downstream
+    # (submission write, candidate_skills, engine, audit chain) is identical.
+    delegated = CandidateEvalRequest(
+        req_id=req.req_id,
+        candidate_text=resume_text,
+        candidate_name=name or "Unnamed candidate",
+        candidate_email=email,
+        linkedin_url=linkedin_url,
+        github_url=github_url,
+        current_title=current_title,
+        current_company=current_company,
+        source=source,
+        candidate_id_existing=cand_id,
+    )
+    return await evaluate_candidate(delegated, user=user)
 
 
 # ============================================================

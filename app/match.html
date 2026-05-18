@@ -93,6 +93,8 @@
   .prior-link { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim); margin-bottom: 1rem; padding: 0.5rem 0.8rem; background: rgba(74, 158, 255, 0.05); border: 1px solid rgba(74, 158, 255, 0.2); border-radius: 6px; }
   .prior-link a { color: var(--blue); text-decoration: none; }
   .prior-link a:hover { text-decoration: underline; }
+  .match-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+  .btn-sm { padding: 0.45rem 0.9rem; font-size: 0.78rem; }
 
   /* Engine scorecard (mirrors pipeline.html, simplified) */
   .engine-scorecard { background: linear-gradient(180deg, rgba(61, 217, 214, 0.04) 0%, transparent 100%); border: 1px solid rgba(61, 217, 214, 0.2); border-radius: 10px; padding: 1rem 1.1rem; }
@@ -340,10 +342,20 @@ function renderMatchRow(row, rank) {
         <div class="match-arrow">▾</div>
       </div>
       <div class="match-detail">
+        <div class="match-actions">
+          <button class="btn btn-primary btn-sm"
+                  onclick="reevaluateAgainstCurrentReq('${escapeHtml(cand.id)}', this)"
+                  title="Run a fresh Source evaluation of this candidate against this req (burns 1 eval credit)">
+            Evaluate for this req
+          </button>
+          ${row.prior_submission_id ? `
+            <a href="/app/pipeline.html?req=${escapeHtml(row.prior_req_id)}" class="btn btn-ghost btn-sm" style="text-decoration: none;">
+              View prior evaluation
+            </a>` : ''}
+        </div>
         ${row.prior_submission_id ? `
           <div class="prior-link">
             Previously evaluated for <strong>${escapeHtml(row.prior_req_title || 'another req')}</strong>.
-            <a href="/app/pipeline.html?req=${escapeHtml(row.prior_req_id)}">View prior evaluation →</a>
           </div>` : `
           <div class="prior-link" style="background: rgba(139, 155, 179, 0.06); border-color: rgba(139, 155, 179, 0.2);">
             <span style="color: var(--text-mute);">No prior evaluation. Engine ran on cached skill data only.</span>
@@ -390,6 +402,41 @@ function renderScorecard(eng) {
       ${eng.note ? `<div class="engine-note">${escapeHtml(eng.note)}</div>` : ''}
     </div>
   `;
+}
+
+// Phase E.2: Match -> Source connector
+// Re-runs the Source eval pipeline against the currently-selected req
+// using this candidate's stored resume_text. Burns 1 eval credit.
+async function reevaluateAgainstCurrentReq(candidateId, btnEl) {
+  const reqId = document.getElementById('req-picker').value;
+  if (!reqId) {
+    alert('No req selected. Refresh the page and pick a req first.');
+    return;
+  }
+  if (!confirm('Run a fresh Source evaluation of this candidate against this req?\n\nThis will burn 1 eval credit. The result will appear in the pipeline view.')) {
+    return;
+  }
+  const originalText = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = 'Evaluating (~30s)...';
+  try {
+    const r = await fetch('/api/source/reevaluate', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ req_id: reqId, candidate_id: candidateId }),
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error(`HTTP ${r.status}: ${txt.slice(0, 300)}`);
+    }
+    // Success - navigate to the pipeline detail page so the user sees the
+    // fresh Engine Scorecard for this candidate against this req.
+    window.location.href = `/app/pipeline.html?req=${encodeURIComponent(reqId)}`;
+  } catch (e) {
+    btnEl.disabled = false;
+    btnEl.textContent = originalText;
+    alert('Re-evaluation failed: ' + e.message);
+  }
 }
 
 // Boot
