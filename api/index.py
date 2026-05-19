@@ -14,13 +14,15 @@ import json
 import asyncio
 import uuid
 import hashlib
+import hmac
+import base64
 import httpx
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from pydantic import BaseModel, EmailStr, Field
 
 # Compliance helpers - lives in api/_compliance.py. See that module's docstring.
@@ -2684,6 +2686,301 @@ def _generate_competitive_boolean_strategies(
         "xray": xray,
         "github": github,
     }
+
+
+# ---------- SCHEDULE EMAIL HELPERS (Phase E.3.3) ----------
+
+def _make_cancel_token(meeting_id: str) -> str:
+    """Generate a self-contained, signed token the candidate can use to
+    cancel a screen without logging in. Format: base64url(meeting_id) + "." + base64url(hmac).
+    We reuse MAGIC_LINK_SECRET with a domain prefix so these tokens can't be
+    replayed as login tokens."""
+    payload = meeting_id.encode("utf-8")
+    secret = ("schedule-cancel:" + MAGIC_LINK_SECRET).encode("utf-8")
+    sig = hmac.new(secret, payload, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(payload).decode().rstrip("=") + "." + base64.urlsafe_b64encode(sig).decode().rstrip("=")
+
+
+def _verify_cancel_token(token: str) -> Optional[str]:
+    """Validate a cancel token and return the meeting_id if good, else None.
+    Constant-time comparison via hmac.compare_digest()."""
+    try:
+        payload_b64, sig_b64 = token.split(".", 1)
+        # Restore padding
+        def _pad(s): return s + "=" * (-len(s) % 4)
+        payload = base64.urlsafe_b64decode(_pad(payload_b64))
+        sig = base64.urlsafe_b64decode(_pad(sig_b64))
+        secret = ("schedule-cancel:" + MAGIC_LINK_SECRET).encode("utf-8")
+        expected = hmac.new(secret, payload, hashlib.sha256).digest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        return payload.decode("utf-8")
+    except Exception:
+        return None
+
+
+def _format_ics_dt(iso_str: str) -> str:
+    """Convert ISO 8601 timestamp to ICS UTC format (YYYYMMDDTHHMMSSZ)."""
+    try:
+        from datetime import datetime, timezone
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt.strftime("%Y%m%dT%H%M%SZ")
+    except Exception:
+        return iso_str
+
+
+def _ics_escape(s: str) -> str:
+    """RFC 5545 text escaping: backslash, semicolon, comma, newline."""
+    if not s:
+        return ""
+    return (s.replace("\\", "\\\\")
+             .replace(";", "\\;")
+             .replace(",", "\\,")
+             .replace("\n", "\\n")
+             .replace("\r", ""))
+
+
+def _build_ics(
+    *,
+    meeting_id: str,
+    scheduled_for: str,
+    duration_minutes: int,
+    summary: str,
+    description: str,
+    organizer_email: str,
+    attendee_emails: List[str],
+    location: Optional[str] = None,
+) -> str:
+    """Build a minimal RFC 5545 .ics calendar file as a string.
+    Compatible with Apple Mail, Gmail, Outlook, Google Calendar."""
+    from datetime import datetime, timezone, timedelta
+    try:
+        start_dt = datetime.fromisoformat(scheduled_for.replace("Z", "+00:00"))
+        if start_dt.tzinfo is None:
+            start_dt = start_dt.replace(tzinfo=timezone.utc)
+        end_dt = start_dt + timedelta(minutes=duration_minutes)
+        dtstart = start_dt.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        dtend = end_dt.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    except Exception:
+        # If we can't parse the time, build a stub - send still goes out without
+        # a valid attachment rather than failing the whole flow
+        dtstart = _format_ics_dt(scheduled_for)
+        dtend = dtstart
+
+    dtstamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # Build as a list of lines to avoid implicit-concat + inline-ternary
+    # operator-precedence gotchas. Each entry is one CRLF-terminated line.
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//SourcingNav//Schedule//EN",
+        "METHOD:REQUEST",
+        "BEGIN:VEVENT",
+        f"UID:{meeting_id}@sourcingnav.com",
+        f"DTSTAMP:{dtstamp}",
+        f"DTSTART:{dtstart}",
+        f"DTEND:{dtend}",
+        f"SUMMARY:{_ics_escape(summary)}",
+        f"DESCRIPTION:{_ics_escape(description)}",
+    ]
+    if location:
+        lines.append(f"LOCATION:{_ics_escape(location)}")
+    lines.append(f"ORGANIZER;CN={_ics_escape(organizer_email)}:mailto:{organizer_email}")
+    for email in attendee_emails:
+        if email:
+            lines.append(f"ATTENDEE;CN={_ics_escape(email)};RSVP=TRUE:mailto:{email}")
+    lines.extend([
+        "STATUS:CONFIRMED",
+        "SEQUENCE:0",
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ])
+    return "\r\n".join(lines) + "\r\n"
+
+
+async def _send_email_with_attachment(
+    *,
+    to: str,
+    subject: str,
+    html: str,
+    attachment_filename: Optional[str] = None,
+    attachment_content: Optional[str] = None,
+    attachment_content_type: str = "text/calendar; method=REQUEST",
+    reply_to: Optional[str] = None,
+) -> bool:
+    """Like _send_email but optionally attaches a file (used for ICS calendar invites).
+    Errors are swallowed - schedule emails are best-effort, must never break the schedule call."""
+    if not RESEND_API_KEY:
+        print(f"[schedule-email] SKIP to={to} reason=no-resend-key")
+        return False
+    body = {
+        "from": "SourcingNav <hello@sourcingnav.com>",
+        "to": to,
+        "subject": subject,
+        "html": html,
+    }
+    if reply_to:
+        body["reply_to"] = reply_to
+    if attachment_filename and attachment_content:
+        body["attachments"] = [{
+            "filename": attachment_filename,
+            "content": base64.b64encode(attachment_content.encode("utf-8")).decode("ascii"),
+            "content_type": attachment_content_type,
+        }]
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+                json=body,
+            )
+        if r.status_code >= 400:
+            print(f"[schedule-email FAIL] to={to} status={r.status_code} body={r.text[:300]}")
+            return False
+        print(f"[schedule-email OK] to={to} subject={subject[:60]}")
+        return True
+    except Exception as e:
+        print(f"[schedule-email ERROR] to={to} type={type(e).__name__} err={str(e)[:200]}")
+        return False
+
+
+def _format_meeting_time_human(iso_str: str) -> str:
+    """Best-effort human-readable time for the email body, in UTC.
+    A future improvement would store recruiter timezone in profile_json
+    and render in their local time."""
+    try:
+        from datetime import datetime, timezone
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt.strftime("%A, %B %-d at %-I:%M %p UTC")
+    except Exception:
+        return iso_str
+
+
+def _build_schedule_email_recruiter(
+    *,
+    recruiter_name: str,
+    candidate_name: str,
+    candidate_email: Optional[str],
+    req_title: str,
+    client_name: Optional[str],
+    when_human: str,
+    duration_minutes: int,
+    interview_type: str,
+    meeting_link: Optional[str],
+    prep_brief: dict,
+    submission_id: str,
+) -> tuple:
+    """Recruiter-facing email - has the prep brief.
+    Returns (subject, html)."""
+    client_clause = f" at {client_name}" if client_name else ""
+    subject = f"Screen with {candidate_name} — {when_human}"
+
+    strengths = (prep_brief.get("top_strengths") or [])[:3]
+    risks = (prep_brief.get("top_risks_to_probe") or [])[:3]
+    blockers = prep_brief.get("engine_blockers") or []
+    questions = (prep_brief.get("suggested_questions") or [])[:5]
+
+    def li_items(items):
+        return "".join(f"<li>{_html_escape(str(x))}</li>" for x in items)
+
+    blocker_pills = "".join(
+        f'<span style="display:inline-block;padding:3px 8px;margin:2px;background:#fee;color:#a00;border-radius:4px;font-size:13px;">{_html_escape(str(b))}</span>'
+        for b in blockers
+    )
+
+    pipeline_url = f"https://sourcingnav.com/app/pipeline.html"
+    schedule_url = f"https://sourcingnav.com/app/schedule.html"
+
+    html = f"""<!DOCTYPE html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#222;max-width:640px;margin:0 auto;padding:24px;">
+  <h2 style="color:#111;margin:0 0 8px 0;">Screen scheduled: {_html_escape(candidate_name)}</h2>
+  <p style="color:#666;margin:0 0 24px 0;">{_html_escape(req_title)}{_html_escape(client_clause)}</p>
+
+  <div style="background:#f7f7f8;border-radius:8px;padding:16px;margin-bottom:24px;">
+    <div style="margin-bottom:8px;"><strong>When:</strong> {_html_escape(when_human)} · {duration_minutes} min</div>
+    <div style="margin-bottom:8px;"><strong>Type:</strong> {_html_escape(interview_type.replace('_', ' '))}</div>
+    {f'<div style="margin-bottom:8px;"><strong>Candidate:</strong> {_html_escape(candidate_name)} &lt;<a href="mailto:{_html_escape(candidate_email)}">{_html_escape(candidate_email)}</a>&gt;</div>' if candidate_email else f'<div style="margin-bottom:8px;color:#a60;"><strong>Candidate:</strong> {_html_escape(candidate_name)} (no email on file)</div>'}
+    {f'<div style="margin-bottom:8px;"><strong>Meeting link:</strong> <a href="{_html_escape(meeting_link)}">{_html_escape(meeting_link)}</a></div>' if meeting_link else ''}
+  </div>
+
+  <h3 style="color:#111;margin:24px 0 8px 0;">Prep brief</h3>
+  {f'<div style="margin-bottom:16px;"><div style="font-size:12px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Engine blockers</div>{blocker_pills}</div>' if blockers else ''}
+  {f'<div style="margin-bottom:16px;"><div style="font-size:12px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Top strengths</div><ul style="margin:0;padding-left:20px;">{li_items(strengths)}</ul></div>' if strengths else ''}
+  {f'<div style="margin-bottom:16px;"><div style="font-size:12px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Risks to probe</div><ul style="margin:0;padding-left:20px;">{li_items(risks)}</ul></div>' if risks else ''}
+  {f'<div style="margin-bottom:16px;"><div style="font-size:12px;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Suggested questions</div><ul style="margin:0;padding-left:20px;">{li_items(questions)}</ul></div>' if questions else ''}
+
+  <hr style="border:0;border-top:1px solid #eee;margin:24px 0;">
+  <p style="font-size:13px;color:#666;">
+    <a href="{schedule_url}" style="color:#0070f3;">Open schedule</a> ·
+    <a href="{pipeline_url}" style="color:#0070f3;">Open pipeline</a>
+  </p>
+  <p style="font-size:12px;color:#999;margin-top:24px;">SourcingNav · sent because you scheduled a screen</p>
+</body></html>"""
+
+    return subject, html
+
+
+def _build_schedule_email_candidate(
+    *,
+    candidate_name: str,
+    recruiter_name: str,
+    recruiter_email: str,
+    req_title: str,
+    client_name: Optional[str],
+    when_human: str,
+    duration_minutes: int,
+    meeting_link: Optional[str],
+    cancel_url: str,
+) -> tuple:
+    """Candidate-facing email - clean, professional, no internal notes.
+    Returns (subject, html)."""
+    client_clause = f" at {client_name}" if client_name else ""
+    subject = f"Interview scheduled: {req_title}{client_clause}"
+
+    html = f"""<!DOCTYPE html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#222;max-width:640px;margin:0 auto;padding:24px;">
+  <p style="font-size:16px;margin:0 0 16px 0;">Hi {_html_escape(candidate_name)},</p>
+
+  <p>Thanks for your interest in the <strong>{_html_escape(req_title)}</strong> role{_html_escape(client_clause)}. I'd like to set up a quick conversation.</p>
+
+  <div style="background:#f7f7f8;border-radius:8px;padding:16px;margin:24px 0;">
+    <div style="margin-bottom:8px;"><strong>When:</strong> {_html_escape(when_human)}</div>
+    <div style="margin-bottom:8px;"><strong>Duration:</strong> {duration_minutes} minutes</div>
+    {f'<div style="margin-bottom:8px;"><strong>Where:</strong> <a href="{_html_escape(meeting_link)}">{_html_escape(meeting_link)}</a></div>' if meeting_link else ''}
+  </div>
+
+  <p>I've attached a calendar invite for your convenience — it should pop into your calendar with one click on most mail clients.</p>
+
+  <p>If the time doesn't work for you, please <a href="{_html_escape(cancel_url)}">let me know here</a> and we'll find a better slot.</p>
+
+  <p style="margin-top:24px;">Looking forward to it.</p>
+  <p>{_html_escape(recruiter_name)}<br><a href="mailto:{_html_escape(recruiter_email)}" style="color:#666;font-size:14px;">{_html_escape(recruiter_email)}</a></p>
+
+  <hr style="border:0;border-top:1px solid #eee;margin:32px 0 16px 0;">
+  <p style="font-size:12px;color:#999;">Sent via SourcingNav on behalf of {_html_escape(recruiter_name)}.</p>
+</body></html>"""
+
+    return subject, html
+
+
+def _html_escape(s) -> str:
+    """Minimal HTML escape for email body interpolation."""
+    if s is None:
+        return ""
+    s = str(s)
+    return (s.replace("&", "&amp;")
+             .replace("<", "&lt;")
+             .replace(">", "&gt;")
+             .replace('"', "&quot;")
+             .replace("'", "&#39;"))
 
 
 # ---------- EMAIL HELPERS ----------
@@ -5704,10 +6001,14 @@ async def schedule_create(req: ScheduleCreateRequest, user: dict = Depends(get_c
         rs = await client.execute(
             """SELECT s.id, s.stage, s.req_id, s.candidate_id, r.user_id,
                       sd.match_breakdown_json,
-                      c.name AS candidate_name, r.title AS req_title
+                      c.name AS candidate_name, r.title AS req_title,
+                      c.email AS candidate_email,
+                      r.client_info_json, r.parsed_json,
+                      u.email AS recruiter_email, u.profile_json AS recruiter_profile
                FROM submissions s
                JOIN requisitions r ON s.req_id = r.id
                JOIN candidates c ON s.candidate_id = c.id
+               JOIN users u ON r.user_id = u.id
                LEFT JOIN submission_dimensions sd ON sd.submission_id = s.id
                WHERE s.id = ?""",
             [req.submission_id],
@@ -5715,9 +6016,34 @@ async def schedule_create(req: ScheduleCreateRequest, user: dict = Depends(get_c
         if not rs.rows:
             raise HTTPException(404, "Submission not found")
         (_, current_stage, req_id, candidate_id, owner_id,
-         match_breakdown_json, candidate_name, req_title) = rs.rows[0]
+         match_breakdown_json, candidate_name, req_title,
+         candidate_email, client_info_json, parsed_json,
+         recruiter_email, recruiter_profile_raw) = rs.rows[0]
         if owner_id != user["id"]:
             raise HTTPException(403, "Not your submission")
+
+        # Parse JSON blobs needed for email rendering
+        client_info = {}
+        try:
+            if client_info_json:
+                client_info = json.loads(client_info_json) or {}
+        except Exception:
+            pass
+        recruiter_profile = {}
+        try:
+            if recruiter_profile_raw:
+                recruiter_profile = json.loads(recruiter_profile_raw) or {}
+        except Exception:
+            pass
+        # Best client name: explicit override > parsed JD > nothing
+        client_name = client_info.get("company_name")
+        if not client_name:
+            try:
+                if parsed_json:
+                    parsed = json.loads(parsed_json)
+                    client_name = (parsed.get("core") or {}).get("company")
+            except Exception:
+                pass
 
         from_stage = current_stage or "evaluated"
         prep_brief = _build_prep_brief(match_breakdown_json)
@@ -5785,6 +6111,72 @@ async def schedule_create(req: ScheduleCreateRequest, user: dict = Depends(get_c
             except Exception as calib_err:
                 print(f"[schedule] calibration event insert failed: {calib_err!r}")
 
+    # Fire-and-forget email sends. Both wrapped so any send error gets
+    # logged but never breaks the schedule_create response.
+    try:
+        when_human = _format_meeting_time_human(req.scheduled_for)
+        recruiter_name = recruiter_profile.get("display_name") or recruiter_email or "your recruiter"
+
+        # Recruiter copy (always)
+        rec_subject, rec_html = _build_schedule_email_recruiter(
+            recruiter_name=recruiter_name,
+            candidate_name=candidate_name,
+            candidate_email=candidate_email,
+            req_title=req_title,
+            client_name=client_name,
+            when_human=when_human,
+            duration_minutes=req.duration_minutes,
+            interview_type=req.interview_type,
+            meeting_link=req.meeting_link,
+            prep_brief=prep_brief,
+            submission_id=req.submission_id,
+        )
+        # ICS for the recruiter so it shows up in their calendar
+        rec_ics = _build_ics(
+            meeting_id=meeting_id,
+            scheduled_for=req.scheduled_for,
+            duration_minutes=req.duration_minutes,
+            summary=f"Screen with {candidate_name} ({req_title})",
+            description=f"{req.interview_type.replace('_', ' ').title()} screen for {req_title}. Meeting link: {req.meeting_link or 'TBD'}",
+            organizer_email=recruiter_email or "hello@sourcingnav.com",
+            attendee_emails=[candidate_email] if candidate_email else [],
+            location=req.meeting_link,
+        )
+        asyncio.create_task(_send_email_with_attachment(
+            to=recruiter_email,
+            subject=rec_subject,
+            html=rec_html,
+            attachment_filename="screen.ics",
+            attachment_content=rec_ics,
+        ))
+
+        # Candidate copy (only if we have their email)
+        if candidate_email:
+            cancel_token = _make_cancel_token(meeting_id)
+            cancel_url = f"https://sourcingnav.com/api/schedule/cancel/{cancel_token}"
+            cand_subject, cand_html = _build_schedule_email_candidate(
+                candidate_name=candidate_name,
+                recruiter_name=recruiter_name,
+                recruiter_email=recruiter_email or "hello@sourcingnav.com",
+                req_title=req_title,
+                client_name=client_name,
+                when_human=when_human,
+                duration_minutes=req.duration_minutes,
+                meeting_link=req.meeting_link,
+                cancel_url=cancel_url,
+            )
+            asyncio.create_task(_send_email_with_attachment(
+                to=candidate_email,
+                subject=cand_subject,
+                html=cand_html,
+                attachment_filename="interview.ics",
+                attachment_content=rec_ics,  # same ICS - both sides see the same event
+                reply_to=recruiter_email,
+            ))
+    except Exception as e:
+        # Email failures must never break schedule_create
+        print(f"[schedule-email schedule FAIL] type={type(e).__name__} err={str(e)[:200]}")
+
     return {
         "meeting_id": meeting_id,
         "submission_id": req.submission_id,
@@ -5794,7 +6186,65 @@ async def schedule_create(req: ScheduleCreateRequest, user: dict = Depends(get_c
         "calibration_event_id": event_id,
         "calibration_signal": signal,
         "prep_brief": prep_brief,
+        "emails_attempted": {
+            "recruiter": bool(recruiter_email),
+            "candidate": bool(candidate_email),
+        },
     }
+
+
+# Candidate-facing cancel endpoint - no auth required, uses signed token
+@app.get("/api/schedule/cancel/{token}")
+async def schedule_cancel_by_token(token: str):
+    """Candidate clicks the link in their invite email and lands here.
+    For now this renders an HTML confirmation page asking them to email
+    the recruiter back. Future: actually mark the meeting cancelled and
+    notify the recruiter. Punting on auto-cancel for v1 because we want
+    the recruiter to confirm before stage moves back."""
+    meeting_id = _verify_cancel_token(token)
+    if not meeting_id:
+        return HTMLResponse(
+            content="""<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;max-width:560px;margin:40px auto;padding:24px;">
+<h2>Link not valid</h2>
+<p>This cancellation link looks malformed or has been tampered with. Please reply directly to the email you received.</p>
+</body></html>""",
+            status_code=400,
+        )
+
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT m.scheduled_for, m.completed_at, m.outcome,
+                      c.name AS candidate_name, r.title AS req_title, u.email AS recruiter_email
+               FROM meetings m
+               JOIN submissions s ON m.submission_id = s.id
+               JOIN candidates c ON s.candidate_id = c.id
+               JOIN requisitions r ON s.req_id = r.id
+               JOIN users u ON r.user_id = u.id
+               WHERE m.id = ?""",
+            [meeting_id],
+        )
+    if not rs.rows:
+        body = "<h2>Meeting not found</h2><p>This invite may have been deleted.</p>"
+    else:
+        scheduled_for, completed_at, outcome, c_name, r_title, rec_email = rs.rows[0]
+        when_h = _format_meeting_time_human(scheduled_for) if scheduled_for else "unknown time"
+        if completed_at:
+            body = f"<h2>Already closed out</h2><p>This screen has already been marked as <strong>{_html_escape(outcome or 'completed')}</strong>. No action needed.</p>"
+        else:
+            body = f"""
+<h2>Need to reschedule?</h2>
+<p>Hi {_html_escape(c_name)}, your screen for <strong>{_html_escape(r_title)}</strong> is currently set for <strong>{_html_escape(when_h)}</strong>.</p>
+<p>To cancel or move it, please reply to the email you received — or send a quick note to <a href="mailto:{_html_escape(rec_email)}">{_html_escape(rec_email)}</a>.</p>
+<p style="color:#666;font-size:14px;margin-top:24px;">For your protection, screens can only be cancelled by the recruiter once they confirm. This keeps your interview record clean.</p>
+"""
+    return HTMLResponse(
+        content=f"""<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;max-width:560px;margin:40px auto;padding:24px;color:#222;">
+{body}
+<hr style="border:0;border-top:1px solid #eee;margin:32px 0 16px 0;">
+<p style="font-size:12px;color:#999;">SourcingNav</p>
+</body></html>""",
+        status_code=200,
+    )
 
 
 class ScheduleCompleteRequest(BaseModel):
