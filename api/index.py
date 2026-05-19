@@ -834,6 +834,133 @@ def parse_json_strict(text: str) -> dict:
     return json.loads(text)
 
 
+async def call_ai_json(
+    user_id: str,
+    prompt: str,
+    *,
+    required_keys: Optional[tuple[str, ...]] = None,
+    max_repair_attempts: int = 2,
+    max_tokens: int = 8000,
+    label: str = "ai-json",
+) -> dict:
+    """call_ai + parse_json_strict with automatic JSON-repair retries.
+
+    Why this exists:
+      AI calls cost real money and ~30s per attempt. When the model returns
+      malformed JSON (rare but happens), the previous behavior was to raise
+      a 500 error to the user and burn their eval credit. That's terrible
+      UX for a transient model glitch.
+
+      This helper wraps the call so that on parse failure or missing-keys
+      failure, we re-prompt the model with a clean repair instruction and
+      try again. Most JSON-formatting failures are fixable on the second
+      attempt because the model just over-narrated or wrapped output in
+      prose.
+
+    Repair strategy:
+      Attempt 1: Original prompt, default model (Haiku 4.5).
+      Attempt 2: Original prompt + JSON repair suffix. Tells the model
+                 what went wrong, includes the first 200 chars of its
+                 previous response, asks for valid JSON only.
+      Attempt 3+: Same as attempt 2 but with model failover already
+                 having kicked in (handled inside _call_with_failover).
+
+    Why we don't model-failover on parse errors:
+      _call_with_failover already does Haiku -> Sonnet on HTTP errors.
+      A parse error means the API returned 200 but the body wasn't JSON.
+      That's a model-output issue, not a transport issue. The right fix is
+      to ask the same model to redo it more carefully, not to switch models
+      and burn 2x the cost. Sonnet failover happens automatically inside
+      _call_with_failover if Haiku's HTTP layer fails.
+
+    Parameters:
+      user_id: For cap-check logging. Pass through from the route handler.
+      prompt: The full rendered prompt text.
+      required_keys: Optional tuple of top-level keys that must be present
+                    in the returned dict. If any are missing, that counts
+                    as a parse failure and triggers a repair attempt.
+                    e.g. ("fit_score", "recommendation", "summary").
+      max_repair_attempts: How many extra calls to make after the first
+                    attempt fails. Default 2 = up to 3 total calls.
+      max_tokens: Passed to call_ai.
+      label: Used in log lines for diagnosis.
+
+    Returns:
+      The parsed JSON dict.
+
+    Raises:
+      HTTPException(500) if all attempts failed. The error includes the
+      last raw output (first 300 chars) for debugging.
+    """
+    last_text = ""
+    last_error = None
+    repair_suffix = ""
+
+    for attempt in range(1, max_repair_attempts + 2):
+        try:
+            full_prompt = prompt + repair_suffix if repair_suffix else prompt
+            raw = await call_ai(user_id, full_prompt, max_tokens=max_tokens)
+            last_text = raw
+
+            try:
+                parsed = parse_json_strict(raw)
+            except json.JSONDecodeError as je:
+                last_error = f"JSONDecodeError: {je.msg} at position {je.pos}"
+                if attempt <= max_repair_attempts:
+                    print(f"[{label}] attempt {attempt} parse failed: {last_error[:160]} - retrying with repair prompt")
+                    repair_suffix = (
+                        "\n\n---REPAIR INSTRUCTION---\n"
+                        f"Your previous response failed JSON parsing. "
+                        f"Specifically: {last_error}. "
+                        f"Your previous output started with: {raw[:200]!r}. "
+                        f"Return ONLY valid JSON. No code fences. No prose before or after the JSON object. "
+                        f"Output the same structure as requested, but with valid syntax."
+                    )
+                    continue
+                raise HTTPException(
+                    500,
+                    f"[{label}] All {attempt} attempts failed JSON parsing. "
+                    f"Last error: {last_error}. Last output starts: {raw[:300]!r}",
+                )
+
+            # JSON parsed - check required keys
+            if required_keys:
+                missing = [k for k in required_keys if k not in parsed]
+                if missing:
+                    last_error = f"Missing required keys: {missing}"
+                    if attempt <= max_repair_attempts:
+                        print(f"[{label}] attempt {attempt} keys missing: {missing} - retrying with repair prompt")
+                        repair_suffix = (
+                            "\n\n---REPAIR INSTRUCTION---\n"
+                            f"Your previous response was valid JSON but was missing required keys: {missing}. "
+                            f"Return the same JSON object but ensure all required keys are present at the top level. "
+                            f"Required keys are: {list(required_keys)}. "
+                            f"Return ONLY valid JSON. No code fences. No prose."
+                        )
+                        continue
+                    raise HTTPException(
+                        500,
+                        f"[{label}] All {attempt} attempts missing required keys. "
+                        f"Last missing: {missing}. Last output starts: {raw[:300]!r}",
+                    )
+
+            # Success
+            if attempt > 1:
+                print(f"[{label}] succeeded on repair attempt {attempt}")
+            return parsed
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            last_error = f"{type(e).__name__}: {str(e)[:200]}"
+            if attempt > max_repair_attempts:
+                raise HTTPException(500, f"[{label}] unexpected error after {attempt} attempts: {last_error}")
+            print(f"[{label}] attempt {attempt} unexpected error: {last_error} - retrying")
+
+    # Unreachable - the loop always either returns or raises
+    raise HTTPException(500, f"[{label}] exhausted retries with no result")
+
+
 # ---------- PROMPTS ----------
 
 SKILL_ALTERNATIVES_PROMPT = """You are an expert sourcer with 13+ years of experience.
@@ -4073,40 +4200,39 @@ async def intake(req: IntakeRequest, user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(500, f"[cap] {type(e).__name__}: {str(e)[:200]}")
 
-    # Step 1: parse JD with AI
+    # Step 1+2: parse JD with AI (with JSON-repair retries)
+    # call_ai_json handles: AI call, fence stripping, JSON parse, retry-on-malformed.
+    # If the model returns prose-wrapped JSON or missing keys, we re-prompt with
+    # a repair instruction before failing. Required keys come from the JD_PARSER
+    # output schema - if any are missing, that signals a model output bug worth
+    # repairing rather than surfacing as a user-facing error.
     try:
-        parsed_text = await call_ai(user["id"], JD_PARSER.render(jd=req.jd_text))
+        parsed = await call_ai_json(
+            user["id"],
+            JD_PARSER.render(jd=req.jd_text),
+            required_keys=("title", "blockers", "preferred"),
+            label="ai-jd-parse",
+        )
     except HTTPException:
         raise
     except Exception as e:
-        # ReadTimeout, ConnectError, etc. - the AI provider didn't respond in time.
-        # Surface a user-friendly message instead of the raw exception class name.
         etype = type(e).__name__
         prompt_len = len(JD_PARSER.render(jd=req.jd_text))
-        print(f"[ai-parse FAIL] type={etype} prompt_len={prompt_len} jd_len={len(req.jd_text)} err={str(e)[:200]}")
+        print(f"[ai-jd-parse FAIL] type={etype} prompt_len={prompt_len} jd_len={len(req.jd_text)} err={str(e)[:200]}")
         if "Timeout" in etype or "ConnectError" in etype:
             raise HTTPException(
                 503,
                 "The AI provider is slow or unreachable right now. Please try again in a moment.",
             )
-        raise HTTPException(500, f"[ai-parse] {etype}: {str(e)[:300]}")
+        raise HTTPException(500, f"[ai-jd-parse] {etype}: {str(e)[:300]}")
 
-    # Step 2: JSON-parse the AI response
+    # Step 3: generate Boolean strings with AI (with JSON-repair retries)
     try:
-        parsed = parse_json_strict(parsed_text)
-    except Exception as e:
-        raise HTTPException(
-            500,
-            f"[json-parse] {type(e).__name__}: {str(e)[:200]}. AI returned: {parsed_text[:300]}",
-        )
-
-    # Step 3: generate Boolean strings with AI
-    try:
-        boolean_text = await call_ai(
+        booleans = await call_ai_json(
             user["id"],
             BOOLEAN_BUILDER.render(parsed_jd=json.dumps(parsed, indent=2)),
+            label="ai-bool",
         )
-        booleans = parse_json_strict(boolean_text)
     except HTTPException:
         raise
     except Exception as e:
@@ -4862,29 +4988,22 @@ async def evaluate_candidate(req: CandidateEvalRequest, user: dict = Depends(get
     except Exception as e:
         raise HTTPException(500, f"[db-req-load] {type(e).__name__}: {str(e)[:200]}")
 
-    # Step 2: AI evaluation
+    # Step 2+3: AI evaluation (with JSON-repair retries)
+    # call_ai_json wraps the AI call + JSON parse + automatic retry on parse
+    # failures or missing required keys. Required keys are the top-level
+    # contract of the CANDIDATE_EVAL prompt schema - if any are missing,
+    # we re-prompt the model with a repair instruction before failing.
     try:
-        eval_text = await call_ai(
+        evaluation = await call_ai_json(
             user["id"],
             CANDIDATE_EVAL.render(parsed_jd=parsed_jd, candidate_text=req.candidate_text),
+            required_keys=("fit_score", "recommendation", "headline", "summary"),
+            label="ai-eval",
         )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(500, f"[ai-eval] {type(e).__name__}: {str(e)[:300]}")
-
-    # Step 3: parse the AI response as JSON
-    try:
-        # AI may wrap in code fences or add preamble; strip defensively
-        cleaned = eval_text.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("```", 2)[1]
-            if cleaned.startswith("json"):
-                cleaned = cleaned[4:]
-            cleaned = cleaned.rsplit("```", 1)[0].strip()
-        evaluation = json.loads(cleaned)
-    except Exception as e:
-        raise HTTPException(500, f"[ai-parse] {type(e).__name__}: {str(e)[:300]} | raw start: {eval_text[:200]}")
 
     # Step 4: save the candidate (idempotent on email if provided)
     # Phase E.2 (Match -> Source connector): if candidate_id_existing is set,
