@@ -5,7 +5,7 @@
 > writing code. It defines the vision, the architecture, what's shipped,
 > what's next, and the order of operations.
 >
-> Last meaningful update: **2026-05-11**. When this gets stale, update it
+> Last meaningful update: **2026-05-19**. When this gets stale, update it
 > the same session you notice. Stale anchor docs cost real time.
 
 ## What we are building
@@ -116,155 +116,109 @@ interview panel against a candidate, an offer probability against a comp
 gap, or a retention risk against a competency drift. One engine, ten use
 cases.
 
-## Current state (as of 2026-05-11)
+## Current state (as of 2026-05-19)
 
 ### Live infrastructure
 - Vercel project `placement-ops` (`prj_f4LrznUkDxYMJtPrBHVAfbSMwT5Q`,
   team `team_gp53yNb8gLQOVixkEteGZ9dI`). Manual `vercel --yes --prod`
   required (GitHub auto-deploy is not reliably wired).
-- Turso DB `sourcingnav-prod` at
-  `libsql://sourcingnav-prod-shotwellj.aws-us-west-2.turso.io`.
-  Custom httpx-based HTTP client (libsql is broken on Vercel).
-- 5 migrations applied: sessions, compliance+taxonomy, calibration,
-  skill_resolution, req_outcomes.
-- 44 live API endpoints.
-- Resend for transactional email, domain verified at `sourcingnav.com`,
+- **Function timeout extended to 300s** via `vercel.json` `functions.maxDuration`.
+  Was 60s default; Source eval + engine writes regularly hit 45-70s on
+  candidates with deep skill graphs, causing browser timeouts even when
+  the backend succeeded. 300s gives real headroom.
+- Turso DB `sourcingnav-prod`. Custom httpx-based HTTP client.
+- 5 migrations applied.
+- Resend for transactional email, verified `sourcingnav.com`,
   from-address `hello@sourcingnav.com`.
-- Together.ai BYOK with server-key fallback (`SERVER_TOGETHER_KEY`).
-  Qwen 235B FP8.
-- Anthropic SERVER_ANTHROPIC_KEY for AI calls (Haiku 4.5 primary,
-  Sonnet 4.5 fallback). Validated at boot.
+- AI: Anthropic Claude Haiku 4.5 primary, Sonnet 4.5 fallback via
+  `_call_with_failover`. Together.ai dropped from primary path (kept
+  in BYOK back-compat only).
+- **Prompt module live**: 3 versioned prompts (JD_PARSER, BOOLEAN_BUILDER,
+  CANDIDATE_EVAL) in `api/_prompts.py`. Audit chain hashes prompt body
+  for version traceability per AI Act Article 11.
+- **Toolkit registry live**: 5 Pydantic-documented capabilities in
+  `api/_toolkit.py`. MCP-ready for future Pro customer integrations.
+- **JSON repair wrapper live**: `call_ai_json` retries malformed AI
+  output with repair instruction. Wired into all 3 AI-decision routes.
 
 ### Database snapshot (live)
-- **197** skills, **616** adjacency edges, **15** competencies
-- **47** total reqs (23 open after duplicate cleanup), **618** req_skills
-  rows, **33** candidate_skills rows
-- **2** outcomes logged, **109** audit_events written
-- Every intake writes req_skills + compliance records ✅
-- Every eval writes candidate_skills + compliance records ✅
+- **227** skills, **682** adjacency edges, **15** competencies
+- **42** total reqs (1 closed, 18 open, 23 cancelled after dup cleanup)
+- **634** req_skills (360 resolved = 56%)
+- **61** candidate_skills (36 resolved = 59%)
+- **9** evaluated submissions, **2** submission_dimensions for Nuve Controls
+  Steve Benz eval (both successful end-to-end, near-duplicates from
+  retry-on-timeout)
+- **4** outcomes logged (2 cancelled, 2 lost; 2 placeable). **1 more
+  placeable outcome unlocks Fill Probability calibration.**
 
-### Layer 1 (Sourcing): ~70%
-- ✅ JD Parser (`POST /api/intake`) with stratified must-haves +
-  comp snapshot + canonical_skills output
-- ✅ Boolean Builder generating 10 strings per JD (3 LR + 7 X-ray)
-- ✅ Pro tier Boolean Strings (Dragnet + Company-Targeted)
-- ✅ Competitive Intelligence (Pro CI) — full 8-card competitor analysis
-  with watering holes, recruiting angles, salary positioning
+### Layer 1 (Sourcing): ~80%
+- ✅ JD Parser, Boolean Builder, Competitive Intelligence
 - ✅ Career Switcher Archetypes + Hidden Talent Pools
-- ✅ Watering Holes intelligence with hit volume + signal scoring
-- ✅ Live Intelligence Stream (SSE endpoint, Stages 1/2/3-A/3-B):
-  pipeline-shape signals + outcome-driven signals + predictive signals
-  on current intake. 9 event types across the 3 stages.
-- ✅ Trends/clustering page (Phase B3 capability, see Layer 3)
-- ✅ PDF export per requisition
-- ✅ Close Out Req feature (pipeline detail view, all 5 outcome types)
-- ❌ Outreach Generator (designed in prior tools, not ported)
-- ❌ Scan / portal crawler
-- ❌ Smart Response / scheduling
-- ❌ DEI Jamboard
+- ✅ Watering Holes intelligence
+- ✅ Trends/clustering page
+- ✅ **30 canonical skills + 66 adjacencies added** (embedded systems
+  coverage: I2C, SPI, UART, TCP/IP, Embedded Linux, Yocto, Zynq, ARM
+  Cortex, MISRA C, BSP, HAL, board bring-up, real-time systems,
+  hardware debugging, etc.)
+- ✅ **4-tier location extractor** + **skill variant generator**
+  (slash splits, paren strip, lead-phrase strip)
 
-### Layer 2 (Taxonomy + Matching Engine): ~95%
-- ✅ Schema with 13+ tables (brain + compliance + outcomes + signatures)
-- ✅ Seed: 197 skills, 616 adjacencies, 15 competencies in DB
-- ✅ JD_PARSER_PROMPT emits canonical_skills for clean taxonomy matching
-- ✅ CANDIDATE_EVAL_PROMPT emits extracted_skills with recency/depth
-- ✅ Every intake writes req_skills + compliance records
-- ✅ Every eval writes candidate_skills + compliance records
-- ✅ **Formal matching engine math in code** (Phase A finished
-  2026-05-11). All 8 rubric dimensions are now deterministic:
-  - Dim 1 Technical Match: match_type × recency × depth × importance
-  - Dim 2 Seniority Fit: candidate vector vs JD signals
-  - Dim 3 Location Alignment: city / remote / country logic
-  - Dim 4 Comp Alignment: midpoint gap %, 5/4/3/2/1 thresholds
-  - Dim 5 Culture: AI-proposed, code-validated range
-  - Dim 6 Gap Severity: hard/soft gap counting
-  - Dim 7 Presentation Risk: AI-proposed, code-validated range
-  - Dim 8 Fill Probability: 40% tech + 30% gap + 30% historical
-  - Composite: weighted average 25/15/10/15/5/10/10/10, blocker cap
-- ✅ Engine module `api/_matching_engine.py` is lifecycle-agnostic.
-  Callable from Match, Interview, Offer, Retain, Develop modes when
-  they ship.
-- ❌ Medical device / automotive / aerospace taxonomy domains beyond
-  what's seeded today
-- ❌ Backfill script not yet run on early reqs created before req_skills
-  writes were added
-- ❌ Future prompt revision: have AI emit seniority vector + culture
-  + presentation scores directly instead of deriving them from
-  fit_score and risks_to_probe (would improve accuracy of Dims 2/5/7
-  but not change determinism)
+### Layer 2 (Taxonomy + Matching Engine): ~100%
+- ✅ **Phase A FINISHED.** All 8 dimensions deterministic per
+  `modes/_matching-engine.md` spec. Engine code in
+  `api/_matching_engine.py` (1012 lines).
+- ✅ Composite cap at 3.0 on blockers
+- ✅ Engine ran end-to-end on Steve Benz vs Nuve Controls: correctly
+  flagged as Hard Pass (composite 2.92) due to 2 blockers (Qt + QML)
+  despite AI eval scoring him INTERVIEW (72/100). AI-vs-engine
+  disagreement working as designed: AI is generous, engine is honest.
 
-### Layer 3 (Calibration Loop): ~35%
-- ✅ `calibration_events` table
-- ✅ `audit_events` tamper-evident HMAC chain (109 events written)
-- ✅ `decision_explanations` table populated for EU AI Act Article 13
-- ✅ `req_outcomes` table + endpoints (POST + GET) for placement
-  outcome logging
-- ✅ Phase B1 calibration math in `api/_calibration.py` — Bayesian
-  dampened adjacency updates from submission stage transitions.
-  `POST /api/calibration/run` endpoint live.
-- ✅ Phase B2 taxonomy resolution: `/api/taxonomy/unresolved`,
-  `/api/taxonomy/suggestion`, `/api/taxonomy/decide` endpoints live.
-  Skill promotion workflow exists.
-- ✅ Phase B3 role archetype discovery: Jaccard clustering live at
-  `/ui/trends.html`, signatures table populated, re-cluster admin
-  endpoint, public market intel page.
-- ⚠️ Phase B1 wired but unproven — calibration_events table not heavily
-  populated yet because submissions are low volume. **B1 will only
-  start producing visibly different adjacency weights once 5+ placement
-  outcomes are logged with placed_candidate_skills.**
-- ❌ Phase B2 surfaced in UI but admin-only; not yet a recurring
-  workflow with notifications
-- ❌ Phase B4 skill mesh co-occurrence — not built
+### Layer 3 (Calibration Loop): ~40%
+- ✅ Math live in `api/_calibration.py`
+- ✅ Phase B2 endpoints: `/api/taxonomy/unresolved` etc.
+- ✅ Phase B3 archetype discovery: Jaccard clustering live at `/api/trends/role-archetypes`
+- ⚠️ **Still need 1 more placeable outcome** to unlock Fill Probability
+  calibration. Steve Benz Nuve Controls submission is a natural
+  candidate (currently evaluated stage).
+- ❌ Phase B4 skill mesh — not built (premature, corpus too small)
 
-### Layer 4 (Lifecycle Modes): ~10%
-**This is the gap that defines the next 12 months of work.** Only one
-of ten modes has any real implementation.
+### Layer 4 (Lifecycle Modes): ~35%
+- ✅ **Source mode** — full 8-dim engine on every eval
+- ✅ **Match mode (Phase E.1)** — `/api/match/batch`, ranks all user
+  candidates against one req using engine, no extra AI calls.
+  UI at `/app/match.html` with Engine Scorecard per candidate.
+- ✅ **Match → Source connector (Phase E.2)** — `/api/source/reevaluate`
+  pulls cached resume_text and runs the full Source pipeline against
+  any candidate-req combo. One-click from Match results. Idempotent
+  within 90s window (prevents duplicate submissions from retry clicks).
+- ✅ **Outcomes dashboard** — `/app/outcomes.html` with locked/unlocked
+  calibration status, awaiting outcomes queue, history timeline.
+- ⏳ **Schedule mode (Phase E.3)** — IN PROGRESS this session. Path A
+  (in-app only). Path B (Google Calendar via MCP) planned for later.
+- ❌ Interview, Offer, Onboard, Perform, Develop, Retain, Depart — not built
 
-- ✅ **Match** (basic): candidate evaluation endpoint
-  (`POST /api/source/evaluate`) — but uses AI scoring, not the formal
-  engine. Refactor planned as the Phase A finishing piece.
-- ❌ **Source**: partial — intake + Booleans + CI exist as features but
-  no "source mode" UI that orchestrates them as a workflow
-- ❌ **Schedule**: not built. Future feature includes native booking
-  page + Google Calendar sync via MCP.
-- ❌ **Interview**: not built. Interview kit generator, structured
-  rubric capture, panel coordination.
-- ❌ **Offer**: not built. Offer letter generation, e-sign integration,
-  comp negotiation tracking.
-- ❌ **Onboard**: not built. First 90 day milestones, HRIS integration.
-- ❌ **Perform**: not built.
-- ❌ **Develop**: not built. Career path mapping, skill gap → training.
-- ❌ **Retain**: not built. Post-placement health checks, flight risk.
-- ❌ **Depart**: not built. Exit interview capture, departure pattern
-  analysis, sister-company placement matching.
-
-### Layer 5 (Agency Surface): ~40%
-- ✅ Auth + sessions (magic link, 30-day sessions)
-- ✅ Intake form (`/app/`) with full CI + career switchers + hidden
-  pools + watering holes
-- ✅ Pipeline page list view (`/app/pipeline.html`)
-- ✅ Pipeline page detail view (comp, skills, Booleans, sourcer notes)
-- ✅ Candidate evaluation form + ranked submissions list
-- ✅ Status mutations via outcome logging (Close Out Req feature)
-- ✅ Trends page (Market Intelligence internal view)
-- ✅ Settings page (BYOK + sessions + plan)
-- ❌ The other 9 agency modes from `/ui/dashboard.html` demo
-- ❌ Source mode as an orchestrated workflow (vs. one-shot intake)
-- ❌ Forecast / Benchmark / Batch / Strategy / Outreach / Scan /
-  Retention modes
+### Layer 5 (Agency Surface): ~50%
+- ✅ Pipeline, settings, taxonomy, trends, match, outcomes pages
+- ✅ Engine Scorecard panel surfaces 8-dim math
+- ✅ Print view for client submission packets
+- ⚠️ Free vs Pro tier gating exists but billing not wired
+- ❌ Outreach Generator (Phase C #6) — designed, not built
 
 ### Layer 6 (Company Surface): 0%
-- ❌ All 11 modes from `/ui/people-ops.html` demo are HTML mockups only
-- ❌ No company-side onboarding flow
-- ❌ No ATS handoff from agency placement to company roster
-- ❌ No company-side billing infrastructure
+Unchanged.
 
 ### Layer 7 (Market Intelligence): ~5%
-- ✅ Public Market Intelligence page at `/market-intel` (anonymized,
-  aggregated counts from all users' parsed signatures)
-- ❌ No paid enterprise customers
-- ❌ No API access for enterprise integrations
-- ❌ Data volume too small for enterprise-grade reports yet
+Unchanged.
+
+### Architecture hygiene (cross-cutting, shipped 2026-05-19)
+- ✅ Prompt module + versioning (`api/_prompts.py`)
+- ✅ Toolkit registry with Pydantic schemas (`api/_toolkit.py`)
+- ✅ `call_ai_json` JSON-repair wrapper with retry strategy
+- ✅ Reevaluate idempotency (90s window) prevents duplicate submissions
+- ✅ Vercel function timeout extended to 300s
+- ✅ Frontend timeout-aware error handling (distinguishes "Failed to
+  fetch" from real failure vs successful-but-cut-off)
 
 ## What's left in each phase (rewritten 2026-05-11)
 
@@ -551,7 +505,11 @@ Critical reference files:
 
 ---
 
-*Last meaningful update: 2026-05-11. Reflects Live Intelligence Stream
+*Last meaningful update: 2026-05-19. Reflects Phase A finish, Match mode (E.1),
+Match → Source connector (E.2), Outcomes dashboard, prompt module + toolkit + JSON
+repair architecture hygiene. Phase E.3 (Schedule mode) in progress.*
+
+*Earlier history: 2026-05-11 — Live Intelligence Stream
 shipped, Pro CI shipped, Trends/clustering shipped, Close Out Req
 shipped, duplicate cleanup applied (47 → 23 open reqs), Phase B1
 calibration scaffolded, Phase B2 endpoints live, Phase A matching

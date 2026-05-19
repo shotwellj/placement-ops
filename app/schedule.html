@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schedule · SourcingNav Talent Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a; --bg-elev: #111827; --bg-card: #151d2e;
+    --border: #1f2a3f; --border-strong: #2d3a54;
+    --text: #e8ecf4; --text-dim: #8b9bb3; --text-mute: #5a6c85;
+    --accent: #3dd9d6; --accent-deep: #2eb8b5; --blue: #4a9eff;
+    --gradient: linear-gradient(135deg, #3dd9d6 0%, #4a9eff 100%);
+    --danger: #ff6b6b; --warn: #ffb74d; --good: #4ade80;
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased; background-image: radial-gradient(ellipse at top right, rgba(61,217,214,0.06) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(74,158,255,0.04) 0%, transparent 50%); background-attachment: fixed; }
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(10, 14, 26, 0.85); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
+  .nav-inner { max-width: 1400px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; letter-spacing: 0.08em; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+  .brand-sub { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); margin-left: 0.75rem; padding-left: 0.75rem; border-left: 1px solid var(--border-strong); }
+  .nav-right { display: flex; align-items: center; gap: 1.5rem; font-size: 0.85rem; }
+  .nav-link { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+  .nav-link:hover { color: var(--accent); }
+  .nav-link.active { color: var(--text); }
+  .page { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+  .page-header { margin-bottom: 2rem; }
+  .page-kicker { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.75rem; }
+  .page-title { font-size: 2.25rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05; }
+  .page-desc { color: var(--text-dim); font-size: 1rem; max-width: 720px; margin-top: 0.75rem; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .empty-state { padding: 4rem 2rem; text-align: center; background: var(--bg-card); border: 1px dashed var(--border-strong); border-radius: 12px; }
+  .empty-state h3 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+  .empty-state p { color: var(--text-dim); max-width: 500px; margin: 0 auto; }
+  .section-header { display: flex; align-items: baseline; justify-content: space-between; margin: 2rem 0 1rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+  .section-header h2 { font-size: 1.1rem; font-weight: 600; }
+  .section-header .count { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-mute); }
+
+  .mtg-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 1.25rem; padding: 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card); margin-bottom: 0.75rem; align-items: center; transition: border-color 0.15s; }
+  .mtg-row:hover { border-color: var(--border-strong); }
+  .mtg-row.overdue { border-color: rgba(255, 183, 77, 0.4); background: rgba(255, 183, 77, 0.03); }
+  .mtg-when { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
+  .mtg-when .date { color: var(--text); font-size: 0.9rem; display: block; margin-bottom: 0.15rem; }
+  .mtg-main { min-width: 0; }
+  .mtg-name { font-weight: 600; font-size: 1rem; margin-bottom: 0.2rem; }
+  .mtg-meta { font-size: 0.82rem; color: var(--text-dim); }
+  .mtg-tags { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+  .tag { display: inline-block; padding: 0.18rem 0.55rem; font-size: 0.7rem; font-family: var(--font-mono); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; color: var(--text-dim); }
+  .tag.type { color: var(--blue); border-color: rgba(74, 158, 255, 0.3); }
+  .tag.rec.INTERVIEW { color: var(--warn); border-color: rgba(255, 183, 77, 0.3); }
+  .tag.rec.SUBMIT { color: var(--good); border-color: rgba(74, 222, 128, 0.3); }
+  .tag.rec.PASS { color: var(--text-mute); }
+  .mtg-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+  .btn-sm { padding: 0.45rem 0.85rem; font-size: 0.78rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text); font-family: inherit; }
+  .btn-sm:hover { border-color: var(--accent); }
+  .btn-sm.primary { background: var(--gradient); color: #0a0e1a; border-color: var(--accent); font-weight: 600; }
+  .btn-sm:disabled { opacity: 0.5; cursor: wait; }
+
+  .brief-toggle { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); cursor: pointer; margin-top: 0.65rem; user-select: none; }
+  .brief-toggle:hover { text-decoration: underline; }
+  .brief { margin-top: 0.85rem; padding: 0.85rem; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; display: none; }
+  .brief.open { display: block; }
+  .brief h4 { font-size: 0.78rem; font-family: var(--font-mono); color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; margin-top: 0.85rem; }
+  .brief h4:first-child { margin-top: 0; }
+  .brief ul { list-style: none; padding: 0; }
+  .brief li { padding: 0.2rem 0; color: var(--text-dim); }
+  .brief .blocker-pill { display: inline-block; padding: 0.2rem 0.55rem; margin: 0.2rem 0.3rem 0.2rem 0; background: rgba(255, 107, 107, 0.1); color: var(--danger); border: 1px solid rgba(255, 107, 107, 0.3); border-radius: 4px; font-family: var(--font-mono); font-size: 0.72rem; }
+
+  .err-box { background: rgba(255, 107, 107, 0.08); border: 1px solid var(--danger); border-radius: 8px; padding: 1rem; color: var(--danger); font-size: 0.9rem; }
+  .loading { padding: 3rem 2rem; text-align: center; color: var(--text-dim); font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <div>
+      <a href="/app/" class="brand">SOURCINGNAV</a>
+      <span class="brand-sub">Schedule</span>
+    </div>
+    <div class="nav-right">
+      <a href="/app/" class="nav-link">Intake</a>
+      <a href="/app/pipeline.html" class="nav-link">Pipeline</a>
+      <a href="/app/match.html" class="nav-link">Match</a>
+      <a href="/app/schedule.html" class="nav-link active">Schedule</a>
+      <a href="/app/outcomes.html" class="nav-link">Outcomes</a>
+      <a href="/app/trends.html" class="nav-link">Trends</a>
+      <a href="/app/taxonomy.html" class="nav-link">Taxonomy</a>
+      <a href="/app/settings.html" class="nav-link">Settings</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="page-header">
+    <div class="page-kicker">Phase E.3 · Lifecycle stage 3</div>
+    <h1 class="page-title">What's <em>on your plate</em></h1>
+    <p class="page-desc">Screens scheduled for the next 14 days and screens that already happened but need an outcome logged. Each one auto-generated a prep brief from the candidate's prior evaluation.</p>
+  </div>
+
+  <div id="content"><div class="loading">Loading...</div></div>
+</main>
+
+<script>
+const AUTH_KEY = 'sourcingnav_token';
+const token = localStorage.getItem(AUTH_KEY);
+if (!token) {
+  window.location.href = '/login.html?next=' + encodeURIComponent(location.pathname);
+}
+const authHeaders = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+  const timeOpts = { hour: 'numeric', minute: '2-digit' };
+  return {
+    date: d.toLocaleDateString('en-US', opts),
+    time: d.toLocaleTimeString('en-US', timeOpts),
+    isPast: d.getTime() < Date.now(),
+  };
+}
+
+function renderMeetingRow(m, isRecent) {
+  const f = formatDate(m.scheduled_for);
+  const overdue = isRecent && m.needs_outcome;
+  const brief = m.prep_brief || {};
+  const blockers = (brief.engine_blockers || []).map(b =>
+    `<span class="blocker-pill">${escapeHtml(b)}</span>`
+  ).join('');
+  const strengths = (brief.top_strengths || []).map(s =>
+    `<li>✓ ${escapeHtml(s)}</li>`
+  ).join('');
+  const risks = (brief.top_risks_to_probe || []).map(r =>
+    `<li>⚠ ${escapeHtml(r)}</li>`
+  ).join('');
+  const qs = (brief.suggested_questions || []).map(q =>
+    `<li>${escapeHtml(typeof q === 'string' ? q : (q.question || ''))}</li>`
+  ).join('');
+
+  const actions = isRecent
+    ? `<button class="btn-sm primary" onclick="markComplete('${escapeHtml(m.meeting_id)}', this)">Log outcome</button>`
+    : `<a href="/app/pipeline.html?req=${encodeURIComponent(m.submission_id || '')}" class="btn-sm" style="text-decoration:none;">Open submission</a>`;
+
+  return `
+    <div class="mtg-row ${overdue ? 'overdue' : ''}">
+      <div class="mtg-when">
+        <span class="date">${f.date}</span>
+        ${f.time} · ${m.duration_minutes || 30}m
+      </div>
+      <div class="mtg-main">
+        <div class="mtg-name">${escapeHtml(m.candidate_name || 'Unnamed')}</div>
+        <div class="mtg-meta">${escapeHtml(m.req_title || '')}${m.client_name ? ' · ' + escapeHtml(m.client_name) : ''}${m.interviewer ? ' · with ' + escapeHtml(m.interviewer) : ''}</div>
+        <div class="mtg-tags">
+          <span class="tag type">${escapeHtml((m.interview_type || 'screen').replace(/_/g, ' '))}</span>
+          ${m.recommendation ? `<span class="tag rec ${escapeHtml(m.recommendation)}">${escapeHtml(m.recommendation)}</span>` : ''}
+          ${m.ai_fit_score != null ? `<span class="tag">Fit ${m.ai_fit_score}</span>` : ''}
+          ${m.outcome ? `<span class="tag">${escapeHtml(m.outcome.replace(/_/g, ' '))}</span>` : ''}
+        </div>
+        ${brief && (strengths || risks || qs || blockers) ? `
+          <div class="brief-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.textContent = this.nextElementSibling.classList.contains('open') ? 'Hide prep brief ▴' : 'Show prep brief ▾';">Show prep brief ▾</div>
+          <div class="brief">
+            ${blockers ? `<h4>Engine blockers</h4><div>${blockers}</div>` : ''}
+            ${strengths ? `<h4>Top strengths</h4><ul>${strengths}</ul>` : ''}
+            ${risks ? `<h4>Top risks to probe</h4><ul>${risks}</ul>` : ''}
+            ${qs ? `<h4>Suggested questions</h4><ul>${qs}</ul>` : ''}
+          </div>
+        ` : ''}
+      </div>
+      <div class="mtg-actions">${actions}</div>
+    </div>
+  `;
+}
+
+async function markComplete(meetingId, btnEl) {
+  const outcome = prompt(
+    'Outcome:\n' +
+    '  1 = completed\n' +
+    '  2 = cancelled_by_candidate\n' +
+    '  3 = cancelled_by_client\n' +
+    '  4 = no_show\n' +
+    '  5 = rescheduled\n' +
+    'Enter number:'
+  );
+  const map = {
+    '1': 'completed', '2': 'cancelled_by_candidate', '3': 'cancelled_by_client',
+    '4': 'no_show', '5': 'rescheduled',
+  };
+  const outcomeVal = map[outcome && outcome.trim()];
+  if (!outcomeVal) return;
+  const notes = prompt('Optional notes (blank to skip):') || null;
+
+  btnEl.disabled = true;
+  btnEl.textContent = 'Saving...';
+  try {
+    const r = await fetch(`/api/schedule/${encodeURIComponent(meetingId)}/complete`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ outcome: outcomeVal, notes }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(`HTTP ${r.status}: ${t.slice(0, 200)}`);
+    }
+    await loadAll();
+  } catch (e) {
+    alert('Could not save outcome: ' + e.message);
+    btnEl.disabled = false;
+    btnEl.textContent = 'Log outcome';
+  }
+}
+
+async function loadAll() {
+  try {
+    const [upcomingR, recentR] = await Promise.all([
+      fetch('/api/schedule/upcoming?days_ahead=14', { headers: authHeaders }),
+      fetch('/api/schedule/recent?limit=20', { headers: authHeaders }),
+    ]);
+    if (!upcomingR.ok || !recentR.ok) {
+      const t = await upcomingR.text();
+      throw new Error(`HTTP ${upcomingR.status}: ${t.slice(0, 200)}`);
+    }
+    const upcoming = await upcomingR.json();
+    const recent = await recentR.json();
+
+    const needsOutcome = (recent.meetings || []).filter(m => m.needs_outcome);
+    const completed = (recent.meetings || []).filter(m => !m.needs_outcome);
+
+    let html = '';
+
+    // Needs outcome section
+    if (needsOutcome.length) {
+      html += `
+        <div class="section-header">
+          <h2>Awaiting outcome</h2>
+          <span class="count">${needsOutcome.length} screen${needsOutcome.length === 1 ? '' : 's'} already happened</span>
+        </div>
+        ${needsOutcome.map(m => renderMeetingRow(m, true)).join('')}
+      `;
+    }
+
+    // Upcoming section
+    html += `
+      <div class="section-header">
+        <h2>Upcoming · next 14 days</h2>
+        <span class="count">${upcoming.count} scheduled</span>
+      </div>
+    `;
+    if (!upcoming.meetings || !upcoming.meetings.length) {
+      html += `
+        <div class="empty-state">
+          <h3>No screens scheduled</h3>
+          <p>When you schedule a screen from the pipeline view, it'll show up here with the candidate's prep brief auto-generated from their prior evaluation.</p>
+        </div>
+      `;
+    } else {
+      html += upcoming.meetings.map(m => renderMeetingRow(m, false)).join('');
+    }
+
+    // History section
+    if (completed.length) {
+      html += `
+        <div class="section-header">
+          <h2>Recent history</h2>
+          <span class="count">${completed.length} completed</span>
+        </div>
+        ${completed.map(m => renderMeetingRow(m, false)).join('')}
+      `;
+    }
+
+    document.getElementById('content').innerHTML = html;
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="err-box">Could not load schedule: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>

@@ -5620,6 +5620,321 @@ async def reevaluate_candidate(
 
 
 # ============================================================
+# SCHEDULE MODE (Phase E.3) - Path A: in-app only
+# ============================================================
+# When a submission has been evaluated and the recruiter wants to move
+# the candidate forward, the next lifecycle action is scheduling a screen.
+# This module captures that action.
+#
+# Path A (this commit): in-app scheduling. The recruiter inputs date/time/
+# interviewer manually. No external calendar integration. The data writes
+# unlock Phase B1 calibration via the existing stage transition pipeline.
+#
+# Path B (future "crush Calendly" build): Google Calendar via MCP server.
+# The schema already supports it - `google_event_id` and `booking_source`
+# fields are sitting empty waiting for that integration.
+
+INTERVIEW_TYPE_TO_STAGE = {
+    "phone_screen": "phone_screen",
+    "technical":    "phone_screen",
+    "behavioral":   "phone_screen",
+    "onsite":       "onsite",
+}
+
+VALID_INTERVIEW_TYPES = tuple(INTERVIEW_TYPE_TO_STAGE.keys())
+
+VALID_MEETING_OUTCOMES = (
+    "completed",
+    "cancelled_by_candidate",
+    "cancelled_by_client",
+    "no_show",
+    "rescheduled",
+)
+
+
+class ScheduleCreateRequest(BaseModel):
+    submission_id: str = Field(..., min_length=1)
+    scheduled_for: str = Field(..., description="ISO 8601 timestamp")
+    duration_minutes: int = Field(30, ge=5, le=480)
+    interview_type: str = Field(..., description=f"One of: {', '.join(VALID_INTERVIEW_TYPES)}")
+    interviewer: Optional[str] = Field(None)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+
+def _build_prep_brief(match_breakdown_json):
+    """Extract the highest-value bits from prior AI eval + engine output into
+    a prep brief the recruiter can skim 60 seconds before the call. Pure
+    function - no AI call, no DB. Reuses structured data from Source eval."""
+    if not match_breakdown_json:
+        return {"summary": "No prior evaluation available."}
+    try:
+        breakdown = json.loads(match_breakdown_json)
+    except Exception:
+        return {"summary": "Prior evaluation data malformed; review submission directly."}
+    ai_eval = breakdown.get("ai_eval") or {}
+    engine = breakdown.get("engine") or {}
+    brief = {
+        "headline": (ai_eval.get("headline") or "")[:300],
+        "fit_score": ai_eval.get("fit_score"),
+        "recommendation": ai_eval.get("recommendation"),
+        "top_strengths": (ai_eval.get("strengths") or [])[:3],
+        "top_risks_to_probe": (ai_eval.get("risks_to_probe") or [])[:3],
+        "suggested_questions": (ai_eval.get("interview_questions") or [])[:5],
+        "engine_blockers": [
+            b.get("requirement_text") for b in (engine.get("blockers") or [])
+        ],
+        "engine_composite": (engine.get("composite") or {}).get("composite"),
+        "engine_recommendation": (engine.get("composite") or {}).get("recommendation"),
+    }
+    return {k: v for k, v in brief.items() if v not in (None, [], "")}
+
+
+@app.post("/api/schedule/create")
+async def schedule_create(req: ScheduleCreateRequest, user: dict = Depends(get_current_user)):
+    """Create a meeting row + transition stage + record calibration."""
+    if req.interview_type not in VALID_INTERVIEW_TYPES:
+        raise HTTPException(400, f"interview_type must be one of: {VALID_INTERVIEW_TYPES}")
+
+    target_stage = INTERVIEW_TYPE_TO_STAGE[req.interview_type]
+
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT s.id, s.stage, s.req_id, s.candidate_id, r.user_id,
+                      sd.match_breakdown_json,
+                      c.name AS candidate_name, r.title AS req_title
+               FROM submissions s
+               JOIN requisitions r ON s.req_id = r.id
+               JOIN candidates c ON s.candidate_id = c.id
+               LEFT JOIN submission_dimensions sd ON sd.submission_id = s.id
+               WHERE s.id = ?""",
+            [req.submission_id],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Submission not found")
+        (_, current_stage, req_id, candidate_id, owner_id,
+         match_breakdown_json, candidate_name, req_title) = rs.rows[0]
+        if owner_id != user["id"]:
+            raise HTTPException(403, "Not your submission")
+
+        from_stage = current_stage or "evaluated"
+        prep_brief = _build_prep_brief(match_breakdown_json)
+        prep_brief["candidate_name"] = candidate_name
+        prep_brief["req_title"] = req_title
+        prep_brief["interview_type"] = req.interview_type
+        prep_brief_str = json.dumps(prep_brief)
+
+        meeting_id = "mtg_" + uuid.uuid4().hex[:16]
+
+        await client.execute(
+            """INSERT INTO meetings
+               (id, submission_id, scheduled_for, duration_minutes,
+                prep_brief_json, booking_source, interview_type,
+                interviewer, notes)
+               VALUES (?, ?, ?, ?, ?, 'in_app', ?, ?, ?)""",
+            [meeting_id, req.submission_id, req.scheduled_for,
+             req.duration_minutes, prep_brief_str,
+             req.interview_type, req.interviewer, req.notes],
+        )
+
+        stage_changed = (target_stage != current_stage)
+        if stage_changed:
+            await client.execute(
+                "UPDATE submissions SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                [target_stage, req.submission_id],
+            )
+
+        signal = signal_for_transition(from_stage, target_stage) if stage_changed else 0.0
+        ae_id = None
+        try:
+            ae_id = await write_audit_event(
+                client,
+                event_type="recruiter_action",
+                action="meeting_scheduled",
+                actor_user_id=user["id"],
+                entity_type="meeting",
+                entity_id=meeting_id,
+                inputs={
+                    "submission_id": req.submission_id,
+                    "scheduled_for": req.scheduled_for,
+                    "interview_type": req.interview_type,
+                    "from_stage": from_stage,
+                    "to_stage": target_stage,
+                },
+                outputs={"calibration_signal": signal, "stage_changed": stage_changed},
+                model_version_id=None,
+            )
+        except Exception as audit_err:
+            print(f"[schedule] audit write failed: {audit_err!r}")
+
+        event_id = None
+        if stage_changed and signal != 0.0:
+            try:
+                event_id = await record_calibration_event(
+                    client,
+                    user_id=user["id"],
+                    submission_id=req.submission_id,
+                    req_id=req_id,
+                    from_stage=from_stage,
+                    to_stage=target_stage,
+                    reason=f"meeting_scheduled:{req.interview_type}",
+                    audit_event_id=ae_id,
+                )
+            except Exception as calib_err:
+                print(f"[schedule] calibration event insert failed: {calib_err!r}")
+
+    return {
+        "meeting_id": meeting_id,
+        "submission_id": req.submission_id,
+        "from_stage": from_stage,
+        "to_stage": target_stage,
+        "stage_changed": stage_changed,
+        "calibration_event_id": event_id,
+        "calibration_signal": signal,
+        "prep_brief": prep_brief,
+    }
+
+
+class ScheduleCompleteRequest(BaseModel):
+    outcome: str = Field(..., description=f"One of: {', '.join(VALID_MEETING_OUTCOMES)}")
+    notes: Optional[str] = Field(None, max_length=2000)
+
+
+@app.post("/api/schedule/{meeting_id}/complete")
+async def schedule_complete(
+    meeting_id: str,
+    payload: ScheduleCompleteRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Mark a meeting as completed and capture the outcome."""
+    if payload.outcome not in VALID_MEETING_OUTCOMES:
+        raise HTTPException(400, f"outcome must be one of: {VALID_MEETING_OUTCOMES}")
+
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT m.id, m.submission_id, m.completed_at, r.user_id, s.stage, s.req_id
+               FROM meetings m
+               JOIN submissions s ON m.submission_id = s.id
+               JOIN requisitions r ON s.req_id = r.id
+               WHERE m.id = ?""",
+            [meeting_id],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Meeting not found")
+        _, submission_id, completed_at, owner_id, current_stage, req_id = rs.rows[0]
+        if owner_id != user["id"]:
+            raise HTTPException(403, "Not your meeting")
+        if completed_at:
+            raise HTTPException(400, "Meeting is already marked complete")
+
+        await client.execute(
+            """UPDATE meetings
+               SET outcome = ?, completed_at = CURRENT_TIMESTAMP,
+                   notes = COALESCE(?, notes)
+               WHERE id = ?""",
+            [payload.outcome, payload.notes, meeting_id],
+        )
+
+        try:
+            await write_audit_event(
+                client,
+                event_type="recruiter_action",
+                action="meeting_completed",
+                actor_user_id=user["id"],
+                entity_type="meeting",
+                entity_id=meeting_id,
+                inputs={"submission_id": submission_id, "outcome": payload.outcome},
+                outputs={"current_stage": current_stage},
+                model_version_id=None,
+            )
+        except Exception as audit_err:
+            print(f"[schedule] audit write failed on complete: {audit_err!r}")
+
+    return {"meeting_id": meeting_id, "outcome": payload.outcome, "completed_at": "now"}
+
+
+@app.get("/api/schedule/upcoming")
+async def schedule_upcoming(days_ahead: int = 14, user: dict = Depends(get_current_user)):
+    """User's scheduled meetings in next N days, not yet completed."""
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT m.id, m.submission_id, m.scheduled_for, m.duration_minutes,
+                      m.interview_type, m.interviewer, m.notes, m.prep_brief_json,
+                      c.name, r.title, r.client_name,
+                      s.ai_fit_score, s.recommendation
+               FROM meetings m
+               JOIN submissions s ON m.submission_id = s.id
+               JOIN candidates c ON s.candidate_id = c.id
+               JOIN requisitions r ON s.req_id = r.id
+               WHERE r.user_id = ?
+                 AND m.completed_at IS NULL
+                 AND datetime(m.scheduled_for) >= datetime('now')
+                 AND datetime(m.scheduled_for) <= datetime('now', '+' || ? || ' days')
+               ORDER BY m.scheduled_for ASC""",
+            [user["id"], days_ahead],
+        )
+        meetings = []
+        for row in rs.rows:
+            prep_brief = None
+            try:
+                prep_brief = json.loads(row[7]) if row[7] else None
+            except Exception:
+                pass
+            meetings.append({
+                "meeting_id": row[0],
+                "submission_id": row[1],
+                "scheduled_for": row[2],
+                "duration_minutes": row[3],
+                "interview_type": row[4],
+                "interviewer": row[5],
+                "notes": row[6],
+                "prep_brief": prep_brief,
+                "candidate_name": row[8],
+                "req_title": row[9],
+                "client_name": row[10],
+                "ai_fit_score": row[11],
+                "recommendation": row[12],
+            })
+    return {"meetings": meetings, "count": len(meetings), "days_ahead": days_ahead}
+
+
+@app.get("/api/schedule/recent")
+async def schedule_recent(limit: int = 20, user: dict = Depends(get_current_user)):
+    """Completed meetings + past meetings not yet closed out."""
+    async with db() as client:
+        rs = await client.execute(
+            """SELECT m.id, m.submission_id, m.scheduled_for, m.duration_minutes,
+                      m.interview_type, m.interviewer, m.outcome, m.completed_at,
+                      c.name, r.title
+               FROM meetings m
+               JOIN submissions s ON m.submission_id = s.id
+               JOIN candidates c ON s.candidate_id = c.id
+               JOIN requisitions r ON s.req_id = r.id
+               WHERE r.user_id = ?
+                 AND (m.completed_at IS NOT NULL
+                      OR datetime(m.scheduled_for) < datetime('now'))
+               ORDER BY COALESCE(m.completed_at, m.scheduled_for) DESC
+               LIMIT ?""",
+            [user["id"], limit],
+        )
+        meetings = []
+        for row in rs.rows:
+            meetings.append({
+                "meeting_id": row[0],
+                "submission_id": row[1],
+                "scheduled_for": row[2],
+                "duration_minutes": row[3],
+                "interview_type": row[4],
+                "interviewer": row[5],
+                "outcome": row[6],
+                "completed_at": row[7],
+                "candidate_name": row[8],
+                "req_title": row[9],
+                "needs_outcome": row[6] is None and row[7] is None,
+            })
+    return {"meetings": meetings, "count": len(meetings)}
+
+
+# ============================================================
 # OUTCOMES DASHBOARD (Phase B1 enablement)
 # ============================================================
 # Centralized view of the user's outcome history. Surfaces:
@@ -5835,7 +6150,11 @@ async def get_req(req_id: str, user: dict = Depends(get_current_user)):
 # ============================================================
 
 ALLOWED_STAGES = {
+    # Pre-pipeline stages (Source mode writes "evaluated", legacy "sourced")
+    "sourced", "evaluated",
+    # Pipeline stages (calibration_events fire on transitions into these)
     "submitted", "phone_screen", "onsite", "offer",
+    # Terminal stages
     "placed", "rejected", "withdrew",
 }
 

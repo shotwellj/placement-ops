@@ -246,6 +246,35 @@
     border: 1px solid var(--border);
   }
   .stage-feedback.err { background: rgba(255,107,107,0.08); color: var(--danger); }
+  /* Schedule modal (Phase E.3) */
+  .sched-trigger { margin-left: 0.6rem; padding: 0.35rem 0.85rem; font-size: 0.78rem;
+    background: rgba(74, 158, 255, 0.12); color: #4a9eff;
+    border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 6px; cursor: pointer;
+    font-family: var(--font-mono); transition: all 0.15s; }
+  .sched-trigger:hover { background: rgba(74, 158, 255, 0.2); }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+    display: none; align-items: center; justify-content: center; padding: 2rem; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { margin: 0 0 0.5rem; font-size: 1.15rem; }
+  .modal-sub { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1.25rem; }
+  .modal label { display: block; font-size: 0.78rem; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; margin-top: 0.85rem; }
+  .modal input, .modal select, .modal textarea { width: 100%; padding: 0.6rem 0.75rem;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: inherit; font-size: 0.9rem; box-sizing: border-box; }
+  .modal textarea { min-height: 60px; resize: vertical; font-family: inherit; }
+  .modal-actions { margin-top: 1.5rem; display: flex; gap: 0.6rem; justify-content: flex-end; }
+  .modal-btn { padding: 0.6rem 1.1rem; border-radius: 6px; cursor: pointer;
+    font-size: 0.88rem; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .modal-btn.primary { background: var(--accent); color: #0b1220; border-color: var(--accent);
+    font-weight: 600; }
+  .modal-btn:disabled { opacity: 0.5; cursor: wait; }
+  .modal-err { background: rgba(255,107,107,0.1); color: var(--danger);
+    padding: 0.6rem 0.85rem; border-radius: 6px; font-size: 0.85rem; margin-top: 0.85rem; display: none; }
+  .modal-err.show { display: block; }
+
 </style>
 </head>
 <body>
@@ -259,6 +288,7 @@
       <a href="/app/" class="nav-link">Intake</a>
       <a href="/app/pipeline.html" class="nav-link active">Pipeline</a>
       <a href="/app/match.html" class="nav-link">Match</a>
+      <a href="/app/schedule.html" class="nav-link">Schedule</a>
       <a href="/app/outcomes.html" class="nav-link">Outcomes</a>
       <a href="/app/trends.html" class="nav-link">Trends</a>
       <a href="/app/taxonomy.html" class="nav-link">Taxonomy</a>
@@ -1229,6 +1259,7 @@ function renderStageBar(submissionId, currentStage) {
     <div class="stage-bar">
       <span class="stage-bar-label">Stage</span>
       ${buttons}
+      <button class="sched-trigger" onclick="event.stopPropagation(); openScheduleModal('${escapeHtml(submissionId)}', this)" title="Schedule a screen for this candidate">+ Schedule screen</button>
       <div id="stage-feedback-${escapeHtml(submissionId)}" style="width: 100%; display: none;"></div>
     </div>
   `;
@@ -1405,6 +1436,84 @@ function renderSubmissionRow(s) {
     </div>
   `;
 }
+
+// ---------- Schedule modal (Phase E.3) ----------
+let _schedTargetSubmissionId = null;
+
+function openScheduleModal(submissionId, btnEl) {
+  _schedTargetSubmissionId = submissionId;
+  // Default to tomorrow at 10am local time
+  const tomorrow = new Date(Date.now() + 24*60*60*1000);
+  tomorrow.setHours(10, 0, 0, 0);
+  // datetime-local input wants "YYYY-MM-DDTHH:MM" in local time
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('schedDate').value =
+    `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:${pad(tomorrow.getMinutes())}`;
+  document.getElementById('schedDuration').value = '30';
+  document.getElementById('schedType').value = 'phone_screen';
+  document.getElementById('schedInterviewer').value = '';
+  document.getElementById('schedNotes').value = '';
+  document.getElementById('schedErr').classList.remove('show');
+  document.getElementById('schedSubmit').disabled = false;
+  document.getElementById('schedSubmit').textContent = 'Schedule';
+  // Pull candidate name from the parent submission row for the modal subhead
+  const row = btnEl.closest('.sub-row');
+  const candidateName = row ? (row.querySelector('.sub-name')?.textContent || 'candidate') : 'candidate';
+  document.getElementById('schedModalSub').textContent = `For ${candidateName}. Stage will move to phone_screen or onsite, calibration signal will fire, prep brief auto-generated.`;
+  document.getElementById('schedModal').classList.add('open');
+}
+
+function closeScheduleModal() {
+  document.getElementById('schedModal').classList.remove('open');
+  _schedTargetSubmissionId = null;
+}
+
+async function submitSchedule() {
+  if (!_schedTargetSubmissionId) return;
+  const btn = document.getElementById('schedSubmit');
+  const errEl = document.getElementById('schedErr');
+  errEl.classList.remove('show');
+
+  const dt = document.getElementById('schedDate').value;
+  if (!dt) { errEl.textContent = 'Pick a date and time'; errEl.classList.add('show'); return; }
+  // Convert local datetime-local to ISO with timezone
+  const isoFor = new Date(dt).toISOString();
+
+  const payload = {
+    submission_id: _schedTargetSubmissionId,
+    scheduled_for: isoFor,
+    duration_minutes: parseInt(document.getElementById('schedDuration').value, 10),
+    interview_type: document.getElementById('schedType').value,
+    interviewer: document.getElementById('schedInterviewer').value.trim() || null,
+    notes: document.getElementById('schedNotes').value.trim() || null,
+  };
+
+  btn.disabled = true;
+  btn.textContent = 'Scheduling...';
+  try {
+    const result = await api('/schedule/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    // Success: close + refresh
+    closeScheduleModal();
+    // Reload submissions to reflect the new stage
+    const container = document.querySelector('[data-req-id]');
+    if (container) {
+      const rid = container.getAttribute('data-req-id');
+      if (rid) loadSubmissions(rid);
+    }
+    // Brief toast - quick alert is fine for now
+    const sigText = result.calibration_signal ? ` (signal +${result.calibration_signal})` : '';
+    alert(`Screen scheduled. Stage: ${result.from_stage} -> ${result.to_stage}${sigText}`);
+  } catch (e) {
+    errEl.textContent = 'Could not schedule: ' + (e.message || 'unknown error');
+    errEl.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = 'Schedule';
+  }
+}
+
 const params = new URLSearchParams(location.search);
 const reqParam = params.get('req');
 if (reqParam) {
@@ -1413,5 +1522,46 @@ if (reqParam) {
   loadList();
 }
 </script>
+
+<!-- Schedule screen modal (Phase E.3) -->
+<div id="schedModal" class="modal-backdrop" onclick="if(event.target===this) closeScheduleModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Schedule a screen</h3>
+    <div class="modal-sub" id="schedModalSub">Loading...</div>
+
+    <label>Date and time</label>
+    <input id="schedDate" type="datetime-local" />
+
+    <label>Duration (minutes)</label>
+    <select id="schedDuration">
+      <option value="15">15 min</option>
+      <option value="30" selected>30 min</option>
+      <option value="45">45 min</option>
+      <option value="60">60 min</option>
+    </select>
+
+    <label>Interview type</label>
+    <select id="schedType">
+      <option value="phone_screen">Phone screen</option>
+      <option value="technical">Technical screen</option>
+      <option value="behavioral">Behavioral screen</option>
+      <option value="onsite">Onsite</option>
+    </select>
+
+    <label>Interviewer (optional)</label>
+    <input id="schedInterviewer" type="text" placeholder="Name or email" />
+
+    <label>Notes (optional)</label>
+    <textarea id="schedNotes" placeholder="Anything to remember about this screen"></textarea>
+
+    <div id="schedErr" class="modal-err"></div>
+
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="closeScheduleModal()">Cancel</button>
+      <button class="modal-btn primary" id="schedSubmit" onclick="submitSchedule()">Schedule</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

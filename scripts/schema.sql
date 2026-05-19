@@ -142,15 +142,19 @@ CREATE TABLE IF NOT EXISTS meetings (
   submission_id      TEXT NOT NULL,
   scheduled_for      TIMESTAMP NOT NULL,
   duration_minutes   INTEGER DEFAULT 30,
-  prep_brief_json    TEXT,
-  google_event_id    TEXT,
-  booking_source     TEXT,
+  prep_brief_json    TEXT,                -- AI-generated prep notes
+  google_event_id    TEXT,                -- null until Path B (Calendar integration)
+  booking_source     TEXT,                -- 'in_app' | 'google_calendar' | 'manual'
+  interview_type     TEXT,                -- 'phone_screen' | 'technical' | 'behavioral' | 'onsite'
+  interviewer        TEXT,                -- free-text name or email of person conducting
   notes              TEXT,
-  outcome            TEXT,
+  outcome            TEXT,                -- 'completed' | 'cancelled_by_candidate' | 'cancelled_by_client' | 'no_show' | 'rescheduled'
   completed_at       TIMESTAMP,
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_meetings_upcoming
+  ON meetings(scheduled_for, completed_at);
 
 CREATE TABLE IF NOT EXISTS signals (
   id            TEXT PRIMARY KEY,
