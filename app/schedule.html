@@ -106,10 +106,9 @@
 </main>
 
 <script>
-const AUTH_KEY = 'sourcingnav_token';
-const token = localStorage.getItem(AUTH_KEY);
+const token = localStorage.getItem('sn_token');
 if (!token) {
-  window.location.href = '/login.html?next=' + encodeURIComponent(location.pathname);
+  window.location.href = '/app/?next=' + encodeURIComponent(location.pathname);
 }
 const authHeaders = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 
