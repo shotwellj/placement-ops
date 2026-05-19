@@ -5560,6 +5560,46 @@ async def reevaluate_candidate(
         if not rs.rows:
             raise HTTPException(404, "Requisition not found or not owned by user")
 
+        # Idempotency check (2026-05-19 fix for duplicate-on-retry):
+        # If a submission for this (req, candidate) was created in the last
+        # 90 seconds, return it instead of starting a fresh eval. This
+        # protects against the case where:
+        #   1. User clicks "Evaluate for this req"
+        #   2. Function takes 50+ seconds (engine + AI + DB writes)
+        #   3. Vercel cuts the response at the function timeout
+        #   4. Browser shows "Failed to fetch"
+        #   5. User clicks again, thinking it failed
+        #   6. Old behavior: second eval runs, creates duplicate submission
+        #   7. New behavior: returns the first submission_id, no duplicate
+        # Window is 90 seconds because:
+        #   - Engine + AI eval rarely exceeds 60s
+        #   - Anything older is probably an intentional re-evaluation
+        #     (e.g. user re-evaluating after taxonomy changes)
+        rs = await client.execute(
+            """SELECT id, ai_fit_score, recommendation, created_at
+               FROM submissions
+               WHERE req_id = ? AND candidate_id = ?
+                 AND created_at > datetime('now', '-90 seconds')
+               ORDER BY created_at DESC LIMIT 1""",
+            [req.req_id, cand_id],
+        )
+        if rs.rows:
+            existing_id, existing_score, existing_rec, existing_created = rs.rows[0]
+            print(f"[reevaluate] returning recent submission {existing_id[:12]} "
+                  f"(created {existing_created}) instead of duplicating")
+            return {
+                "submission_id": existing_id,
+                "fit_score": existing_score,
+                "recommendation": existing_rec,
+                "idempotent": True,
+                "note": (
+                    "A recent evaluation for this candidate against this req "
+                    "already exists. Returning that one instead of running a "
+                    "duplicate. To force a fresh evaluation, wait 90 seconds "
+                    "or use the standard Source flow."
+                ),
+            }
+
     # Delegate to the existing Source eval pipeline. By passing
     # candidate_id_existing, we tell evaluate_candidate to skip the new-
     # candidate insert and reuse the existing row. Everything downstream

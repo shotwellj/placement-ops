@@ -418,7 +418,9 @@ async function reevaluateAgainstCurrentReq(candidateId, btnEl) {
   }
   const originalText = btnEl.textContent;
   btnEl.disabled = true;
-  btnEl.textContent = 'Evaluating (~30s)...';
+  btnEl.textContent = 'Evaluating (~45s)...';
+  // Track how long we waited so we can distinguish timeout from immediate failure.
+  const t0 = Date.now();
   try {
     const r = await fetch('/api/source/reevaluate', {
       method: 'POST',
@@ -429,13 +431,36 @@ async function reevaluateAgainstCurrentReq(candidateId, btnEl) {
       const txt = await r.text();
       throw new Error(`HTTP ${r.status}: ${txt.slice(0, 300)}`);
     }
+    const data = await r.json();
+    if (data.idempotent) {
+      // The backend detected a duplicate click and returned the prior submission.
+      alert('A recent evaluation already exists for this candidate. Opening the pipeline view.');
+    }
     // Success - navigate to the pipeline detail page so the user sees the
     // fresh Engine Scorecard for this candidate against this req.
     window.location.href = `/app/pipeline.html?req=${encodeURIComponent(reqId)}`;
   } catch (e) {
+    const elapsedSec = (Date.now() - t0) / 1000;
     btnEl.disabled = false;
     btnEl.textContent = originalText;
-    alert('Re-evaluation failed: ' + e.message);
+    // Distinguish two failure modes:
+    // 1. Network/CORS/immediate failure (<5s): probably a real error
+    // 2. Timeout-shaped failure (>50s): function probably succeeded on backend
+    //    but Vercel cut the response. The next request within 90s will
+    //    return the existing submission via idempotency, so just nudge
+    //    the user to the pipeline view.
+    if (e.message.includes('Failed to fetch') && elapsedSec > 50) {
+      const proceed = confirm(
+        `The request timed out after ${Math.round(elapsedSec)}s, but the evaluation likely completed server-side. ` +
+        `Click OK to open the pipeline view and check, or Cancel to stay here.`
+      );
+      if (proceed) {
+        window.location.href = `/app/pipeline.html?req=${encodeURIComponent(reqId)}`;
+        return;
+      }
+    } else {
+      alert('Re-evaluation failed: ' + e.message);
+    }
   }
 }
 
