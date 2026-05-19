@@ -79,6 +79,17 @@
   </section>
 
   <section class="card">
+    <div class="card-label">Recruiter profile</div>
+    <h2 class="card-title">Your default details</h2>
+    <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.25rem;">
+      These auto-fill when you schedule a screen, so you don't retype them every time.
+    </p>
+    <div id="profileView">
+      <div style="color: var(--text-dim); padding: 1rem 0;">Loading...</div>
+    </div>
+  </section>
+
+  <section class="card">
     <div class="card-label">Active Sessions</div>
     <h2 class="card-title">Where you're signed in</h2>
     <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.25rem;">Each device or browser you've used to sign in shows up here. Revoke a session to sign that device out immediately.</p>
@@ -121,6 +132,116 @@ async function loadAccount() {
 }
 
 loadAccount();
+
+// ---------- Recruiter profile ----------
+let _profileCurrent = {};
+
+function pEscape(s) { return escapeHtml(s == null ? '' : String(s)); }
+
+function profileRenderView(p) {
+  p = p || {};
+  const hasAny = p.display_name || p.default_meeting_link
+    || p.work_start || p.work_end || p.email_signature;
+  if (!hasAny) {
+    return `
+      <p style="color: var(--text-dim); margin: 0 0 1rem 0;">No profile defaults set yet.</p>
+      <button class="btn btn-primary" onclick="profileStartEdit()">Set up profile defaults</button>
+    `;
+  }
+  return `
+    <div style="display: grid; grid-template-columns: max-content 1fr; gap: 0.6rem 1.5rem; font-size: 0.95rem;">
+      ${p.display_name ? `<div style="color: var(--text-dim);">Display name</div><div>${pEscape(p.display_name)}</div>` : ''}
+      ${p.default_meeting_link ? `<div style="color: var(--text-dim);">Default meeting link</div><div><a href="${pEscape(p.default_meeting_link)}" target="_blank" rel="noopener">${pEscape(p.default_meeting_link)}</a></div>` : ''}
+      ${(p.work_start || p.work_end) ? `<div style="color: var(--text-dim);">Working hours</div><div>${pEscape(p.work_start || '?')} – ${pEscape(p.work_end || '?')}</div>` : ''}
+      ${p.email_signature ? `<div style="color: var(--text-dim);">Email signature</div><div style="white-space: pre-wrap;">${pEscape(p.email_signature)}</div>` : ''}
+    </div>
+    <div style="margin-top: 1rem;">
+      <button class="btn" style="background: transparent; border: 1px solid var(--border-strong); color: var(--text);" onclick="profileStartEdit()">Edit</button>
+    </div>
+  `;
+}
+
+function profileStartEdit() {
+  const p = _profileCurrent || {};
+  document.getElementById('profileView').innerHTML = `
+    <label style="display: block; margin-top: 0.5rem; font-weight: 600;">Display name</label>
+    <input id="p_display_name" class="input-field" value="${pEscape(p.display_name || '')}" placeholder="e.g. Jason Shotwell" />
+
+    <label style="display: block; margin-top: 0.75rem; font-weight: 600;">Default meeting link</label>
+    <input id="p_default_meeting_link" class="input-field" value="${pEscape(p.default_meeting_link || '')}" placeholder="https://zoom.us/j/YOUR_ROOM" />
+    <div style="color: var(--text-dim); font-size: 0.8rem; margin-top: 0.25rem;">Pre-fills the Meeting link field when you schedule a screen.</div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem;">
+      <div>
+        <label style="display: block; font-weight: 600;">Work start</label>
+        <input id="p_work_start" type="time" class="input-field" value="${pEscape(p.work_start || '09:00')}" />
+      </div>
+      <div>
+        <label style="display: block; font-weight: 600;">Work end</label>
+        <input id="p_work_end" type="time" class="input-field" value="${pEscape(p.work_end || '18:00')}" />
+      </div>
+    </div>
+
+    <label style="display: block; margin-top: 0.75rem; font-weight: 600;">Email signature</label>
+    <textarea id="p_email_signature" class="input-field" rows="3" placeholder="What goes at the bottom of outreach and interview invites">${pEscape(p.email_signature || '')}</textarea>
+
+    <div id="profileErr" class="status" style="margin-top: 0.75rem;"></div>
+
+    <div style="margin-top: 1rem; display: flex; gap: 0.6rem;">
+      <button class="btn btn-primary" onclick="profileSave()">Save</button>
+      <button class="btn" style="background: transparent; border: 1px solid var(--border-strong); color: var(--text);" onclick="profileCancelEdit()">Cancel</button>
+    </div>
+  `;
+}
+
+function profileCollect() {
+  const out = {};
+  const dn = document.getElementById('p_display_name').value.trim();
+  if (dn) out.display_name = dn;
+  const ml = document.getElementById('p_default_meeting_link').value.trim();
+  if (ml) out.default_meeting_link = ml;
+  const ws = document.getElementById('p_work_start').value.trim();
+  if (ws) out.work_start = ws;
+  const we = document.getElementById('p_work_end').value.trim();
+  if (we) out.work_end = we;
+  const sig = document.getElementById('p_email_signature').value.trim();
+  if (sig) out.email_signature = sig;
+  return out;
+}
+
+async function profileSave() {
+  const errEl = document.getElementById('profileErr');
+  errEl.className = 'status';
+  errEl.textContent = '';
+  const profile = profileCollect();
+  try {
+    const result = await api('/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ profile }),
+    });
+    _profileCurrent = result.profile || profile;
+    document.getElementById('profileView').innerHTML = profileRenderView(_profileCurrent);
+  } catch (e) {
+    errEl.className = 'status err';
+    errEl.textContent = e.message || 'Could not save';
+  }
+}
+
+function profileCancelEdit() {
+  document.getElementById('profileView').innerHTML = profileRenderView(_profileCurrent);
+}
+
+async function loadProfile() {
+  try {
+    const data = await api('/user/profile');
+    _profileCurrent = data.profile || {};
+    document.getElementById('profileView').innerHTML = profileRenderView(_profileCurrent);
+  } catch (e) {
+    document.getElementById('profileView').innerHTML = `<div class="status err">Could not load: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+loadProfile();
 
 // ---------- Active Sessions ----------
 

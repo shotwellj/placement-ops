@@ -120,6 +120,15 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function safeUrl(u) {
+  if (!u) return '';
+  const s = String(u).trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^mailto:/i.test(s)) return s;
+  return 'https://' + s;
+}
+
 function formatDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -165,11 +174,11 @@ function renderMeetingRow(m, isRecent) {
         <div class="mtg-meta">${escapeHtml(m.req_title || '')}${
           m.client_name
             ? ' · ' + (((m.client_info||{}).website)
-                ? '<a href="' + escapeHtml(m.client_info.website) + '" target="_blank" rel="noopener">' + escapeHtml(m.client_name) + '</a>'
+                ? '<a href="' + escapeHtml(safeUrl(m.client_info.website)) + '" target="_blank" rel="noopener">' + escapeHtml(m.client_name) + '</a>'
                 : escapeHtml(m.client_name))
             : ''
         }${m.interviewer ? ' · with ' + escapeHtml(m.interviewer) : ''}</div>
-        ${m.meeting_link ? `<div class="mtg-link"><a href="${escapeHtml(m.meeting_link)}" target="_blank" rel="noopener">Join meeting →</a></div>` : ''}
+        ${m.meeting_link ? `<div class="mtg-link"><a href="${escapeHtml(safeUrl(m.meeting_link))}" target="_blank" rel="noopener">Join meeting →</a></div>` : ''}
         <div class="mtg-tags">
           <span class="tag type">${escapeHtml((m.interview_type || 'screen').replace(/_/g, ' '))}</span>
           ${m.recommendation ? `<span class="tag rec ${escapeHtml(m.recommendation)}">${escapeHtml(m.recommendation)}</span>` : ''}

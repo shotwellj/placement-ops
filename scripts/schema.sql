@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   usage_eval      INTEGER NOT NULL DEFAULT 0,
   usage_outreach  INTEGER NOT NULL DEFAULT 0,
   usage_reset_at  TIMESTAMP,
+  profile_json    TEXT,                       -- Free-form recruiter profile: display name, default meeting link, working hours, signature
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

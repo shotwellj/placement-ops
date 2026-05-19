@@ -326,6 +326,19 @@
 
 const API = '/api';
 const token = localStorage.getItem('sn_token');
+let _userProfile = {};
+let _loadedSubmissions = [];
+
+async function ensureUserProfile() {
+  if (Object.keys(_userProfile).length) return _userProfile;
+  try {
+    const data = await api('/user/profile');
+    _userProfile = data.profile || {};
+  } catch (e) {
+    _userProfile = {};
+  }
+  return _userProfile;
+}
 if (!token) {
   // Was: silent redirect that looked like a blank page when localStorage
   // was clear in a new tab. Now shows a visible message for 1 second,
@@ -345,6 +358,15 @@ async function api(path, opts = {}) {
     throw new Error(err.detail || `Request failed (${res.status})`);
   }
   return res.json();
+}
+
+function safeUrl(u) {
+  if (!u) return '';
+  const s = String(u).trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^mailto:/i.test(s)) return s;
+  return 'https://' + s;
 }
 
 function escapeHtml(s) {
@@ -655,7 +677,7 @@ function ciRenderView(info) {
     if (c.role) lines.push(`<span style="color: var(--text-dim);">${ciEscape(c.role)}</span>`);
     if (c.email) lines.push(`<a href="mailto:${ciEscape(c.email)}">${ciEscape(c.email)}</a>`);
     if (c.phone) lines.push(ciEscape(c.phone));
-    if (c.linkedin) lines.push(`<a href="${ciEscape(c.linkedin)}" target="_blank" rel="noopener">LinkedIn</a>`);
+    if (c.linkedin) lines.push(`<a href="${ciEscape(safeUrl(c.linkedin))}" target="_blank" rel="noopener">LinkedIn</a>`);
     return `<li style="margin-bottom: 0.5rem;">${lines.join(' &middot; ')}</li>`;
   }).join('');
   const processHtml = (i.interview_process || []).map((stage, idx) => {
@@ -669,7 +691,7 @@ function ciRenderView(info) {
   return `
     <div class="kpi-row">
       ${i.company_name ? `<div class="kpi"><div class="kpi-label">Company</div><div class="kpi-value text">${ciEscape(i.company_name)}</div></div>` : ''}
-      ${i.website ? `<div class="kpi"><div class="kpi-label">Website</div><div class="kpi-value text"><a href="${ciEscape(i.website)}" target="_blank" rel="noopener">${ciEscape(i.website)}</a></div></div>` : ''}
+      ${i.website ? `<div class="kpi"><div class="kpi-label">Website</div><div class="kpi-value text"><a href="${ciEscape(safeUrl(i.website))}" target="_blank" rel="noopener">${ciEscape(i.website)}</a></div></div>` : ''}
     </div>
     ${contactsHtml ? `
       <div class="note-block">
@@ -1472,6 +1494,7 @@ async function loadSubmissions(reqId) {
   if (!container) return;
   try {
     const data = await api(`/reqs/${encodeURIComponent(reqId)}/submissions`);
+    _loadedSubmissions = (data && data.submissions) || [];
     if (!data.submissions || data.submissions.length === 0) {
       container.innerHTML = '<div style="color: var(--text-mute); font-size: 0.9rem; padding: 1rem 0;">No candidates evaluated yet. Use the form below to add one.</div>';
       return;
@@ -1694,27 +1717,92 @@ function renderSubmissionRow(s) {
 // ---------- Schedule modal (Phase E.3) ----------
 let _schedTargetSubmissionId = null;
 
-function openScheduleModal(submissionId, btnEl) {
+async function openScheduleModal(submissionId, btnEl) {
   _schedTargetSubmissionId = submissionId;
-  // Default to tomorrow at 10am local time
+  // Make sure profile defaults are available
+  await ensureUserProfile();
+
+  // Default to tomorrow at the user's work_start (or 10am)
   const tomorrow = new Date(Date.now() + 24*60*60*1000);
-  tomorrow.setHours(10, 0, 0, 0);
-  // datetime-local input wants "YYYY-MM-DDTHH:MM" in local time
+  const workStart = (_userProfile.work_start || '10:00').split(':');
+  tomorrow.setHours(parseInt(workStart[0]) || 10, parseInt(workStart[1]) || 0, 0, 0);
   const pad = n => String(n).padStart(2, '0');
   document.getElementById('schedDate').value =
     `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth()+1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:${pad(tomorrow.getMinutes())}`;
   document.getElementById('schedDuration').value = '30';
   document.getElementById('schedType').value = 'phone_screen';
-  document.getElementById('schedInterviewer').value = '';
+
+  // Pre-fill interviewer + meeting link from profile defaults
+  document.getElementById('schedInterviewer').value = _userProfile.display_name || '';
+  document.getElementById('schedMeetingLink').value = _userProfile.default_meeting_link || '';
+
   document.getElementById('schedNotes').value = '';
   document.getElementById('schedErr').classList.remove('show');
   document.getElementById('schedSubmit').disabled = false;
   document.getElementById('schedSubmit').textContent = 'Schedule';
-  // Pull candidate name from the parent submission row for the modal subhead
-  const row = btnEl.closest('.sub-row');
-  const candidateName = row ? (row.querySelector('.sub-name')?.textContent || 'candidate') : 'candidate';
-  document.getElementById('schedModalSub').textContent = `For ${candidateName}. Stage will move to phone_screen or onsite, calibration signal will fire, prep brief auto-generated.`;
+
+  // Look up candidate data from loaded submissions
+  const sub = _loadedSubmissions.find(s => s.id === submissionId);
+  const candidateName = (sub && sub.candidate_name) || (btnEl.closest('.sub-row')?.querySelector('.sub-name')?.textContent) || 'candidate';
+  const candidateEmail = sub ? sub.candidate_email : null;
+  const candidateId = sub ? sub.candidate_id : null;
+
+  // Build sub-headline
+  let sub_msg = `For ${candidateName}.`;
+  if (candidateEmail) {
+    sub_msg += ` Email: <a href="mailto:${escapeHtml(candidateEmail)}">${escapeHtml(candidateEmail)}</a>.`;
+  }
+  document.getElementById('schedModalSub').innerHTML = sub_msg;
+
+  // Email warning + inline add
+  const warnEl = document.getElementById('schedEmailWarn');
+  if (warnEl) {
+    if (!candidateEmail && candidateId) {
+      warnEl.innerHTML = `
+        <div style="background: rgba(255,165,0,0.08); border: 1px solid rgba(255,165,0,0.3); border-radius: 6px; padding: 0.6rem 0.8rem; margin-bottom: 0.75rem; font-size: 0.85rem;">
+          <strong style="color: orange;">No email on file for this candidate.</strong>
+          You'll need one before sending an invite.
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <input id="schedCandEmail" type="email" placeholder="candidate@example.com" style="flex: 1; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-elev); color: var(--text);" />
+            <button class="modal-btn" data-candidate-id="${escapeHtml(candidateId)}" onclick="saveCandidateEmail(this)">Save email</button>
+          </div>
+        </div>
+      `;
+    } else {
+      warnEl.innerHTML = '';
+    }
+  }
+
   document.getElementById('schedModal').classList.add('open');
+}
+
+async function saveCandidateEmail(btn) {
+  const candidateId = btn.getAttribute('data-candidate-id');
+  const input = document.getElementById('schedCandEmail');
+  const email = (input.value || '').trim();
+  if (!email) { input.focus(); return; }
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    await api(`/candidates/${encodeURIComponent(candidateId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ email }),
+    });
+    // Update the cached submission so the modal sub-headline updates
+    const sub = _loadedSubmissions.find(s => s.candidate_id === candidateId);
+    if (sub) sub.candidate_email = email;
+    document.getElementById('schedEmailWarn').innerHTML = `
+      <div style="background: rgba(40,180,90,0.08); border: 1px solid rgba(40,180,90,0.3); border-radius: 6px; padding: 0.5rem 0.8rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-dim);">
+        Email saved: <a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>
+      </div>
+    `;
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = orig;
+    input.style.borderColor = 'red';
+    alert('Could not save email: ' + (e.message || 'unknown error'));
+  }
 }
 
 function closeScheduleModal() {
@@ -1783,6 +1871,7 @@ if (reqParam) {
   <div class="modal" onclick="event.stopPropagation()">
     <h3>Schedule a screen</h3>
     <div class="modal-sub" id="schedModalSub">Loading...</div>
+    <div id="schedEmailWarn"></div>
 
     <label>Date and time</label>
     <input id="schedDate" type="datetime-local" />

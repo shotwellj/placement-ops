@@ -5256,6 +5256,7 @@ async def list_submissions(req_id: str, user: dict = Depends(get_current_user)):
             """SELECT s.id, s.candidate_id, s.ai_fit_score, s.recommendation, s.stage,
                       s.fit_analysis_json, s.created_at,
                       c.name, c.current_title, c.current_company,
+                      c.email, c.linkedin_url,
                       sd.technical_match, sd.seniority_fit, sd.location_alignment,
                       sd.comp_alignment, sd.culture_signals, sd.gap_severity,
                       sd.presentation_risk, sd.fill_probability,
@@ -5295,19 +5296,20 @@ async def list_submissions(req_id: str, user: dict = Depends(get_current_user)):
                     "evaluation": json.loads(r[5]) if r[5] else None,
                     "created_at": r[6],
                     "candidate_name": r[7], "current_title": r[8], "current_company": r[9],
+                    "candidate_email": r[10], "candidate_linkedin": r[11],
                     "engine": {
-                        "technical_match": r[10],
-                        "seniority_fit": r[11],
-                        "location_alignment": r[12],
-                        "comp_alignment": r[13],
-                        "culture_signals": r[14],
-                        "gap_severity": r[15],
-                        "presentation_risk": r[16],
-                        "fill_probability": r[17],
-                        "composite": r[18],
-                        "blocker_count": r[19],
-                        "breakdown": _engine_breakdown(r[20]),
-                    } if r[10] is not None or r[18] is not None else None,
+                        "technical_match": r[12],
+                        "seniority_fit": r[13],
+                        "location_alignment": r[14],
+                        "comp_alignment": r[15],
+                        "culture_signals": r[16],
+                        "gap_severity": r[17],
+                        "presentation_risk": r[18],
+                        "fill_probability": r[19],
+                        "composite": r[20],
+                        "blocker_count": r[21],
+                        "breakdown": _engine_breakdown(r[22]),
+                    } if r[12] is not None or r[20] is not None else None,
                 }
                 for r in rs.rows
             ]
@@ -6166,6 +6168,124 @@ async def get_req(req_id: str, user: dict = Depends(get_current_user)):
             "parsed": json.loads(r[3]) if r[3] else None,
             "boolean_strings": json.loads(r[4]) if r[4] else None,
             "status": r[5], "opened_at": r[6], "org_name": r[7],
+        }
+
+
+# ============================================================
+# Recruiter profile (per-user) - free-form JSON blob storing things like
+# default meeting link, working hours, display name, signature. Same
+# pattern as client_info_json: schemaless beyond a documented shape so
+# we can add fields without migrations.
+# ============================================================
+
+@app.get("/api/user/profile")
+async def get_user_profile(user: dict = Depends(get_current_user)):
+    """Read the recruiter profile JSON blob. Returns {} if never set."""
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT profile_json FROM users WHERE id = ?",
+            [user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "User not found")
+        raw = rs.rows[0][0]
+        if not raw:
+            return {"profile": {}}
+        try:
+            return {"profile": json.loads(raw)}
+        except Exception:
+            return {"profile": {}, "warning": "stored value not valid JSON"}
+
+
+class ProfileUpdateRequest(BaseModel):
+    profile: dict = Field(..., description="Free-form profile blob")
+
+
+@app.put("/api/user/profile")
+async def put_user_profile(
+    body: ProfileUpdateRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Replace the entire profile JSON blob for the current user."""
+    serialized = json.dumps(body.profile)
+    if len(serialized) > 20_000:
+        raise HTTPException(400, "profile too large (max 20KB)")
+    async with db() as client:
+        await client.execute(
+            "UPDATE users SET profile_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [serialized, user["id"]],
+        )
+    return {"profile": body.profile, "saved": True}
+
+
+# ============================================================
+# Candidate update (Phase E.3.2) - lets the recruiter edit candidate
+# fields (mainly email and LinkedIn) after the initial Source eval so
+# we can email interview invites, log proper contact info, etc.
+# Owner-scoped via the user_id column on candidates.
+# ============================================================
+
+class CandidateUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, max_length=200)
+    email: Optional[str] = Field(None, max_length=200)
+    linkedin_url: Optional[str] = Field(None, max_length=500)
+    github_url: Optional[str] = Field(None, max_length=500)
+    current_title: Optional[str] = Field(None, max_length=200)
+    current_company: Optional[str] = Field(None, max_length=200)
+
+
+@app.put("/api/candidates/{candidate_id}")
+async def update_candidate(
+    candidate_id: str,
+    body: CandidateUpdateRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Update editable fields on a candidate row. Owner-scoped.
+    Only fields explicitly present in the request body are touched -
+    None means 'leave existing value alone' (since we cannot tell None
+    apart from missing in JSON, we treat both the same way: don't update).
+    To clear a field, send an empty string."""
+    # exclude_unset means we only see what the client actually sent
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(400, "No fields to update")
+
+    # Build dynamic UPDATE statement safely - column names are not user input
+    set_clauses = []
+    params = []
+    for col, val in updates.items():
+        set_clauses.append(f"{col} = ?")
+        # Empty string means clear; treat as NULL in DB
+        params.append(val if val != "" else None)
+    set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+
+    async with db() as client:
+        # Verify ownership first
+        rs = await client.execute(
+            "SELECT id FROM candidates WHERE id = ? AND user_id = ?",
+            [candidate_id, user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Candidate not found")
+
+        params.extend([candidate_id, user["id"]])
+        await client.execute(
+            f"UPDATE candidates SET {', '.join(set_clauses)} WHERE id = ? AND user_id = ?",
+            params,
+        )
+
+        # Return the updated row
+        rs = await client.execute(
+            """SELECT id, name, email, linkedin_url, github_url,
+                      current_title, current_company
+               FROM candidates WHERE id = ?""",
+            [candidate_id],
+        )
+        r = rs.rows[0]
+        return {
+            "id": r[0], "name": r[1], "email": r[2],
+            "linkedin_url": r[3], "github_url": r[4],
+            "current_title": r[5], "current_company": r[6],
         }
 
 
