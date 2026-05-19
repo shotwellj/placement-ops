@@ -5859,7 +5859,7 @@ async def schedule_upcoming(days_ahead: int = 14, user: dict = Depends(get_curre
         rs = await client.execute(
             """SELECT m.id, m.submission_id, m.scheduled_for, m.duration_minutes,
                       m.interview_type, m.interviewer, m.notes, m.prep_brief_json,
-                      c.name, r.title, r.client_name,
+                      c.name, r.title, r.parsed_json,
                       s.ai_fit_score, s.recommendation
                FROM meetings m
                JOIN submissions s ON m.submission_id = s.id
@@ -5879,6 +5879,14 @@ async def schedule_upcoming(days_ahead: int = 14, user: dict = Depends(get_curre
                 prep_brief = json.loads(row[7]) if row[7] else None
             except Exception:
                 pass
+            # Extract client company name from parsed_json.core.company
+            client_name = None
+            try:
+                if row[10]:
+                    parsed = json.loads(row[10])
+                    client_name = (parsed.get("core") or {}).get("company")
+            except Exception:
+                pass
             meetings.append({
                 "meeting_id": row[0],
                 "submission_id": row[1],
@@ -5890,7 +5898,7 @@ async def schedule_upcoming(days_ahead: int = 14, user: dict = Depends(get_curre
                 "prep_brief": prep_brief,
                 "candidate_name": row[8],
                 "req_title": row[9],
-                "client_name": row[10],
+                "client_name": client_name,
                 "ai_fit_score": row[11],
                 "recommendation": row[12],
             })
