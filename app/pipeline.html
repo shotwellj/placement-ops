@@ -480,6 +480,7 @@ function renderDetail(d) {
       ` : ''}
     </div>
     ${renderCloseOutForm(d)}
+    ${renderClientInfoCard(d.id)}
     ${renderCompCard(comp, p)}
     ${renderSkillsCard(mustHaves, niceToHaves)}
     ${renderAltTitlesCard(p.alt_titles)}
@@ -506,6 +507,7 @@ function renderDetail(d) {
   wireEvalForm();
   wireCloseOutForm(d);
   loadSubmissions(d.id);
+  ciLoad();
 }
 
 // Close Out feature (2026-05-11): allows closing out an open req from the
@@ -616,6 +618,258 @@ function wireCloseOutForm(d) {
     }
   });
 }
+// Client info panel (Phase E.3.1) - free-form company/contact/prep info per req.
+// Renders a collapsed card with a placeholder until populated, plus an inline
+// editor that saves the whole blob via PUT /api/reqs/{id}/client-info.
+function renderClientInfoCard(reqId) {
+  return `
+    <section class="card" id="clientInfoCard" data-req-id="${escapeHtml(reqId)}">
+      <div class="card-label">Client Info</div>
+      <h2 class="card-title">Company, contacts, and prep</h2>
+      <div id="clientInfoView">
+        <div class="loading" style="padding: 1rem 0;">Loading...</div>
+      </div>
+    </section>
+  `;
+}
+
+function ciEscape(s) { return escapeHtml(s == null ? '' : String(s)); }
+
+function ciRenderView(info) {
+  const i = info || {};
+  const hasAny = i.company_name || i.website || (i.contacts && i.contacts.length)
+    || i.prep_notes || (i.interview_process && i.interview_process.length)
+    || i.perks_talking_points;
+  if (!hasAny) {
+    return `
+      <p style="color: var(--text-dim); margin: 0 0 1rem 0;">
+        No client info captured yet. Add the company, contacts, prep notes,
+        interview process, and perks talking points here so every screen has it.
+      </p>
+      <button class="btn btn-primary" onclick="ciStartEdit()">Add client info</button>
+    `;
+  }
+  const contactsHtml = (i.contacts || []).map(c => {
+    const lines = [];
+    if (c.name) lines.push(`<strong>${ciEscape(c.name)}</strong>`);
+    if (c.role) lines.push(`<span style="color: var(--text-dim);">${ciEscape(c.role)}</span>`);
+    if (c.email) lines.push(`<a href="mailto:${ciEscape(c.email)}">${ciEscape(c.email)}</a>`);
+    if (c.phone) lines.push(ciEscape(c.phone));
+    if (c.linkedin) lines.push(`<a href="${ciEscape(c.linkedin)}" target="_blank" rel="noopener">LinkedIn</a>`);
+    return `<li style="margin-bottom: 0.5rem;">${lines.join(' &middot; ')}</li>`;
+  }).join('');
+  const processHtml = (i.interview_process || []).map((stage, idx) => {
+    const parts = [];
+    if (stage.stage) parts.push(`<strong>${idx + 1}. ${ciEscape(stage.stage)}</strong>`);
+    if (stage.who) parts.push(`<span style="color: var(--text-dim);">${ciEscape(stage.who)}</span>`);
+    if (stage.duration) parts.push(ciEscape(stage.duration));
+    const focus = stage.focus ? `<div style="color: var(--text-dim); font-size: 0.85rem; margin-top: 0.25rem;">${ciEscape(stage.focus)}</div>` : '';
+    return `<li style="margin-bottom: 0.5rem;">${parts.join(' &middot; ')}${focus}</li>`;
+  }).join('');
+  return `
+    <div class="kpi-row">
+      ${i.company_name ? `<div class="kpi"><div class="kpi-label">Company</div><div class="kpi-value text">${ciEscape(i.company_name)}</div></div>` : ''}
+      ${i.website ? `<div class="kpi"><div class="kpi-label">Website</div><div class="kpi-value text"><a href="${ciEscape(i.website)}" target="_blank" rel="noopener">${ciEscape(i.website)}</a></div></div>` : ''}
+    </div>
+    ${contactsHtml ? `
+      <div class="note-block">
+        <div class="note-label">Contacts</div>
+        <ul style="margin: 0.5rem 0 0 1.2rem; padding: 0;">${contactsHtml}</ul>
+      </div>
+    ` : ''}
+    ${i.prep_notes ? `
+      <div class="note-block">
+        <div class="note-label">Client prep notes</div>
+        <div class="note-text" style="white-space: pre-wrap;">${ciEscape(i.prep_notes)}</div>
+      </div>
+    ` : ''}
+    ${processHtml ? `
+      <div class="note-block">
+        <div class="note-label">Interview process</div>
+        <ol style="margin: 0.5rem 0 0 1.2rem; padding: 0;">${processHtml}</ol>
+      </div>
+    ` : ''}
+    ${i.perks_talking_points ? `
+      <div class="note-block">
+        <div class="note-label">Perks &amp; pay talking points</div>
+        <div class="note-text" style="white-space: pre-wrap;">${ciEscape(i.perks_talking_points)}</div>
+      </div>
+    ` : ''}
+    <div style="margin-top: 1rem;">
+      <button class="btn btn-ghost" onclick="ciStartEdit()">Edit client info</button>
+    </div>
+  `;
+}
+
+let _ciCurrent = {};
+
+async function ciLoad() {
+  const card = document.getElementById('clientInfoCard');
+  if (!card) return;
+  const reqId = card.getAttribute('data-req-id');
+  const view = document.getElementById('clientInfoView');
+  try {
+    const data = await api(`/reqs/${encodeURIComponent(reqId)}/client-info`);
+    _ciCurrent = data.client_info || {};
+    view.innerHTML = ciRenderView(_ciCurrent);
+  } catch (e) {
+    view.innerHTML = `<div class="err-box">Could not load client info: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function ciStartEdit() {
+  const view = document.getElementById('clientInfoView');
+  if (!view) return;
+  const i = _ciCurrent || {};
+  const contactRows = (i.contacts && i.contacts.length ? i.contacts : [{}]).map((c, idx) => ciContactRow(c, idx)).join('');
+  const processRows = (i.interview_process && i.interview_process.length ? i.interview_process : [{}]).map((s, idx) => ciProcessRow(s, idx)).join('');
+  view.innerHTML = `
+    <p style="color: var(--text-dim); margin: 0 0 1rem 0; font-size: 0.85rem;">
+      Everything here is optional. Add what you have, leave the rest blank.
+    </p>
+    <label style="display: block; margin-top: 0.75rem; font-weight: 600;">Company name</label>
+    <input id="ci_company_name" class="input-field" value="${ciEscape(i.company_name || '')}" placeholder="e.g. Nuve Controls LLC" />
+
+    <label style="display: block; margin-top: 0.75rem; font-weight: 600;">Website</label>
+    <input id="ci_website" class="input-field" value="${ciEscape(i.website || '')}" placeholder="https://example.com" />
+
+    <label style="display: block; margin-top: 1rem; font-weight: 600;">Contacts</label>
+    <div id="ci_contacts">${contactRows}</div>
+    <button class="btn btn-ghost" type="button" onclick="ciAddContact()" style="margin-top: 0.5rem;">+ Add contact</button>
+
+    <label style="display: block; margin-top: 1rem; font-weight: 600;">Client prep notes</label>
+    <textarea id="ci_prep_notes" class="input-field" rows="4" placeholder="Culture, gotchas, must-asks, anything to remember when talking to this client">${ciEscape(i.prep_notes || '')}</textarea>
+
+    <label style="display: block; margin-top: 1rem; font-weight: 600;">Interview process</label>
+    <div id="ci_process">${processRows}</div>
+    <button class="btn btn-ghost" type="button" onclick="ciAddProcess()" style="margin-top: 0.5rem;">+ Add stage</button>
+
+    <label style="display: block; margin-top: 1rem; font-weight: 600;">Perks &amp; pay talking points</label>
+    <textarea id="ci_perks" class="input-field" rows="3" placeholder="Comp, equity, remote policy, benefits, why this role is worth the move">${ciEscape(i.perks_talking_points || '')}</textarea>
+
+    <div id="ciErr" class="err-box" style="display: none; margin-top: 1rem;"></div>
+
+    <div style="margin-top: 1.25rem; display: flex; gap: 0.6rem;">
+      <button class="btn btn-primary" onclick="ciSave()">Save</button>
+      <button class="btn btn-ghost" onclick="ciCancelEdit()">Cancel</button>
+    </div>
+  `;
+}
+
+function ciContactRow(c, idx) {
+  c = c || {};
+  return `
+    <div class="ci-contact-row" data-idx="${idx}" style="border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; margin-top: 0.5rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+        <input class="input-field ci-c-name" value="${ciEscape(c.name || '')}" placeholder="Name" />
+        <input class="input-field ci-c-role" value="${ciEscape(c.role || '')}" placeholder="Role (hiring_manager, recruiter, etc.)" />
+        <input class="input-field ci-c-email" value="${ciEscape(c.email || '')}" placeholder="Email" />
+        <input class="input-field ci-c-phone" value="${ciEscape(c.phone || '')}" placeholder="Phone" />
+        <input class="input-field ci-c-linkedin" value="${ciEscape(c.linkedin || '')}" placeholder="LinkedIn URL" style="grid-column: 1 / -1;" />
+      </div>
+      <button class="btn btn-ghost" type="button" onclick="ciRemoveContact(${idx})" style="margin-top: 0.4rem; font-size: 0.8rem;">Remove</button>
+    </div>
+  `;
+}
+
+function ciProcessRow(s, idx) {
+  s = s || {};
+  return `
+    <div class="ci-process-row" data-idx="${idx}" style="border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; margin-top: 0.5rem;">
+      <div style="display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 0.5rem;">
+        <input class="input-field ci-p-stage" value="${ciEscape(s.stage || '')}" placeholder="Stage (e.g. Phone screen)" />
+        <input class="input-field ci-p-who" value="${ciEscape(s.who || '')}" placeholder="Who (Recruiter, Hiring Manager, etc.)" />
+        <input class="input-field ci-p-duration" value="${ciEscape(s.duration || '')}" placeholder="Duration" />
+      </div>
+      <input class="input-field ci-p-focus" value="${ciEscape(s.focus || '')}" placeholder="Focus / what they're looking for" style="margin-top: 0.4rem;" />
+      <button class="btn btn-ghost" type="button" onclick="ciRemoveProcess(${idx})" style="margin-top: 0.4rem; font-size: 0.8rem;">Remove</button>
+    </div>
+  `;
+}
+
+function ciCollectFromForm() {
+  const contacts = [];
+  document.querySelectorAll('#ci_contacts .ci-contact-row').forEach(row => {
+    const c = {
+      name: row.querySelector('.ci-c-name').value.trim(),
+      role: row.querySelector('.ci-c-role').value.trim(),
+      email: row.querySelector('.ci-c-email').value.trim(),
+      phone: row.querySelector('.ci-c-phone').value.trim(),
+      linkedin: row.querySelector('.ci-c-linkedin').value.trim(),
+    };
+    // Only include non-empty contacts
+    if (c.name || c.email || c.phone || c.linkedin) contacts.push(c);
+  });
+  const process = [];
+  document.querySelectorAll('#ci_process .ci-process-row').forEach(row => {
+    const s = {
+      stage: row.querySelector('.ci-p-stage').value.trim(),
+      who: row.querySelector('.ci-p-who').value.trim(),
+      duration: row.querySelector('.ci-p-duration').value.trim(),
+      focus: row.querySelector('.ci-p-focus').value.trim(),
+    };
+    if (s.stage || s.who || s.duration || s.focus) process.push(s);
+  });
+  const info = {};
+  const co = document.getElementById('ci_company_name').value.trim();
+  if (co) info.company_name = co;
+  const ws = document.getElementById('ci_website').value.trim();
+  if (ws) info.website = ws;
+  if (contacts.length) info.contacts = contacts;
+  const pn = document.getElementById('ci_prep_notes').value.trim();
+  if (pn) info.prep_notes = pn;
+  if (process.length) info.interview_process = process;
+  const pk = document.getElementById('ci_perks').value.trim();
+  if (pk) info.perks_talking_points = pk;
+  return info;
+}
+
+function ciAddContact() {
+  const wrap = document.getElementById('ci_contacts');
+  const idx = wrap.children.length;
+  wrap.insertAdjacentHTML('beforeend', ciContactRow({}, idx));
+}
+
+function ciAddProcess() {
+  const wrap = document.getElementById('ci_process');
+  const idx = wrap.children.length;
+  wrap.insertAdjacentHTML('beforeend', ciProcessRow({}, idx));
+}
+
+function ciRemoveContact(idx) {
+  const row = document.querySelector(`#ci_contacts .ci-contact-row[data-idx="${idx}"]`);
+  if (row) row.remove();
+}
+
+function ciRemoveProcess(idx) {
+  const row = document.querySelector(`#ci_process .ci-process-row[data-idx="${idx}"]`);
+  if (row) row.remove();
+}
+
+async function ciSave() {
+  const card = document.getElementById('clientInfoCard');
+  if (!card) return;
+  const reqId = card.getAttribute('data-req-id');
+  const info = ciCollectFromForm();
+  const errEl = document.getElementById('ciErr');
+  errEl.style.display = 'none';
+  try {
+    const result = await api(`/reqs/${encodeURIComponent(reqId)}/client-info`, {
+      method: 'PUT',
+      body: JSON.stringify({ client_info: info }),
+    });
+    _ciCurrent = result.client_info || info;
+    document.getElementById('clientInfoView').innerHTML = ciRenderView(_ciCurrent);
+  } catch (e) {
+    errEl.textContent = 'Could not save: ' + (e.message || 'unknown error');
+    errEl.style.display = 'block';
+  }
+}
+
+function ciCancelEdit() {
+  document.getElementById('clientInfoView').innerHTML = ciRenderView(_ciCurrent);
+}
+
 function renderCompCard(comp, p) {
   // Handle both shapes the model returns: numeric (base_min/base_max) OR pre-formatted string (base_range)
   const base = comp.base_range || (comp.base_min && comp.base_max ? `$${comp.base_min.toLocaleString()}–$${comp.base_max.toLocaleString()}` : null);
@@ -1485,6 +1739,7 @@ async function submitSchedule() {
     duration_minutes: parseInt(document.getElementById('schedDuration').value, 10),
     interview_type: document.getElementById('schedType').value,
     interviewer: document.getElementById('schedInterviewer').value.trim() || null,
+    meeting_link: document.getElementById('schedMeetingLink').value.trim() || null,
     notes: document.getElementById('schedNotes').value.trim() || null,
   };
 
@@ -1550,6 +1805,9 @@ if (reqParam) {
 
     <label>Interviewer (optional)</label>
     <input id="schedInterviewer" type="text" placeholder="Name or email" />
+
+    <label>Meeting link (optional)</label>
+    <input id="schedMeetingLink" type="text" placeholder="Zoom / Meet / Teams URL or dial-in" />
 
     <label>Notes (optional)</label>
     <textarea id="schedNotes" placeholder="Anything to remember about this screen"></textarea>

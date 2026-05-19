@@ -5658,6 +5658,7 @@ class ScheduleCreateRequest(BaseModel):
     duration_minutes: int = Field(30, ge=5, le=480)
     interview_type: str = Field(..., description=f"One of: {', '.join(VALID_INTERVIEW_TYPES)}")
     interviewer: Optional[str] = Field(None)
+    meeting_link: Optional[str] = Field(None, max_length=500, description="Zoom/Meet/Teams URL or dial-in")
     notes: Optional[str] = Field(None, max_length=2000)
 
 
@@ -5729,11 +5730,11 @@ async def schedule_create(req: ScheduleCreateRequest, user: dict = Depends(get_c
             """INSERT INTO meetings
                (id, submission_id, scheduled_for, duration_minutes,
                 prep_brief_json, booking_source, interview_type,
-                interviewer, notes)
-               VALUES (?, ?, ?, ?, ?, 'in_app', ?, ?, ?)""",
+                interviewer, meeting_link, notes)
+               VALUES (?, ?, ?, ?, ?, 'in_app', ?, ?, ?, ?)""",
             [meeting_id, req.submission_id, req.scheduled_for,
              req.duration_minutes, prep_brief_str,
-             req.interview_type, req.interviewer, req.notes],
+             req.interview_type, req.interviewer, req.meeting_link, req.notes],
         )
 
         stage_changed = (target_stage != current_stage)
@@ -5859,8 +5860,9 @@ async def schedule_upcoming(days_ahead: int = 14, user: dict = Depends(get_curre
         rs = await client.execute(
             """SELECT m.id, m.submission_id, m.scheduled_for, m.duration_minutes,
                       m.interview_type, m.interviewer, m.notes, m.prep_brief_json,
-                      c.name, r.title, r.parsed_json,
-                      s.ai_fit_score, s.recommendation
+                      m.meeting_link,
+                      c.name, r.title, r.parsed_json, r.client_info_json,
+                      s.ai_fit_score, s.recommendation, r.id
                FROM meetings m
                JOIN submissions s ON m.submission_id = s.id
                JOIN candidates c ON s.candidate_id = c.id
@@ -5879,14 +5881,21 @@ async def schedule_upcoming(days_ahead: int = 14, user: dict = Depends(get_curre
                 prep_brief = json.loads(row[7]) if row[7] else None
             except Exception:
                 pass
-            # Extract client company name from parsed_json.core.company
-            client_name = None
+            # Prefer client_info.company_name override, fall back to parsed_json.core.company
+            client_info = {}
             try:
-                if row[10]:
-                    parsed = json.loads(row[10])
-                    client_name = (parsed.get("core") or {}).get("company")
+                if row[12]:
+                    client_info = json.loads(row[12]) or {}
             except Exception:
                 pass
+            client_name = client_info.get("company_name")
+            if not client_name:
+                try:
+                    if row[11]:
+                        parsed = json.loads(row[11])
+                        client_name = (parsed.get("core") or {}).get("company")
+                except Exception:
+                    pass
             meetings.append({
                 "meeting_id": row[0],
                 "submission_id": row[1],
@@ -5896,11 +5905,14 @@ async def schedule_upcoming(days_ahead: int = 14, user: dict = Depends(get_curre
                 "interviewer": row[5],
                 "notes": row[6],
                 "prep_brief": prep_brief,
-                "candidate_name": row[8],
-                "req_title": row[9],
+                "meeting_link": row[8],
+                "candidate_name": row[9],
+                "req_title": row[10],
                 "client_name": client_name,
-                "ai_fit_score": row[11],
-                "recommendation": row[12],
+                "client_info": client_info,
+                "ai_fit_score": row[13],
+                "recommendation": row[14],
+                "req_id": row[15],
             })
     return {"meetings": meetings, "count": len(meetings), "days_ahead": days_ahead}
 
@@ -5912,7 +5924,8 @@ async def schedule_recent(limit: int = 20, user: dict = Depends(get_current_user
         rs = await client.execute(
             """SELECT m.id, m.submission_id, m.scheduled_for, m.duration_minutes,
                       m.interview_type, m.interviewer, m.outcome, m.completed_at,
-                      c.name, r.title
+                      m.meeting_link,
+                      c.name, r.title, r.parsed_json, r.client_info_json, r.id
                FROM meetings m
                JOIN submissions s ON m.submission_id = s.id
                JOIN candidates c ON s.candidate_id = c.id
@@ -5926,6 +5939,20 @@ async def schedule_recent(limit: int = 20, user: dict = Depends(get_current_user
         )
         meetings = []
         for row in rs.rows:
+            client_info = {}
+            try:
+                if row[12]:
+                    client_info = json.loads(row[12]) or {}
+            except Exception:
+                pass
+            client_name = client_info.get("company_name")
+            if not client_name:
+                try:
+                    if row[11]:
+                        parsed = json.loads(row[11])
+                        client_name = (parsed.get("core") or {}).get("company")
+                except Exception:
+                    pass
             meetings.append({
                 "meeting_id": row[0],
                 "submission_id": row[1],
@@ -5935,8 +5962,12 @@ async def schedule_recent(limit: int = 20, user: dict = Depends(get_current_user
                 "interviewer": row[5],
                 "outcome": row[6],
                 "completed_at": row[7],
-                "candidate_name": row[8],
-                "req_title": row[9],
+                "meeting_link": row[8],
+                "candidate_name": row[9],
+                "req_title": row[10],
+                "client_name": client_name,
+                "client_info": client_info,
+                "req_id": row[13],
                 "needs_outcome": row[6] is None and row[7] is None,
             })
     return {"meetings": meetings, "count": len(meetings)}
@@ -6136,6 +6167,69 @@ async def get_req(req_id: str, user: dict = Depends(get_current_user)):
             "boolean_strings": json.loads(r[4]) if r[4] else None,
             "status": r[5], "opened_at": r[6], "org_name": r[7],
         }
+
+
+# ============================================================
+# Client info (req-level) - free-form JSON blob storing things like
+# company contacts, prep notes, interview process map, perks talking
+# points. Schema is intentionally flexible so we can add fields without
+# migrations. Frontend renders any keys it knows about.
+# ============================================================
+
+@app.get("/api/reqs/{req_id}/client-info")
+async def get_client_info(req_id: str, user: dict = Depends(get_current_user)):
+    """Read the client info JSON blob for a req. Returns {} if never set."""
+    async with db() as client:
+        rs = await client.execute(
+            "SELECT client_info_json FROM requisitions WHERE id = ? AND user_id = ?",
+            [req_id, user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Requisition not found")
+        raw = rs.rows[0][0]
+        if not raw:
+            return {"req_id": req_id, "client_info": {}}
+        try:
+            return {"req_id": req_id, "client_info": json.loads(raw)}
+        except Exception:
+            # Defensive: corrupt JSON in DB shouldn't break the page
+            return {"req_id": req_id, "client_info": {}, "warning": "stored value not valid JSON"}
+
+
+class ClientInfoUpdateRequest(BaseModel):
+    client_info: dict = Field(..., description="Free-form client info blob")
+
+
+@app.put("/api/reqs/{req_id}/client-info")
+async def put_client_info(
+    req_id: str,
+    body: ClientInfoUpdateRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Replace the entire client info JSON blob for a req. Caller is
+    expected to send the full object - this is a PUT, not a PATCH."""
+    # Cheap size guard - the JSON blob lives in a single TEXT column and
+    # we don't want runaway payloads from a typo or paste accident.
+    serialized = json.dumps(body.client_info)
+    if len(serialized) > 50_000:
+        raise HTTPException(400, "client_info too large (max 50KB)")
+
+    async with db() as client:
+        # Verify ownership first so 404 vs 403 is honest
+        rs = await client.execute(
+            "SELECT id FROM requisitions WHERE id = ? AND user_id = ?",
+            [req_id, user["id"]],
+        )
+        if not rs.rows:
+            raise HTTPException(404, "Requisition not found")
+
+        await client.execute(
+            """UPDATE requisitions
+               SET client_info_json = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            [serialized, req_id],
+        )
+    return {"req_id": req_id, "client_info": body.client_info, "saved": True}
 
 
 # ============================================================

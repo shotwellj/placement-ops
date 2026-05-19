@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS requisitions (
   competitive_intel_json TEXT,
   jamboard_json         TEXT,
   dei_strategy_json     TEXT,
+  client_info_json      TEXT,                -- Free-form client/company info: contacts, prep notes, process map, perks
   status                TEXT NOT NULL DEFAULT 'open',
   priority              TEXT DEFAULT 'medium',
   fee_estimate          INTEGER,
@@ -147,6 +148,7 @@ CREATE TABLE IF NOT EXISTS meetings (
   booking_source     TEXT,                -- 'in_app' | 'google_calendar' | 'manual'
   interview_type     TEXT,                -- 'phone_screen' | 'technical' | 'behavioral' | 'onsite'
   interviewer        TEXT,                -- free-text name or email of person conducting
+  meeting_link       TEXT,                -- Zoom/Meet/Teams URL or dial-in
   notes              TEXT,
   outcome            TEXT,                -- 'completed' | 'cancelled_by_candidate' | 'cancelled_by_client' | 'no_show' | 'rescheduled'
   completed_at       TIMESTAMP,
