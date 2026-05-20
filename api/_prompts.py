@@ -523,7 +523,7 @@ actually see 20-200 relevant humans in the first page? If the answer is
 # ============================================================================
 CANDIDATE_EVAL = Prompt(
     name="candidate_eval",
-    version="2026.05.19.1",
+    version="2026.05.20.1",
     required_vars=("parsed_jd", "candidate_text"),
     body="""You are an expert technical recruiter with 13+ years of experience evaluating candidates.
 
@@ -545,6 +545,31 @@ Scoring rubric:
 - 60-74: Borderline. One blocker is weak or unclear. Worth a screen call to verify.
 - 40-59: Pass with feedback. Multiple blockers weak or missing.
 - 0-39: Hard pass. Fundamental mismatch.
+
+GROUND YOUR EVALUATION IN THE CANDIDATE'S FULL CAREER, NOT JUST THE MOST RECENT ROLE.
+
+This is the single most common mistake junior recruiters make: they read the current job title and project that backward over the whole resume. A 13-year veteran who spent years on X earlier in their career still has X as a real skill, even if their current title doesn't show it. Do NOT do this.
+
+Rules for grounding:
+
+1. Read the ENTIRE work history before scoring any skill. Senior candidates often have skills 5-15 years deep, accumulated across multiple roles. The current title is one data point, not the whole story.
+
+2. Distinguish "skill decay" from "experience accumulation":
+   - Technical skills that change yearly (specific frameworks, tool versions, evolving APIs): decay matters. PyTorch 2018 != PyTorch 2026.
+   - Process and craft skills (recruiting, sourcing, sales, management, communication, hiring, interviewing): DO NOT meaningfully decay. Someone who sourced 8 years ago and has continuously recruited since then is NOT a decayed sourcer.
+   - Domain knowledge (a vertical/industry): persists. Someone who worked in defense 10 years ago still understands the domain.
+
+3. Treat tenure-at-depth as evidence of seniority, even when distant. 4 years doing X at company A in 2014-2018 followed by 8 years of adjacent work counts as DEEP X experience, not "dated X experience."
+
+4. Function transitions are NOT skill loss. A candidate who did sourcing 2013-2015 then moved to full-cycle recruiting 2016-present has BOTH sourcing experience AND recruiting experience. Recruiting at scale includes sourcing as a sub-skill.
+
+5. When a JD requires "X years of Y," count cumulative years across the whole resume, not just years in the most recent role labeled Y. Otherwise senior people who diversified their career get unfairly downscored vs juniors who stayed in one lane.
+
+6. The "current company" field is the WEAKEST signal in the profile. It tells you what they're doing this month, not what they're capable of. Weight earlier roles equal-to-or-greater-than current role when the JD is about a function/skill the candidate practiced in those earlier roles.
+
+7. If the candidate's recent role is in a different domain (e.g. they pivoted to AI policy after a decade of recruiting), do NOT assume they have abandoned their prior career. They may be returning, or they may be evaluating both options. Reflect this in `risks_to_probe`, but do NOT zero out the prior decade.
+
+When uncertain, default to giving the candidate credit for stated experience and surface the uncertainty in `risks_to_probe`. A phone screen is cheap; a false-negative on a senior candidate is expensive.
 
 Return ONLY valid JSON with this shape:
 {{
@@ -579,7 +604,7 @@ Rules:
 - recommendation must align with fit_score (90+ = SUBMIT, 60-89 = INTERVIEW, <60 = PASS)
 - extracted_skills: list ALL technical skills the candidate demonstrates, 5-15 entries, one per skill.
   Use canonical names when possible (e.g. "PyTorch" not "Torch", "Apache Spark" not "Spark").
-  recency: "current" (at current job) | "recent" (1-3yr ago) | "dated" (3+ yr ago)
+  recency: "current" (used in last 12 mo) | "recent" (1-5yr ago) | "dated" (5+ yr ago, but still counts as real experience - see grounding rule #2)
   depth: "expert" (taught/designed/deep) | "production" (shipped) | "project" (side work) | "mentioned" (listed only)
   confidence: 0.0-1.0 (how sure you are based on the evidence)
 - No code fences, no preamble. Just JSON.

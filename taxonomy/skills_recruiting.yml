@@ -1,0 +1,278 @@
+# ============================================================
+# Placement-Ops - Recruiting Skill Taxonomy
+# ============================================================
+# Skills that recruiters, sourcers, talent acquisition pros,
+# and people-ops folks actually use. Until this file existed,
+# the matching engine evaluated recruiter candidates against
+# engineering taxonomies and scored everyone at zero.
+#
+# Key adjacency principle: Recruiting and Sourcing overlap
+# heavily. A senior recruiter at a tier-1 tech company has
+# sourcing as a sub-skill, full stop. The taxonomy reflects
+# that with high adjacency scores between the two functions.
+# ============================================================
+
+# -----------------------------------------------
+# CORE RECRUITING FUNCTIONS
+# -----------------------------------------------
+core_recruiting_functions:
+  - name: Technical Sourcing
+    aliases: [technical sourcer, sourcing, candidate sourcing, talent sourcing, passive candidate sourcing]
+    adjacent: [Technical Recruiting, Talent Acquisition, Boolean Search, LinkedIn Recruiter, Engineering Recruiting]
+    weight: high
+
+  - name: Technical Recruiting
+    aliases: [technical recruiter, full-cycle technical recruiting, engineering recruiter, software recruiter]
+    adjacent: [Technical Sourcing, Talent Acquisition, Engineering Recruiting, Executive Search, Full-Cycle Recruiting]
+    weight: high
+
+  - name: Talent Acquisition
+    aliases: [TA, talent acquisition specialist, recruiting, in-house recruiting]
+    adjacent: [Technical Recruiting, Technical Sourcing, Talent Operations, Executive Search]
+    weight: high
+
+  - name: Full-Cycle Recruiting
+    aliases: [full cycle recruiting, end-to-end recruiting, 360 recruiting]
+    adjacent: [Technical Recruiting, Talent Acquisition, Candidate Closing, Technical Sourcing]
+    weight: high
+
+  - name: Engineering Recruiting
+    aliases: [engineering recruiter, software engineering recruiting, eng recruiting]
+    adjacent: [Technical Recruiting, Technical Sourcing, Hardware Recruiting]
+    weight: high
+
+  - name: Executive Search
+    aliases: [exec search, retained search, leadership recruiting, executive recruiting]
+    adjacent: [Technical Recruiting, Talent Acquisition]
+    weight: medium
+
+  - name: Agency Recruiting
+    aliases: [contingency recruiting, third-party recruiting, recruiting agency, staffing]
+    adjacent: [Technical Recruiting, Technical Sourcing, Full-Cycle Recruiting]
+    weight: medium
+
+  - name: Hardware Recruiting
+    aliases: [hardware recruiter, embedded recruiting, electrical engineering recruiting]
+    adjacent: [Engineering Recruiting, Technical Recruiting, Defense Recruiting]
+    weight: medium
+
+  - name: Defense Recruiting
+    aliases: [cleared recruiting, government contract recruiting, defense talent acquisition, aerospace recruiting]
+    adjacent: [Hardware Recruiting, Engineering Recruiting, Cleared Talent Network]
+    weight: medium
+
+# -----------------------------------------------
+# SOURCING METHODS & TECHNIQUES
+# -----------------------------------------------
+sourcing_methods:
+  - name: Boolean Search
+    aliases: [boolean strings, boolean operators, boolean syntax]
+    adjacent: [LinkedIn Recruiter, X-Ray Search, GitHub Sourcing, Google Dorking]
+    weight: high
+
+  - name: X-Ray Search
+    aliases: [xray search, x-ray sourcing, google x-ray, advanced google search]
+    adjacent: [Boolean Search, Google Dorking, GitHub Sourcing]
+    weight: high
+
+  - name: Google Dorking
+    aliases: [google dorks, advanced search operators]
+    adjacent: [Boolean Search, X-Ray Search]
+    weight: medium
+
+  - name: GitHub Sourcing
+    aliases: [github mining, github recruiter, code-based sourcing, repo mining]
+    adjacent: [Boolean Search, X-Ray Search, Open Source Sourcing]
+    weight: medium
+
+  - name: Passive Candidate Engagement
+    aliases: [passive sourcing, passive outreach, candidate engagement]
+    adjacent: [Technical Sourcing, Cold Outreach, InMail]
+    weight: high
+
+  - name: Cold Outreach
+    aliases: [cold email, cold messaging, outbound recruiting]
+    adjacent: [InMail, Passive Candidate Engagement, Email Sequences]
+    weight: high
+
+  - name: InMail
+    aliases: [linkedin inmail, linkedin messaging]
+    adjacent: [LinkedIn Recruiter, Cold Outreach, Passive Candidate Engagement]
+    weight: medium
+
+  - name: Talent Pipeline Building
+    aliases: [pipeline development, talent pipelining, candidate pipelining, warm bench]
+    adjacent: [Technical Sourcing, Passive Candidate Engagement]
+    weight: high
+
+  - name: Competitive Intelligence
+    aliases: [comp intel, competitive sourcing, market mapping, talent mapping]
+    adjacent: [Talent Pipeline Building, Market Research]
+    weight: medium
+
+# -----------------------------------------------
+# RECRUITING TOOLS - ATS & PLATFORMS
+# -----------------------------------------------
+recruiting_tools_ats:
+  - name: LinkedIn Recruiter
+    aliases: [LinkedIn Recruiter Lite, LinkedIn Talent Solutions, LIR]
+    adjacent: [Boolean Search, InMail, Technical Sourcing, LinkedIn Talent Insights]
+    weight: high
+
+  - name: Greenhouse
+    aliases: [greenhouse ATS, greenhouse io, greenhouse software]
+    adjacent: [Lever, Workable, Ashby, ATS]
+    weight: high
+
+  - name: Lever
+    aliases: [lever ATS, lever io]
+    adjacent: [Greenhouse, Workable, Ashby, ATS]
+    weight: high
+
+  - name: Workable
+    aliases: [workable ATS]
+    adjacent: [Greenhouse, Lever, ATS]
+    weight: medium
+
+  - name: Ashby
+    aliases: [ashby ATS, ashby hq]
+    adjacent: [Greenhouse, Lever, ATS]
+    weight: medium
+
+  - name: iCIMS
+    aliases: [icims ATS]
+    adjacent: [Greenhouse, Workable, ATS]
+    weight: medium
+
+  - name: Gem
+    aliases: [gem com, gem CRM, gem io]
+    adjacent: [LinkedIn Recruiter, Talent CRM, Sourcing Platform]
+    weight: medium
+
+  - name: Eightfold
+    aliases: [eightfold ai, eightfold talent intelligence]
+    adjacent: [AI Sourcing Tools, Talent CRM]
+    weight: medium
+
+  - name: ATS
+    aliases: [applicant tracking system, applicant tracking, ATS proficiency]
+    adjacent: [Greenhouse, Lever, Workable, Ashby, iCIMS]
+    weight: high
+
+  - name: Talent CRM
+    aliases: [recruiting CRM, candidate CRM, recruitment CRM]
+    adjacent: [Gem, ATS, Talent Pipeline Building]
+    weight: medium
+
+  - name: AI Sourcing Tools
+    aliases: [AI-powered sourcing, AI recruiting tools, AI candidate matching]
+    adjacent: [Eightfold, Gem, Technical Sourcing]
+    weight: medium
+
+# -----------------------------------------------
+# DOMAIN & VERTICAL KNOWLEDGE
+# -----------------------------------------------
+recruiting_domains:
+  - name: Hardware Development Process Knowledge
+    aliases: [hardware engineering knowledge, PCB design awareness, firmware integration, hardware-software co-design]
+    adjacent: [Engineering Recruiting, Hardware Recruiting, Embedded Systems Familiarity]
+    weight: medium
+
+  - name: Embedded Systems Familiarity
+    aliases: [embedded software knowledge, RTOS familiarity, firmware familiarity]
+    adjacent: [Hardware Development Process Knowledge, Hardware Recruiting]
+    weight: medium
+
+  - name: Defense Aerospace Domain Knowledge
+    aliases: [defense domain, aerospace domain, UAV knowledge, UAS knowledge, weapons systems knowledge]
+    adjacent: [Defense Recruiting, Government Contracting Knowledge, Hardware Recruiting]
+    weight: high
+
+  - name: Government Contracting Knowledge
+    aliases: [GovCon, ITAR awareness, government contracting, federal contracting]
+    adjacent: [Defense Aerospace Domain Knowledge, Defense Recruiting, Cleared Talent Network]
+    weight: medium
+
+  - name: Cleared Talent Network
+    aliases: [TS/SCI network, security clearance network, cleared engineer network]
+    adjacent: [Defense Recruiting, Government Contracting Knowledge, Defense Aerospace Domain Knowledge]
+    weight: medium
+
+  - name: Data Engineering Recruiting Knowledge
+    aliases: [data infrastructure recruiting, data platform recruiting, data engineering domain]
+    adjacent: [Technical Recruiting, ML Engineering Recruiting]
+    weight: medium
+
+  - name: ML Engineering Recruiting Knowledge
+    aliases: [ML recruiting, AI recruiting, machine learning recruiting]
+    adjacent: [Data Engineering Recruiting Knowledge, Technical Recruiting]
+    weight: medium
+
+  - name: Startup Recruiting Playbook
+    aliases: [early-stage recruiting, hypergrowth recruiting, series A recruiting, series B recruiting]
+    adjacent: [Full-Cycle Recruiting, Technical Sourcing]
+    weight: medium
+
+# -----------------------------------------------
+# RECRUITING CRAFT & SOFT SKILLS
+# -----------------------------------------------
+recruiting_craft:
+  - name: Candidate Engagement
+    aliases: [candidate experience, candidate relationship, candidate communication]
+    adjacent: [Passive Candidate Engagement, Cold Outreach, Candidate Closing]
+    weight: high
+
+  - name: Candidate Closing
+    aliases: [closing candidates, offer negotiation, candidate persuasion]
+    adjacent: [Candidate Engagement, Full-Cycle Recruiting, Negotiation]
+    weight: high
+
+  - name: Hiring Manager Partnership
+    aliases: [HM partnership, stakeholder management, recruiter-HM alignment, intake meetings]
+    adjacent: [Talent Acquisition, Technical Recruiting]
+    weight: high
+
+  - name: Interview Design
+    aliases: [interview process design, interview rubric, structured interviewing, hiring framework]
+    adjacent: [Hiring Manager Partnership, Technical Recruiting, Bias Reduction]
+    weight: medium
+
+  - name: Bias Reduction
+    aliases: [unconscious bias, structured interviewing, fair hiring, DEI recruiting]
+    adjacent: [Interview Design, DEI Recruiting]
+    weight: medium
+
+  - name: DEI Recruiting
+    aliases: [diversity recruiting, diversity sourcing, inclusive hiring]
+    adjacent: [Bias Reduction, Technical Sourcing]
+    weight: medium
+
+  - name: Recruiting Analytics
+    aliases: [recruiting metrics, pipeline analytics, sourcing analytics, time-to-hire metrics]
+    adjacent: [Data-Driven Recruiting, Talent Operations]
+    weight: medium
+
+  - name: Data-Driven Recruiting
+    aliases: [data-driven sourcing, metrics-driven recruiting, analytics-driven hiring]
+    adjacent: [Recruiting Analytics, Talent Operations]
+    weight: medium
+
+  - name: Talent Operations
+    aliases: [talent ops, recruiting operations, TA ops]
+    adjacent: [Recruiting Analytics, Talent Acquisition]
+    weight: medium
+
+  - name: Market Research
+    aliases: [talent market research, market intelligence, talent mapping]
+    adjacent: [Competitive Intelligence, Recruiting Analytics]
+    weight: medium
+
+  - name: Negotiation
+    aliases: [salary negotiation, offer negotiation, comp negotiation]
+    adjacent: [Candidate Closing, Selling to Executives]
+    weight: medium
+
+  - name: Selling to Executives
+    aliases: [executive selling, exec presence, stakeholder selling]
+    adjacent: [Hiring Manager Partnership, Negotiation]
+    weight: low

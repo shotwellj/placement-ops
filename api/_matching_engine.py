@@ -50,11 +50,18 @@ IMPORTANCE_WEIGHTS = {
 }
 
 # Recency decay (Step 2)
+# Rebalanced 2026-05-20: senior candidates with multi-decade careers were
+# getting unfairly punished for skills they used heavily 5-10 years ago.
+# Process/craft skills (recruiting, sourcing, sales, management) don't
+# decay the way coding frameworks do. A more graceful curve here, plus
+# the AI eval prompt's grounding rules, fixes the recency over-penalty
+# without a full skill-class taxonomy. If we still see false-negatives
+# on senior candidates after this, the next step is per-skill decay_class.
 RECENCY_WEIGHTS = {
     "current": 1.0,
-    "recent": 0.8,
-    "dated": 0.5,
-    "unclear": 0.5,        # be charitable but not generous
+    "recent": 0.85,         # was 0.8 - the 1-5yr window is still very real experience
+    "dated": 0.75,          # was 0.5 - 5+ year skills are real, not zero
+    "unclear": 0.5,         # be skeptical of unknowns, not generous
 }
 
 # Depth multiplier (Step 2)
